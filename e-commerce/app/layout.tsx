@@ -7,7 +7,7 @@ import Footer from "./components/footer/Footer";
 const poppins = Poppins({ subsets: ["latin"], weight: ["400", "700"] });
 
 export const metadata: Metadata = {
-  title: "E-Commerce",
+  title: "SGTech",
   description: "ECommerce Application",
 };
 
