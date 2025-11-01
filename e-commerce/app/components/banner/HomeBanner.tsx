@@ -8,6 +8,7 @@ interface Slide {
   title: string;
   description: string;
   buttonText: string;
+  link?: string;
 }
 
 const HomeBanner = () => {
@@ -20,6 +21,7 @@ const HomeBanner = () => {
       title: "Latest Products",
       description: "Discover our newest and best products",
       buttonText: "View Now",
+      link: "/products",
     },
     {
       id: 2,
@@ -27,6 +29,7 @@ const HomeBanner = () => {
       title: "Special Promotion",
       description: "Up to 50% off on all products",
       buttonText: "Shop Now",
+      link: "/products",
     },
     {
       id: 3,
@@ -34,10 +37,11 @@ const HomeBanner = () => {
       title: "Customer Service",
       description: "We are always ready to support you 24/7",
       buttonText: "Contact Us",
+      link: "/#footer",
     },
-     {
+    {
       id: 4,
-      image: "/Image/banner3.jpg",
+      image: "/Image/banner4.jpg",
       title: "Customer Service",
       description: "We are always ready to support you 24/7",
       buttonText: "Contact Us",
@@ -54,6 +58,12 @@ const HomeBanner = () => {
 
   const goToSlide = (index: number) => {
     setCurrentSlide(index);
+  };
+
+  const handleButtonClick = (link?: string) => {
+    if (link) {
+      window.location.href = link;
+    }
   };
 
   // Auto-play functionality
@@ -81,7 +91,9 @@ const HomeBanner = () => {
             <div className={styles.slideContent}>
               <h2>{slide.title}</h2>
               <p>{slide.description}</p>
-              <button>{slide.buttonText}</button>
+              <button onClick={() => handleButtonClick(slide.link)}>
+                {slide.buttonText}
+              </button>
             </div>
           </div>
         ))}

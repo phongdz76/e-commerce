@@ -5,7 +5,6 @@ import Image from "next/image";
 import { MdFacebook } from "react-icons/md";
 import { FaTwitter, FaInstagram, FaYoutube } from "react-icons/fa";
 
-
 const Footer = () => {
   return (
     <footer
@@ -15,7 +14,10 @@ const Footer = () => {
     mt-10"
     >
       <Container>
-        <div className="flex flex-col md:flex-row justify-between pt-16 pb-8">
+        <div
+          id="footer"
+          className="flex flex-col md:flex-row justify-between pt-16 pb-8"
+        >
           <FooterList>
             <Link href="/" className={`text-2xl font-bold text-black mb-2`}>
               <span className="text-white">SG</span>
@@ -28,20 +30,40 @@ const Footer = () => {
 
           <FooterList>
             <div className="font-bold text-lg">Shop Categories</div>
-            <Link href="#" className="hover:text-teal-400 transition-colors">Phones</Link>
-            <Link href="#" className="hover:text-teal-400 transition-colors">Laptops</Link>
-            <Link href="#" className="hover:text-teal-400 transition-colors">Desktops</Link>
-            <Link href="#" className="hover:text-teal-400 transition-colors">Watches</Link>
-            <Link href="#" className="hover:text-teal-400 transition-colors">TVs</Link>
-            <Link href="#" className="hover:text-teal-400 transition-colors">Accessories</Link>
+            <Link href="#" className="hover:text-teal-400 transition-colors">
+              Phones
+            </Link>
+            <Link href="#" className="hover:text-teal-400 transition-colors">
+              Laptops
+            </Link>
+            <Link href="#" className="hover:text-teal-400 transition-colors">
+              Desktops
+            </Link>
+            <Link href="#" className="hover:text-teal-400 transition-colors">
+              Watches
+            </Link>
+            <Link href="#" className="hover:text-teal-400 transition-colors">
+              TVs
+            </Link>
+            <Link href="#" className="hover:text-teal-400 transition-colors">
+              Accessories
+            </Link>
           </FooterList>
 
           <FooterList>
             <div className="font-bold text-lg">Customer Service</div>
-            <Link href="#" className="hover:text-teal-400 transition-colors">Contact Us</Link>
-            <Link href="#" className="hover:text-teal-400 transition-colors">Returns & Exchanges</Link>
-            <Link href="#" className="hover:text-teal-400 transition-colors">Shipping Policy</Link>
-            <Link href="#" className="hover:text-teal-400 transition-colors">FAQs</Link>
+            <Link href="#" className="hover:text-teal-400 transition-colors">
+              Contact Us
+            </Link>
+            <Link href="#" className="hover:text-teal-400 transition-colors">
+              Returns & Exchanges
+            </Link>
+            <Link href="#" className="hover:text-teal-400 transition-colors">
+              Shipping Policy
+            </Link>
+            <Link href="#" className="hover:text-teal-400 transition-colors">
+              FAQs
+            </Link>
           </FooterList>
 
           <FooterList>
@@ -56,9 +78,9 @@ const Footer = () => {
                 priority={true}
               />
               <p className="text-xs">Scan to follow us</p>
-              
+
               <div className="flex gap-4 items-center">
-                <Link 
+                <Link
                   href="https://www.facebook.com/profile.php?id=100058767700619&mibextid=LQQJ4d"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -66,33 +88,31 @@ const Footer = () => {
                 >
                   <MdFacebook size={24} />
                 </Link>
-                <Link 
-                  href="#" 
+                <Link
+                  href="#"
                   className="text-teal-400 hover:text-white transition-colors flex items-center gap-1"
                 >
-                  <FaTwitter size={20} />
+                  <FaTwitter size={24} />
                 </Link>
-                <Link 
-                  href="https://www.instagram.com/__tphong7684/" 
+                <Link
+                  href="https://www.instagram.com/__tphong7684/"
                   className="text-teal-400 hover:text-white transition-colors flex items-center gap-1"
                 >
-                  <FaInstagram size={20} />
+                  <FaInstagram size={24} />
                 </Link>
-                <Link 
-                  href="https://www.youtube.com/@PhongNguyen-ch9hv" 
+                <Link
+                  href="https://www.youtube.com/@PhongNguyen-ch9hv"
                   className="text-teal-400 hover:text-white transition-colors flex items-center gap-1"
                 >
-                  <FaYoutube size={20} />
+                  <FaYoutube size={24} />
                 </Link>
               </div>
             </div>
           </FooterList>
         </div>
-        
+
         <div className="border-t border-slate-600 pt-4 text-center">
-          <p>
-            &copy; {new Date().getFullYear()} SGTech. All rights reserved.
-          </p>
+          <p>&copy; {new Date().getFullYear()} SGTech. All rights reserved.</p>
         </div>
       </Container>
     </footer>

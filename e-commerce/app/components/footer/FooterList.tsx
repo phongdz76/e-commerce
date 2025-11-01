@@ -1,10 +1,11 @@
 interface FooterListProps {
-    children?: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 const FooterList: React.FC<FooterListProps> = ({ children }) => {
   return (
-  <div className="
+    <div
+      className="
   w-full
   sm:w-1/2
   md:w-1/4
@@ -13,10 +14,11 @@ const FooterList: React.FC<FooterListProps> = ({ children }) => {
   flex
   flex-col
   gap-2
-  ">
-    {children}
-  </div>
-);
+  "
+    >
+      {children}
+    </div>
+  );
 };
 
 export default FooterList;
