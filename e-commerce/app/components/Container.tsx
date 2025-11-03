@@ -2,7 +2,7 @@ interface ContainerProps {
     children: React.ReactNode;
 }
 
-const Container: React.FC<ContainerProps> = ({ children }) => {
+const Container: React.FC<ContainerProps> = ({ children }: any) => {
     return (
         <div className="
         max-w-[1920px] 
