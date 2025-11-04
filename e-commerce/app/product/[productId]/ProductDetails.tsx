@@ -4,6 +4,8 @@ import { Rating } from "@mui/material";
 import { formatPrice } from "@/utils/formatPrice";
 import { useCallback, useState } from "react";
 import SetColor from "@/app/components/products/SetColor";
+import SetQuantity from "@/app/components/products/SetQuantity";
+import Button from "@/app/components/Button";
 
 interface ProductDetailsProps {
   product: any;
@@ -60,7 +62,25 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
     [cartProduct.selectedImg]
   );
 
-  // console.log(cartProduct);
+  const handleQtyDecreaser = useCallback(() => {
+    if (cartProduct.quantity === 1) {
+      return;
+    }
+    setCartProduct((prev) => ({
+      ...prev,
+      quantity: prev.quantity > 1 ? prev.quantity - 1 : 1,
+    }));
+  }, [cartProduct.quantity]);
+
+  const handleQtyIncreaser = useCallback(() => {
+    if (cartProduct.quantity >= 10) {
+      return;
+    }
+    setCartProduct((prev) => ({
+      ...prev,
+      quantity: prev.quantity + 1,
+    }));
+  }, [cartProduct.quantity]);
 
   const productRating =
     product.reviews.reduce((acc: number, item: any) => acc + item.rating, 0) /
@@ -111,9 +131,18 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
           handColorSelect={handColorSelect}
         ></SetColor>
         <Horizontal />
-        <div>QUANTITY</div>
+        <SetQuantity
+          cartProduct={cartProduct}
+          handleQtyIncreaser={handleQtyIncreaser}
+          handleQtyDecreaser={handleQtyDecreaser}
+        ></SetQuantity>
         <Horizontal />
-        <div>ADD TO CART</div>
+        <div>
+          <Button
+            label="ADD TO CART"
+            onClick={() => console.log("Add to cart clicked")}
+          />
+        </div>
       </div>
     </div>
   );
