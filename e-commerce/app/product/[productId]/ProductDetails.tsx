@@ -6,6 +6,8 @@ import { useCallback, useState } from "react";
 import SetColor from "@/app/components/products/SetColor";
 import SetQuantity from "@/app/components/products/SetQuantity";
 import Button from "@/app/components/Button";
+import ProductImage from "@/app/components/products/ProductImage";
+import { useCart } from "@/app/hooks/useCart";
 
 interface ProductDetailsProps {
   product: any;
@@ -33,7 +35,7 @@ const Horizontal = () => (
     <div
       role="separator"
       aria-hidden="true"
-      className="w-[40%] h-1 rounded-full bg-gray-300"
+      className="w-[35%] h-1 rounded-full bg-gray-300"
     />
   </div>
 );
@@ -92,13 +94,12 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
     md:grid-cols-2 gap-12
     "
     >
-      <div>
-        <img
-          src={product.images[0].image}
-          alt={product.name}
-          className="w-70 h-auto object-contain"
-        />
-      </div>
+      <ProductImage
+        cartProduct={cartProduct}
+        product={product}
+        handleColorSelect={handColorSelect}
+      ></ProductImage>
+
       <div className="flex flex-col gap-1 text-slate-700 text-sm">
         <h2 className="text-3xl font-medium">{product.name}</h2>
         <div className="flex items-center gap-2">
@@ -137,7 +138,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
           handleQtyDecreaser={handleQtyDecreaser}
         ></SetQuantity>
         <Horizontal />
-        <div>
+        <div className="max-w-[300px]">
           <Button
             label="ADD TO CART"
             onClick={() => console.log("Add to cart clicked")}

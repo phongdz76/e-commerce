@@ -31,7 +31,7 @@ export default function Button({
         rounded-md
         hover:opacity-80
         transition
-        w-full
+        w-[70%]
         border-slate-700
         flex
         items-center

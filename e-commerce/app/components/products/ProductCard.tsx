@@ -4,7 +4,7 @@ import { formatPrice } from "@/utils/formatPrice";
 import { truncateText } from "@/utils/truncateText";
 import { Rating } from "@mui/material";
 import Link from "next/link";
-import { useState } from "react";
+import Image from "next/image";
 
 interface ProductCardProps {
   data?: any;
@@ -50,11 +50,12 @@ export default function ProductCard({ data }: ProductCardProps) {
         justify-between
       "
         >
-          <div className="aspect-square w-full overflow-hidden flex items-center justify-center min-h-[140px] bg-transparent p-0">
-            <img
+          <div className="aspect-square w-full overflow-hidden flex items-center justify-center min-h-[140px] bg-transparent p-0 relative">
+            <Image
               src={data?.images?.[0]?.image}
               alt={data?.name ?? "product"}
-              className="max-w-[70%] max-h-[70%] object-contain"
+              fill
+              className="object-contain p-8"
             />
           </div>
           <div className="mt-4 font-medium">{truncateText(data?.name)}</div>
