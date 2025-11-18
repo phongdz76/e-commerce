@@ -25,13 +25,15 @@ export default function Button({
   return (
     <>
       <button
+        disabled={disabled}
+        onClick={onClick}
         className={`
         disabled:opacity-70
         disabled:cursor-not-allowed
         rounded-md
         hover:opacity-80
         transition
-        w-[70%]
+        w-[100%]
         border-slate-700
         flex
         items-center

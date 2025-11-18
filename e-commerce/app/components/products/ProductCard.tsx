@@ -31,13 +31,14 @@ export default function ProductCard({ data }: ProductCardProps) {
     hover:shadow-lg
     hover:border-slate-300
     text-center
-    text-sm
+    text-xs
     transition-transform duration-300 ease-out
     transform-gpu
     hover:scale-105
     hover:-translate-y-1
     group
     w-full h-full
+    max-w-[200px]
     "
       >
         <div
@@ -50,20 +51,20 @@ export default function ProductCard({ data }: ProductCardProps) {
         justify-between
       "
         >
-          <div className="aspect-square w-full overflow-hidden flex items-center justify-center min-h-[140px] bg-transparent p-0 relative">
+          <div className="aspect-square w-full overflow-hidden flex items-center justify-center min-h-[100px] bg-transparent p-0 relative">
             <Image
               src={data?.images?.[0]?.image}
               alt={data?.name ?? "product"}
               fill
-              className="object-contain p-8"
+              className="object-contain p-2"
             />
           </div>
-          <div className="mt-4 font-medium">{truncateText(data?.name)}</div>
+          <div className="mt-1 font-medium text-xs">{truncateText(data?.name)}</div>
           <div>
-            <Rating value={productRating} readOnly />
+            <Rating value={productRating} readOnly size="small" />
           </div>
-          <div>{data.reviews.length} reviews</div>
-          <div className="font-semibold">{formatPrice(data?.price)}</div>
+          <div className="text-xs">{data.reviews.length} reviews</div>
+          <div className="font-semibold text-sm">{formatPrice(data?.price)}</div>
         </div>
       </div>
     </Link>
