@@ -14,9 +14,11 @@ export default function CartCount() {
       <div>
         <CiShoppingCart size={28} />
       </div>
-      <div className="absolute -top-2 -right-2 rounded-full bg-red-600 w-5 h-5 flex items-center justify-center text-white text-xs font-bold">
-        {cartTotalQty}
-      </div>
+      {cartTotalQty > 0 && (
+        <div className="absolute -top-2 -right-2 rounded-full bg-red-600 w-5 h-5 flex items-center justify-center text-white text-xs font-bold">
+          {cartTotalQty}
+        </div>
+      )}
     </div>
   );
 }
