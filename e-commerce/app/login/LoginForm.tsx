@@ -5,11 +5,13 @@ import Heading from "../components/Headinng";
 import Input from "../components/inputs/Input";
 import { FieldValues, SubmitHandler, useForm } from "react-hook-form";
 import Button from "../components/Button";
-import { on } from "events";
 import Link from "next/link";
 import { AiOutlineGoogle } from "react-icons/ai";
+import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 
-export default function RegisterForm() {
+export default function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const {
     register,
@@ -17,24 +19,39 @@ export default function RegisterForm() {
     formState: { errors },
   } = useForm<FieldValues>({
     defaultValues: {
-      email: "",
+      emailOrUsername: "",
       password: "",
     },
   });
 
-  function onSubmit(data: FieldValues) {
+  const router = useRouter();
+
+  const onSubmit: SubmitHandler<FieldValues> = (data) => {
     setIsLoading(true);
-    console.log(data);
-  }
+    signIn("credentials", {
+      ...data,
+      redirect: false,
+    }).then((callback) => {
+      setIsLoading(false);
+      if (callback?.ok) {
+        router.push("/");
+        router.refresh();
+        toast.success("Logged in successfully!");
+      }
+      if (callback?.error) {
+        toast.error(callback.error);
+      }
+    });
+  };
 
   return (
     <div className="w-full items-center flex flex-col gap-6">
       <Heading title="Login" />
 
       <Input
-        id="email"
-        label="Email"
-        type="email"
+        id="emailOrUsername"
+        label="Email or Username"
+        type="text"
         disabled={isLoading}
         required
         register={register}
@@ -51,8 +68,12 @@ export default function RegisterForm() {
         errors={errors}
       ></Input>
 
+      <Link href="" className="self-end text-sm text-gray-600 hover:underline">
+        Forgot your password?
+      </Link>
+
       <Button
-        label={isLoading ? "Loading" : "Sign Up"}
+        label={isLoading ? "Loading" : "Login"}
         onClick={handleSubmit(onSubmit)}
       ></Button>
 

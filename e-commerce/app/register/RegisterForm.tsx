@@ -8,6 +8,10 @@ import Button from "../components/Button";
 import { on } from "events";
 import Link from "next/link";
 import { AiOutlineGoogle } from "react-icons/ai";
+import axios from "axios";
+import toast from "react-hot-toast";
+import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 export default function RegisterForm() {
   const [isLoading, setIsLoading] = useState(false);
@@ -23,9 +27,36 @@ export default function RegisterForm() {
     },
   });
 
+  const router = useRouter();
+
   function onSubmit(data: FieldValues) {
     setIsLoading(true);
-    console.log(data);
+    axios
+      .post("/api/register", data)
+      .then(() => {
+        toast.success("Account created successfully!");
+        return signIn("credentials", {
+          email: data.email,
+          password: data.password,
+          redirect: false,
+        });
+      })
+      .then((callback) => {
+        if (callback?.ok) {
+          router.push("/");
+          router.refresh();
+          toast.success("Logged in successfully!");
+        }
+        if (callback?.error) {
+          toast.error(callback.error);
+        }
+      })
+      .catch((error) => {
+        toast.error(error?.response?.data?.error || "Something went wrong!");
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   }
 
   return (
