@@ -110,7 +110,9 @@ export default function LoginForm({ currentUser }: LoginFormProps) {
 
       <Button
         label="Continue with Google"
-        onClick={() => {}}
+        onClick={() => {
+          signIn("google");
+        }}
         outline
         icon={AiOutlineGoogle}
       ></Button>

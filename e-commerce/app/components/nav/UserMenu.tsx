@@ -41,7 +41,10 @@ export default function UserMenu({ currentUser }: UserMenuProps) {
         text-slate-700
         "
         >
-          <Avatar sx={{ width: 24, height: 24 }} />
+          <Avatar
+            src={currentUser?.image || undefined}
+            sx={{ width: 24, height: 24 }}
+          />
           <AiFillCaretDown className="text-xs" />
         </div>
         {isOpen && (

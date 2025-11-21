@@ -129,7 +129,9 @@ export default function RegisterForm({ currentUser }: RegisterFormProps) {
 
       <Button
         label="Continue with Google"
-        onClick={() => {}}
+        onClick={() => {
+          signIn("google");
+        }}
         outline
         icon={AiOutlineGoogle}
       ></Button>
