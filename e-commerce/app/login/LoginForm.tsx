@@ -55,7 +55,6 @@ export default function LoginForm({ currentUser }: LoginFormProps) {
         toast.success("Logged in successfully!");
         setShowSuccessMessage(true);
 
-        // Delay 2 giây rồi mới redirect
         setTimeout(() => {
           router.push("/");
           router.refresh();
