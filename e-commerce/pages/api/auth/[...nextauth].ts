@@ -11,6 +11,7 @@ export const authOptions: AuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+      allowDangerousEmailAccountLinking: true,
     }),
     CredentialsProvider({
       name: "credentials",
@@ -55,6 +56,48 @@ export const authOptions: AuthOptions = {
   debug: process.env.NODE_ENV === "development",
   session: { strategy: "jwt" },
   secret: process.env.NEXTAUTH_SECRET,
+  events: {
+    async linkAccount({ user, account, profile }) {
+      // Khi Google account được link, cập nhật thông tin từ Google
+      if (account.provider === "google" && profile?.image) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            image: profile.image,
+            emailVerified: new Date(),
+          },
+        });
+      }
+    },
+  },
+  callbacks: {
+    async jwt({ token, user, account }) {
+      // Khi đăng nhập lần đầu, gán thông tin từ account và user
+      if (account && user) {
+        return {
+          ...token,
+          accessToken: account.access_token,
+          idToken: account.id_token,
+          expiresIn: account.expires_at,
+          userId: user.id,
+        };
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      // Gán thông tin token vào session để client có thể truy cập
+      return {
+        ...session,
+        accessToken: token.accessToken,
+        idToken: token.idToken,
+        expiresIn: token.expiresIn,
+        user: {
+          ...session.user,
+          id: token.userId,
+        },
+      };
+    },
+  },
 };
 
 export default NextAuth(authOptions);
