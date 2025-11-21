@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Documentation files (không push lên GitHub)
+PASSWORD_RESET_GUIDE.md
+IMPLEMENTATION_SUMMARY.md
