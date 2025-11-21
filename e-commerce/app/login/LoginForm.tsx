@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Heading from "../components/Headinng";
 import Input from "../components/inputs/Input";
 import { FieldValues, SubmitHandler, useForm } from "react-hook-form";
@@ -10,9 +10,16 @@ import { AiOutlineGoogle } from "react-icons/ai";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { safeUser } from "@/types";
 
-export default function LoginForm() {
+interface LoginFormProps {
+  currentUser: safeUser | null;
+}
+
+export default function LoginForm({ currentUser }: LoginFormProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+
   const {
     register,
     handleSubmit,
@@ -26,6 +33,17 @@ export default function LoginForm() {
 
   const router = useRouter();
 
+  useEffect(() => {
+    if (currentUser) {
+      const timer = setTimeout(() => {
+        router.push("/");
+        router.refresh();
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [currentUser, router]);
+
   const onSubmit: SubmitHandler<FieldValues> = (data) => {
     setIsLoading(true);
     signIn("credentials", {
@@ -34,15 +52,29 @@ export default function LoginForm() {
     }).then((callback) => {
       setIsLoading(false);
       if (callback?.ok) {
-        router.push("/");
-        router.refresh();
         toast.success("Logged in successfully!");
+        setShowSuccessMessage(true);
+
+        // Delay 2 giây rồi mới redirect
+        setTimeout(() => {
+          router.push("/");
+          router.refresh();
+        }, 3000);
       }
       if (callback?.error) {
         toast.error(callback.error);
       }
     });
   };
+
+  if (currentUser || showSuccessMessage) {
+    return (
+      <div className="w-full text-center py-6 flex flex-col gap-4">
+        <p className="text-lg">You are already logged in</p>
+        <p className="text-sm text-gray-500">Redirecting to home page...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full items-center flex flex-col gap-6">

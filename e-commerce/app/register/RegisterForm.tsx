@@ -1,20 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Heading from "../components/Headinng";
 import Input from "../components/inputs/Input";
 import { FieldValues, SubmitHandler, useForm } from "react-hook-form";
 import Button from "../components/Button";
-import { on } from "events";
 import Link from "next/link";
 import { AiOutlineGoogle } from "react-icons/ai";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { safeUser } from "@/types";
 
-export default function RegisterForm() {
+interface RegisterFormProps {
+  currentUser: safeUser | null;
+}
+
+export default function RegisterForm({ currentUser }: RegisterFormProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+
   const {
     register,
     handleSubmit,
@@ -29,23 +35,38 @@ export default function RegisterForm() {
 
   const router = useRouter();
 
-  function onSubmit(data: FieldValues) {
+  useEffect(() => {
+    if (currentUser) {
+      const timer = setTimeout(() => {
+        router.push("/");
+        router.refresh();
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [currentUser, router]);
+
+  const onSubmit: SubmitHandler<FieldValues> = (data) => {
     setIsLoading(true);
     axios
       .post("/api/register", data)
       .then(() => {
         toast.success("Account created successfully!");
         return signIn("credentials", {
-          email: data.email,
+          emailOrUsername: data.email,
           password: data.password,
           redirect: false,
         });
       })
       .then((callback) => {
         if (callback?.ok) {
-          router.push("/");
-          router.refresh();
           toast.success("Logged in successfully!");
+          setShowSuccessMessage(true);
+
+          setTimeout(() => {
+            router.push("/");
+            router.refresh();
+          }, 3000);
         }
         if (callback?.error) {
           toast.error(callback.error);
@@ -57,6 +78,15 @@ export default function RegisterForm() {
       .finally(() => {
         setIsLoading(false);
       });
+  };
+
+  if (currentUser || showSuccessMessage) {
+    return (
+      <div className="w-full text-center py-6 flex flex-col gap-4">
+        <p className="text-lg">You are already logged in</p>
+        <p className="text-sm text-gray-500">Redirecting to home page...</p>
+      </div>
+    );
   }
 
   return (

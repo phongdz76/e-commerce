@@ -1,14 +1,14 @@
-"use client";
-
+import { getCurrentUser } from "@/actions/getCurrentUser";
 import Container from "../components/Container";
 import FormWrap from "../components/FormWrap";
 import LoginForm from "./LoginForm";
 
-export default function Login() {
+export default async function Login() {
+  const currentUser = await getCurrentUser();
   return (
     <Container>
       <FormWrap>
-        <LoginForm />
+        <LoginForm currentUser={currentUser} />
       </FormWrap>
     </Container>
   );
