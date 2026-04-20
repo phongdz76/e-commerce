@@ -7,11 +7,14 @@ import Heading from "../components/Headinng";
 import Button from "../components/Button";
 import ItemContent from "./ItemContent";
 import { formatPrice } from "@/utils/formatPrice";
+import { useRouter } from "next/navigation";
 
 export function CartClient() {
   const { cartProducts } = useCart().context;
   const { handleClearCart } = useCart().context;
   const { cartTotalQtyAmount } = useCart().context;
+  const router = useRouter();
+
   if (!cartProducts || cartProducts.length === 0) {
     return (
       <div className="flex flex-col items-center">
@@ -62,7 +65,10 @@ export function CartClient() {
           <p className="text-slate-500">
             Taxes and shipping calculated at checkout
           </p>
-          <Button label="Proceed to Checkout" onClick={() => {}}></Button>
+          <Button
+            label="Proceed to Checkout"
+            onClick={() => router.push("/checkout")}
+          ></Button>
           <Link
             href="/"
             className="text-slate-500 flex items-center gap-1 mt-2"

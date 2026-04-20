@@ -7,6 +7,7 @@ import {
 } from "react";
 import { CartProductProps } from "../product/[productId]/ProductDetails";
 import toast, { Toast } from "react-hot-toast";
+import { set } from "react-hook-form";
 
 type CartContextType = {
   cartTotalQty: number;
@@ -17,6 +18,8 @@ type CartContextType = {
   handleQtyDecreaser: (product: CartProductProps) => void;
   handleQtyIncreaser: (product: CartProductProps) => void;
   handleClearCart: () => void;
+  handleSetPaymentIntent: (val: string) => void;
+  paymentIntent: string | null;
 };
 
 export const CartContext = createContext<CartContextType | null>(null);
@@ -29,16 +32,18 @@ export const CartContextProvider = (props: Props) => {
   const [cartTotalQtyAmount, setCartTotalQtyAmount] = useState(0);
   const [cartTotalQty, setCartTotalQty] = useState(0);
   const [cartProducts, setCartProducts] = useState<CartProductProps[] | null>(
-    null
+    null,
   );
-
-  // console.log("qty", cartTotalQty);
-  // console.log("amount", cartTotalQtyAmount);
+  const [paymentIntent, setPaymentIntent] = useState<string | null>(null);
 
   useEffect(() => {
     const cartItems: any = localStorage.getItem("CartItems");
     const cProducts: CartProductProps[] | null = JSON.parse(cartItems);
+    const savedPaymentIntent: any = localStorage.getItem("savedPaymentIntent");
+    const paymentIntent: string | null = JSON.parse(savedPaymentIntent);
+
     setCartProducts(cProducts);
+    setPaymentIntent(paymentIntent);
   }, []);
 
   useEffect(() => {
@@ -58,7 +63,7 @@ export const CartContextProvider = (props: Props) => {
         {
           total: 0,
           qty: 0,
-        }
+        },
       );
       setCartTotalQty(qty);
       setCartTotalQtyAmount(total);
@@ -91,14 +96,14 @@ export const CartContextProvider = (props: Props) => {
     (product: CartProductProps) => {
       if (cartProducts) {
         const filteredProducts = cartProducts.filter(
-          (item) => item.id !== product.id
+          (item) => item.id !== product.id,
         );
         setCartProducts(filteredProducts);
         toast.success("Product removed from cart!");
         localStorage.setItem("CartItems", JSON.stringify(filteredProducts));
       }
     },
-    [cartProducts]
+    [cartProducts],
   );
 
   const handleQtyDecreaser = useCallback(
@@ -110,7 +115,7 @@ export const CartContextProvider = (props: Props) => {
       if (cartProducts) {
         updatedCart = [...cartProducts];
         const existingIndex = updatedCart.findIndex(
-          (item) => item.id === product.id
+          (item) => item.id === product.id,
         );
         if (existingIndex > -1) {
           updatedCart[existingIndex].quantity -= 1;
@@ -119,7 +124,7 @@ export const CartContextProvider = (props: Props) => {
         localStorage.setItem("CartItems", JSON.stringify(updatedCart));
       }
     },
-    [cartProducts]
+    [cartProducts],
   );
 
   const handleQtyIncreaser = useCallback(
@@ -132,7 +137,7 @@ export const CartContextProvider = (props: Props) => {
       if (cartProducts) {
         updatedCart = [...cartProducts];
         const existingIndex = updatedCart.findIndex(
-          (item) => item.id === product.id
+          (item) => item.id === product.id,
         );
 
         if (existingIndex > -1) {
@@ -143,24 +148,36 @@ export const CartContextProvider = (props: Props) => {
         localStorage.setItem("CartItems", JSON.stringify(updatedCart));
       }
     },
-    [cartProducts]
+    [cartProducts],
   );
 
   const handleClearCart = useCallback(() => {
     setCartProducts(null);
+    setPaymentIntent(null);
     localStorage.removeItem("CartItems");
+    localStorage.removeItem("savedPaymentIntent");
     setCartTotalQty(0);
   }, [cartProducts]);
+
+  const handleSetPaymentIntent = useCallback(
+    (val: string) => {
+      setPaymentIntent(val);
+      localStorage.setItem("savedPaymentIntent", JSON.stringify(val));
+    },
+    [paymentIntent],
+  );
 
   const value = {
     cartTotalQty,
     cartTotalQtyAmount,
     cartProducts,
+    paymentIntent,
     handleAddProductToCart,
     handleRemoveProductFromCart,
     handleQtyDecreaser,
     handleQtyIncreaser,
     handleClearCart,
+    handleSetPaymentIntent,
   };
   return <CartContext.Provider value={value} {...props}></CartContext.Provider>;
 };

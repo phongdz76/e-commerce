@@ -5,6 +5,30 @@ import prisma from "../../../libs/prismadb";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcrypt";
 
+const getGoogleProfileImage = (profile: unknown): string | null => {
+  if (!profile || typeof profile !== "object") {
+    return null;
+  }
+
+  const parsedProfile = profile as { picture?: unknown; image?: unknown };
+
+  if (
+    typeof parsedProfile.picture === "string" &&
+    parsedProfile.picture.trim().length > 0
+  ) {
+    return parsedProfile.picture;
+  }
+
+  if (
+    typeof parsedProfile.image === "string" &&
+    parsedProfile.image.trim().length > 0
+  ) {
+    return parsedProfile.image;
+  }
+
+  return null;
+};
+
 export const authOptions: AuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
@@ -39,7 +63,7 @@ export const authOptions: AuthOptions = {
 
         const isCorrectPassword = await compare(
           credentials.password,
-          user.hashedPassword
+          user.hashedPassword,
         );
 
         if (!isCorrectPassword) {
@@ -59,11 +83,13 @@ export const authOptions: AuthOptions = {
   events: {
     async linkAccount({ user, account, profile }) {
       // Khi Google account được link, cập nhật thông tin từ Google
-      if (account.provider === "google" && profile?.image) {
+      const googleProfileImage = getGoogleProfileImage(profile);
+
+      if (account.provider === "google" && googleProfileImage) {
         await prisma.user.update({
           where: { id: user.id },
           data: {
-            image: profile.image,
+            image: googleProfileImage,
             emailVerified: new Date(),
           },
         });
@@ -71,6 +97,24 @@ export const authOptions: AuthOptions = {
     },
   },
   callbacks: {
+    async signIn({ user, account, profile }) {
+      if (account?.provider === "google" && user.id) {
+        const googleProfileImage = getGoogleProfileImage(profile);
+
+        if (googleProfileImage && googleProfileImage !== user.image) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: {
+              image: googleProfileImage,
+              emailVerified: new Date(),
+            },
+          });
+        }
+      }
+
+      return true;
+    },
+
     async jwt({ token, user, account }) {
       // Khi đăng nhập lần đầu, gán thông tin từ account và user
       if (account && user) {
