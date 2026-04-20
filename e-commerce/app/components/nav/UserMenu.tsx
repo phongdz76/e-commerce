@@ -8,6 +8,7 @@ import MenuItem from "./MenuItem";
 import { signOut } from "next-auth/react";
 import BackDrop from "./BackDrop";
 import { safeUser } from "@/types";
+import { getCurrentUser } from "@/actions/getCurrentUser";
 
 interface UserMenuProps {
   currentUser: safeUser | null;
@@ -68,9 +69,14 @@ export default function UserMenu({ currentUser }: UserMenuProps) {
                 <Link href="/orders">
                   <MenuItem onClick={toggleOpen}>Your Orders</MenuItem>
                 </Link>
-                <Link href="/admin">
-                  <MenuItem onClick={toggleOpen}>Admin Dashboard</MenuItem>
-                </Link>
+                  <Link href="/profile">
+                    <MenuItem onClick={toggleOpen}>Profile</MenuItem>
+                  </Link>
+                {currentUser?.role === "ADMIN" && (
+                  <Link href="/admin">
+                    <MenuItem onClick={toggleOpen}>Admin Dashboard</MenuItem>
+                  </Link>
+                )}
                 <hr />
                 <MenuItem
                   onClick={() => {
