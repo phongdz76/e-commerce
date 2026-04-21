@@ -50,6 +50,8 @@ const normalizeOptionalText = (rawValue: unknown): string | null => {
 };
 
 const mapProfileResponse = (user: User) => {
+  const hasPassword = Boolean(user.hashedPassword);
+
   return {
     id: user.id,
     name: user.name,
@@ -62,7 +64,8 @@ const mapProfileResponse = (user: User) => {
     emailVerified: user.emailVerified,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
-    hasPassword: Boolean(user.hashedPassword),
+    hasPassword,
+    requiresPasswordSetup: !hasPassword,
   };
 };
 
@@ -189,6 +192,18 @@ export async function PATCH(request: Request) {
 
     if (!user) {
       return NextResponse.json({ message: "User not found" }, { status: 404 });
+    }
+
+    if (!user.hashedPassword && !newPassword) {
+      return NextResponse.json(
+        {
+          message:
+            "This account uses Google Sign-In. Please set a password before saving profile changes.",
+          code: "PASSWORD_SETUP_REQUIRED",
+          requiresPasswordSetup: true,
+        },
+        { status: 400 },
+      );
     }
 
     const updateData: {

@@ -27,6 +27,8 @@ const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 const PASSWORD_REGEX =
   /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
 const PHONE_REGEX = /^\+?[0-9]{9,15}$/;
+const PASSWORD_HELPER_TEXT =
+  "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.";
 
 const inputClassName =
   "w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:opacity-70";
@@ -36,9 +38,13 @@ const passwordInputClassName =
 
 export default function Profile({ currentUser }: ProfileProps) {
   const router = useRouter();
+  const requiresPasswordSetup = !currentUser.hasPassword;
   const [isLoading, setIsLoading] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [isCurrentPasswordFocused, setIsCurrentPasswordFocused] =
+    useState(false);
+  const [isNewPasswordFocused, setIsNewPasswordFocused] = useState(false);
   const [showAvatarUrlInput, setShowAvatarUrlInput] = useState(false);
 
   const defaultFormValues: ProfileFormValues = {
@@ -54,6 +60,9 @@ export default function Profile({ currentUser }: ProfileProps) {
   const { register, handleSubmit, watch, reset } = useForm<ProfileFormValues>({
     defaultValues: defaultFormValues,
   });
+
+  const currentPasswordField = register("currentPassword");
+  const newPasswordField = register("newPassword");
 
   const avatarPreview = watch("profileImageUrl") || currentUser.image || "";
 
@@ -81,6 +90,13 @@ export default function Profile({ currentUser }: ProfileProps) {
       return;
     }
 
+    if (requiresPasswordSetup && !newPassword) {
+      toast.error(
+        "This account uses Google Sign-In. Please set a password before saving changes.",
+      );
+      return;
+    }
+
     if (newPassword) {
       if (!PASSWORD_REGEX.test(newPassword)) {
         toast.error(
@@ -89,7 +105,7 @@ export default function Profile({ currentUser }: ProfileProps) {
         return;
       }
 
-      if (currentUser.hasPassword && !currentPassword) {
+      if (!requiresPasswordSetup && !currentPassword) {
         toast.error("Current password is required to set a new password");
         return;
       }
@@ -146,6 +162,8 @@ export default function Profile({ currentUser }: ProfileProps) {
     setShowAvatarUrlInput(false);
     setShowCurrentPassword(false);
     setShowNewPassword(false);
+    setIsCurrentPasswordFocused(false);
+    setIsNewPasswordFocused(false);
   };
 
   return (
@@ -219,6 +237,13 @@ export default function Profile({ currentUser }: ProfileProps) {
           />
         </div>
 
+        {requiresPasswordSetup ? (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-blue-700 text-sm leading-6">
+            This account uses Google Sign-In. You can set a password now to also
+            log in with email/password. Current password is not required.
+          </div>
+        ) : null}
+
         <div className="flex flex-col gap-2">
           <label className="text-sm font-medium text-slate-700">Address</label>
           <input
@@ -243,44 +268,66 @@ export default function Profile({ currentUser }: ProfileProps) {
           />
         </div>
 
-        <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-slate-700">
-            Current Password
-          </label>
-          <div className="relative">
-            <input
-              type={showCurrentPassword ? "text" : "password"}
-              className={passwordInputClassName}
-              disabled={isLoading}
-              placeholder="Required only when setting a new password"
-              {...register("currentPassword")}
-            />
-            <button
-              type="button"
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500"
-              onClick={() => setShowCurrentPassword((prev) => !prev)}
-              disabled={isLoading}
-            >
-              {showCurrentPassword ? (
-                <AiOutlineEyeInvisible size={20} />
-              ) : (
-                <AiOutlineEye size={20} />
-              )}
-            </button>
+        {!requiresPasswordSetup ? (
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-slate-700">
+              Current Password
+            </label>
+            <div className="relative">
+              <input
+                type={showCurrentPassword ? "text" : "password"}
+                className={passwordInputClassName}
+                disabled={isLoading}
+                placeholder="Required only when setting a new password"
+                {...currentPasswordField}
+                onFocus={() => setIsCurrentPasswordFocused(true)}
+                onBlur={(event) => {
+                  currentPasswordField.onBlur(event);
+                  setIsCurrentPasswordFocused(false);
+                }}
+              />
+              <button
+                type="button"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500"
+                onClick={() => setShowCurrentPassword((prev) => !prev)}
+                disabled={isLoading}
+              >
+                {showCurrentPassword ? (
+                  <AiOutlineEyeInvisible size={20} />
+                ) : (
+                  <AiOutlineEye size={20} />
+                )}
+              </button>
+            </div>
+            {isCurrentPasswordFocused ? (
+              <p className="text-sm text-slate-600">{PASSWORD_HELPER_TEXT}</p>
+            ) : null}
           </div>
-        </div>
+        ) : null}
 
         <div className="flex flex-col gap-2">
           <label className="text-sm font-medium text-slate-700">
             New Password
+            {requiresPasswordSetup ? (
+              <span className="text-rose-500"> *</span>
+            ) : null}
           </label>
           <div className="relative">
             <input
               type={showNewPassword ? "text" : "password"}
               className={passwordInputClassName}
               disabled={isLoading}
-              placeholder="Leave blank if you do not want to change password"
-              {...register("newPassword")}
+              placeholder={
+                requiresPasswordSetup
+                  ? "Set a password for your account"
+                  : "Leave blank if you do not want to change password"
+              }
+              {...newPasswordField}
+              onFocus={() => setIsNewPasswordFocused(true)}
+              onBlur={(event) => {
+                newPasswordField.onBlur(event);
+                setIsNewPasswordFocused(false);
+              }}
             />
             <button
               type="button"
@@ -295,6 +342,9 @@ export default function Profile({ currentUser }: ProfileProps) {
               )}
             </button>
           </div>
+          {isNewPasswordFocused ? (
+            <p className="text-sm text-slate-600">{PASSWORD_HELPER_TEXT}</p>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-3 pt-2">
