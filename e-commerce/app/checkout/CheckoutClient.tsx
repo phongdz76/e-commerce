@@ -13,13 +13,20 @@ const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY as string,
 );
 
-export default function CheckoutClient() {
+import { safeUser } from "@/types";
+
+interface CheckoutClientProps {
+  currentUser: safeUser | null;
+}
+
+export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
   const { cartProducts, paymentIntent, handleSetPaymentIntent } =
     useCart().context;
   const [loading, setLoading] = useState<boolean>(false);
   const [clientSecret, setClientSecret] = useState<string>("");
   const [paymentSuccess, setPaymentSuccess] = useState<boolean>(false);
   const [error, setError] = useState<boolean>(false);
+  const [processedCartString, setProcessedCartString] = useState<string | null>(null);
 
   const router = useRouter();
 
@@ -27,7 +34,9 @@ export default function CheckoutClient() {
   console.log("clientSecret in CheckoutClient:", clientSecret);
 
   useEffect(() => {
-    if (cartProducts && cartProducts.length > 0) {
+    const currentCartString = JSON.stringify(cartProducts);
+
+    if (cartProducts && cartProducts.length > 0 && currentCartString !== processedCartString) {
       setLoading(true);
       setError(false);
 
@@ -62,6 +71,7 @@ export default function CheckoutClient() {
             throw new Error("Invalid payment intent response");
           }
 
+          setProcessedCartString(currentCartString);
           handleSetPaymentIntent(data.paymentIntent.id);
           setClientSecret(data.paymentIntent.client_secret);
         })
@@ -72,7 +82,7 @@ export default function CheckoutClient() {
           toast.error("Something went wrong. Please try again.");
         });
     }
-  }, [cartProducts, paymentIntent, handleSetPaymentIntent, router]);
+  }, [cartProducts, paymentIntent, handleSetPaymentIntent, router, processedCartString]);
 
   const options: StripeElementsOptions = {
     clientSecret,
@@ -99,10 +109,11 @@ export default function CheckoutClient() {
           <CheckoutForm
             clientSecret={clientSecret}
             handleSetPaymentSuccess={handlePaymentSuccess}
+            currentUser={currentUser}
           />
         </Elements>
       )}
-      {loading && (
+      {loading && !clientSecret && (
         <div className="w-full text-center py-6">
           <p className="text-lg">Loading checkout...</p>
         </div>

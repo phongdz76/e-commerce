@@ -195,15 +195,24 @@ export async function PATCH(request: Request) {
     }
 
     if (!user.hashedPassword && !newPassword) {
-      return NextResponse.json(
-        {
-          message:
-            "This account uses Google Sign-In. Please set a password before saving profile changes.",
-          code: "PASSWORD_SETUP_REQUIRED",
-          requiresPasswordSetup: true,
-        },
-        { status: 400 },
-      );
+      const isOnlyUpdatingAddressOrPhone = 
+        (address !== undefined || phoneNumber !== undefined) &&
+        username === undefined &&
+        email === undefined &&
+        profileImageUrl === undefined &&
+        currentPassword === undefined;
+        
+      if (!isOnlyUpdatingAddressOrPhone) {
+        return NextResponse.json(
+          {
+            message:
+              "This account uses Google Sign-In. Please set a password before saving profile changes.",
+            code: "PASSWORD_SETUP_REQUIRED",
+            requiresPasswordSetup: true,
+          },
+          { status: 400 },
+        );
+      }
     }
 
     const updateData: {

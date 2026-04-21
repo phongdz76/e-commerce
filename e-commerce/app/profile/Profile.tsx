@@ -3,7 +3,7 @@
 import axios from "axios";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { SubmitHandler, useForm } from "react-hook-form";
 import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai";
@@ -47,6 +47,64 @@ export default function Profile({ currentUser }: ProfileProps) {
   const [isNewPasswordFocused, setIsNewPasswordFocused] = useState(false);
   const [showAvatarUrlInput, setShowAvatarUrlInput] = useState(false);
 
+  // Address States
+  const [useNewAddress, setUseNewAddress] = useState(!currentUser?.address);
+  const [houseNumber, setHouseNumber] = useState("");
+  const [provinces, setProvinces] = useState<any[]>([]);
+  const [districts, setDistricts] = useState<any[]>([]);
+  const [wards, setWards] = useState<any[]>([]);
+  const [province, setProvince] = useState<any>(null);
+  const [district, setDistrict] = useState<any>(null);
+  const [ward, setWard] = useState<any>(null);
+
+  useEffect(() => {
+    fetch("https://provinces.open-api.vn/api/p/")
+      .then((res) => res.json())
+      .then((data) => setProvinces(data))
+      .catch((err) => console.log(err));
+  }, []);
+
+  const handleProvinceChange = (code: string) => {
+    const p = provinces.find((x) => x.code == code);
+    setProvince(p);
+    setDistrict(null);
+    setWard(null);
+    setDistricts([]);
+    setWards([]);
+    if (p) {
+      fetch(`https://provinces.open-api.vn/api/p/${p.code}?depth=2`)
+        .then((res) => res.json())
+        .then((data) => setDistricts(data.districts))
+        .catch((err) => console.log(err));
+    }
+  };
+
+  const handleDistrictChange = (code: string) => {
+    const d = districts.find((x) => x.code == code);
+    setDistrict(d);
+    setWard(null);
+    setWards([]);
+    if (d) {
+      fetch(`https://provinces.open-api.vn/api/d/${d.code}?depth=2`)
+        .then((res) => res.json())
+        .then((data) => setWards(data.wards))
+        .catch((err) => console.log(err));
+    }
+  };
+
+  const handleWardChange = (code: string) => {
+    const w = wards.find((x) => x.code == code);
+    setWard(w);
+  };
+
+  const getFinalAddress = () => {
+    const parts = [houseNumber];
+    if (ward) parts.push(ward.name);
+    if (district) parts.push(district.name);
+    if (province) parts.push(province.name);
+    return parts.filter(Boolean).join(", ");
+  };
+
   const defaultFormValues: ProfileFormValues = {
     username: currentUser.name || "",
     email: currentUser.email || "",
@@ -70,7 +128,7 @@ export default function Profile({ currentUser }: ProfileProps) {
     const username = data.username.trim();
     const email = data.email.trim().toLowerCase();
     const profileImageUrl = data.profileImageUrl.trim();
-    const address = data.address.trim();
+    const finalAddress = useNewAddress ? getFinalAddress().trim() : currentUser?.address;
     const phoneNumber = data.phoneNumber.trim().replace(/\s+/g, "");
     const currentPassword = data.currentPassword;
     const newPassword = data.newPassword.trim();
@@ -118,7 +176,7 @@ export default function Profile({ currentUser }: ProfileProps) {
         username,
         email,
         profileImageUrl: profileImageUrl || null,
-        address: address || null,
+        address: finalAddress || null,
         phoneNumber: phoneNumber || null,
         currentPassword: currentPassword || undefined,
         newPassword: newPassword || undefined,
@@ -127,6 +185,7 @@ export default function Profile({ currentUser }: ProfileProps) {
         const updatedUser = response?.data;
 
         toast.success("Profile updated successfully");
+        setUseNewAddress(false);
         reset({
           username: updatedUser?.username || username,
           email: updatedUser?.email || email,
@@ -244,16 +303,100 @@ export default function Profile({ currentUser }: ProfileProps) {
           </div>
         ) : null}
 
-        <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-slate-700">Address</label>
-          <input
-            type="text"
-            className={inputClassName}
-            disabled={isLoading}
-            placeholder="Street, district, city"
-            {...register("address")}
-          />
-        </div>
+        {!useNewAddress && currentUser?.address ? (
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-slate-700">Address</label>
+            <div className="p-4 rounded-lg border border-slate-300 bg-slate-50 flex justify-between items-center shadow-sm">
+              <span className="text-slate-700">{currentUser.address}</span>
+              <button
+                type="button"
+                className="text-sm text-blue-600 font-medium hover:underline bg-white px-3 py-1 rounded border border-blue-200"
+                onClick={() => setUseNewAddress(true)}
+                disabled={isLoading}
+              >
+                Change
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-slate-700">Province / City</label>
+              <select
+                required
+                value={province?.code || ""}
+                onChange={(e) => handleProvinceChange(e.target.value)}
+                className={inputClassName}
+                disabled={isLoading}
+              >
+                <option value="" disabled>Select Province / City</option>
+                {provinces.map((p) => (
+                  <option key={p.code} value={p.code}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-slate-700">District</label>
+                <select
+                  required
+                  disabled={!province || isLoading}
+                  value={district?.code || ""}
+                  onChange={(e) => handleDistrictChange(e.target.value)}
+                  className={inputClassName}
+                >
+                  <option value="" disabled>Select District</option>
+                  {districts.map((d) => (
+                    <option key={d.code} value={d.code}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-slate-700">Ward</label>
+                <select
+                  required
+                  disabled={!district || isLoading}
+                  value={ward?.code || ""}
+                  onChange={(e) => handleWardChange(e.target.value)}
+                  className={inputClassName}
+                >
+                  <option value="" disabled>Select Ward</option>
+                  {wards.map((w) => (
+                    <option key={w.code} value={w.code}>{w.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-slate-700">
+                House Number, Street Name
+              </label>
+              <input
+                type="text"
+                value={houseNumber}
+                onChange={(e) => setHouseNumber(e.target.value)}
+                placeholder="e.g., 387/57 1st Street..."
+                required
+                className={inputClassName}
+                disabled={isLoading}
+              />
+            </div>
+
+            {currentUser?.address && (
+              <button
+                type="button"
+                onClick={() => setUseNewAddress(false)}
+                className="text-sm text-slate-500 font-medium hover:underline text-left mt-1 w-max"
+                disabled={isLoading}
+              >
+                Cancel and use saved address
+              </button>
+            )}
+          </>
+        )}
 
         <div className="flex flex-col gap-2">
           <label className="text-sm font-medium text-slate-700">
