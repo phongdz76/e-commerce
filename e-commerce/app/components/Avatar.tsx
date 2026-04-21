@@ -1,23 +1,23 @@
 import Image from "next/image";
 import { FaUserCircle } from "react-icons/fa";
-import { FaU } from "react-icons/fa6";
 
 interface AvatarProps {
   src?: string | null | undefined;
+  size?: number;
 }
 
-export default function Avatar({ src }: AvatarProps) {
+export default function Avatar({ src, size = 30 }: AvatarProps) {
   if (src) {
     return (
       <Image
         src={src}
         alt="User Avatar"
         className="rounded-full"
-        width="30"
-        height="30"
+        width={size}
+        height={size}
       ></Image>
     );
   }
 
-  return <FaUserCircle size={40} />;
+  return <FaUserCircle size={size} className="text-slate-400" />;
 }

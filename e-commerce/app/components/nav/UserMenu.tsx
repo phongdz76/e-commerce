@@ -1,14 +1,13 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Avatar } from "@mui/material";
 import { AiFillCaretDown } from "react-icons/ai";
 import Link from "next/link";
 import MenuItem from "./MenuItem";
 import { signOut } from "next-auth/react";
 import BackDrop from "./BackDrop";
 import { safeUser } from "@/types";
-import { getCurrentUser } from "@/actions/getCurrentUser";
+import Avatar from "../Avatar";
 
 interface UserMenuProps {
   currentUser: safeUser | null;
@@ -42,10 +41,7 @@ export default function UserMenu({ currentUser }: UserMenuProps) {
         text-slate-700
         "
         >
-          <Avatar
-            src={currentUser?.image || undefined}
-            sx={{ width: 24, height: 24 }}
-          />
+          <Avatar src={currentUser?.image || undefined} size={24} />
           <AiFillCaretDown className="text-xs" />
         </div>
         {isOpen && (
@@ -69,9 +65,9 @@ export default function UserMenu({ currentUser }: UserMenuProps) {
                 <Link href="/orders">
                   <MenuItem onClick={toggleOpen}>Your Orders</MenuItem>
                 </Link>
-                  <Link href="/profile">
-                    <MenuItem onClick={toggleOpen}>Profile</MenuItem>
-                  </Link>
+                <Link href="/profile">
+                  <MenuItem onClick={toggleOpen}>Profile</MenuItem>
+                </Link>
                 {currentUser?.role === "ADMIN" && (
                   <Link href="/admin">
                     <MenuItem onClick={toggleOpen}>Admin Dashboard</MenuItem>
