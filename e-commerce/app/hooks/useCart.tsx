@@ -18,7 +18,7 @@ type CartContextType = {
   handleQtyDecreaser: (product: CartProductProps) => void;
   handleQtyIncreaser: (product: CartProductProps) => void;
   handleClearCart: () => void;
-  handleSetPaymentIntent: (val: string) => void;
+  handleSetPaymentIntent: (val: string | null) => void;
   paymentIntent: string | null;
 };
 
@@ -160,7 +160,7 @@ export const CartContextProvider = (props: Props) => {
   }, [cartProducts]);
 
   const handleSetPaymentIntent = useCallback(
-    (val: string) => {
+    (val: string | null) => {
       setPaymentIntent(val);
       localStorage.setItem("savedPaymentIntent", JSON.stringify(val));
     },
