@@ -8,6 +8,9 @@ import toast from "react-hot-toast";
 import { SubmitHandler, useForm } from "react-hook-form";
 import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai";
 import { safeUser } from "@/types";
+import { API_PATHS } from "../../utils/apiPaths";
+import { PROVINCES_API } from "../../utils/externalApiPaths";
+import ImageUpload from "../components/inputs/ImageUpload";
 
 interface ProfileProps {
   currentUser: safeUser;
@@ -58,7 +61,7 @@ export default function Profile({ currentUser }: ProfileProps) {
   const [ward, setWard] = useState<any>(null);
 
   useEffect(() => {
-    fetch("https://provinces.open-api.vn/api/p/")
+    fetch(PROVINCES_API.GET_ALL)
       .then((res) => res.json())
       .then((data) => setProvinces(data))
       .catch((err) => console.log(err));
@@ -72,7 +75,7 @@ export default function Profile({ currentUser }: ProfileProps) {
     setDistricts([]);
     setWards([]);
     if (p) {
-      fetch(`https://provinces.open-api.vn/api/p/${p.code}?depth=2`)
+      fetch(PROVINCES_API.GET_PROVINCE(p.code))
         .then((res) => res.json())
         .then((data) => setDistricts(data.districts))
         .catch((err) => console.log(err));
@@ -85,7 +88,7 @@ export default function Profile({ currentUser }: ProfileProps) {
     setWard(null);
     setWards([]);
     if (d) {
-      fetch(`https://provinces.open-api.vn/api/d/${d.code}?depth=2`)
+      fetch(PROVINCES_API.GET_DISTRICT(d.code))
         .then((res) => res.json())
         .then((data) => setWards(data.wards))
         .catch((err) => console.log(err));
@@ -115,7 +118,7 @@ export default function Profile({ currentUser }: ProfileProps) {
     newPassword: "",
   };
 
-  const { register, handleSubmit, watch, reset } = useForm<ProfileFormValues>({
+  const { register, handleSubmit, watch, reset, setValue } = useForm<ProfileFormValues>({
     defaultValues: defaultFormValues,
   });
 
@@ -172,7 +175,7 @@ export default function Profile({ currentUser }: ProfileProps) {
     setIsLoading(true);
 
     axios
-      .patch("/api/profile", {
+      .patch(API_PATHS.AUTH.PROFILE, {
         username,
         email,
         profileImageUrl: profileImageUrl || null,
@@ -260,14 +263,20 @@ export default function Profile({ currentUser }: ProfileProps) {
         {showAvatarUrlInput ? (
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium text-slate-700">
-              Avatar URL
+              Upload Avatar
             </label>
-            <input
-              type="text"
-              className={inputClassName}
-              disabled={isLoading}
-              placeholder="https://example.com/avatar.png"
-              {...register("profileImageUrl")}
+            <ImageUpload
+              value={watch("profileImageUrl")}
+              onChange={(value) => {
+                setValue("profileImageUrl", value, {
+                  shouldValidate: true,
+                  shouldDirty: true,
+                });
+                setShowAvatarUrlInput(false);
+                // Khôi phục thanh cuộn bằng tay vì Widget bị unmount trước khi kịp chạy hàm cleanup
+                document.body.style.overflow = "unset";
+              }}
+              uploadPreset="ecommerce_avatar"
             />
           </div>
         ) : null}

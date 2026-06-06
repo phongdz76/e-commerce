@@ -12,6 +12,7 @@ import toast from "react-hot-toast";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { safeUser } from "@/types";
+import { API_PATHS } from "../../utils/apiPaths";
 
 interface RegisterFormProps {
   currentUser: safeUser | null;
@@ -49,7 +50,7 @@ export default function RegisterForm({ currentUser }: RegisterFormProps) {
   const onSubmit: SubmitHandler<FieldValues> = (data) => {
     setIsLoading(true);
     axios
-      .post("/api/register", data)
+      .post(API_PATHS.AUTH.REGISTER, data)
       .then(() => {
         toast.success("Account created successfully!");
         return signIn("credentials", {

@@ -8,6 +8,7 @@ import Button from "../components/Button";
 import Link from "next/link";
 import axios from "axios";
 import toast from "react-hot-toast";
+import { API_PATHS } from "../../utils/apiPaths";
 
 export default function ForgotPasswordForm() {
   const [isLoading, setIsLoading] = useState(false);
@@ -27,7 +28,7 @@ export default function ForgotPasswordForm() {
     setIsLoading(true);
 
     try {
-      await axios.post("/api/forgot-password", data);
+      await axios.post(API_PATHS.AUTH.FORGOT_PASSWORD, data);
       toast.success("Password reset email sent! Check your inbox.");
       setEmailSent(true);
     } catch (error: any) {

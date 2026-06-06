@@ -14,6 +14,7 @@ const stripePromise = loadStripe(
 );
 
 import { safeUser } from "@/types";
+import { API_PATHS } from "../../utils/apiPaths";
 
 interface CheckoutClientProps {
   currentUser: safeUser | null;
@@ -40,7 +41,7 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
       setLoading(true);
       setError(false);
 
-      fetch("/api/create-payment-intent", {
+      fetch(API_PATHS.PAYMENT.CREATE_INTENT, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
