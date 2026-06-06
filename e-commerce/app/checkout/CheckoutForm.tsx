@@ -15,6 +15,8 @@ import { MdArrowBack } from "react-icons/md";
 import Button from "../components/Button";
 import { safeUser } from "@/types";
 import axios from "axios";
+import { API_PATHS } from "../../utils/apiPaths";
+import { PROVINCES_API } from "../../utils/externalApiPaths";
 
 const PHONE_REGEX = /^\+?[0-9]{9,15}$/;
 
@@ -58,7 +60,7 @@ export default function CheckoutForm({
   const formattedPrice = formatPrice(cartTotalQtyAmount);
 
   useEffect(() => {
-    fetch("https://provinces.open-api.vn/api/p/")
+    fetch(PROVINCES_API.GET_ALL)
       .then((res) => res.json())
       .then((data) => setProvinces(data))
       .catch((err) => console.log(err));
@@ -72,7 +74,7 @@ export default function CheckoutForm({
     setDistricts([]);
     setWards([]);
     if (p) {
-      fetch(`https://provinces.open-api.vn/api/p/${p.code}?depth=2`)
+      fetch(PROVINCES_API.GET_PROVINCE(p.code))
         .then((res) => res.json())
         .then((data) => setDistricts(data.districts))
         .catch((err) => console.log(err));
@@ -85,7 +87,7 @@ export default function CheckoutForm({
     setWard(null);
     setWards([]);
     if (d) {
-      fetch(`https://provinces.open-api.vn/api/d/${d.code}?depth=2`)
+      fetch(PROVINCES_API.GET_DISTRICT(d.code))
         .then((res) => res.json())
         .then((data) => setWards(data.wards))
         .catch((err) => console.log(err));
@@ -173,7 +175,7 @@ export default function CheckoutForm({
 
           if (currentUser && shouldSaveDeliveryInfo) {
             try {
-              await axios.patch("/api/profile", {
+              await axios.patch(API_PATHS.AUTH.PROFILE, {
                 address: finalAddress,
                 phoneNumber: finalPhone,
               });

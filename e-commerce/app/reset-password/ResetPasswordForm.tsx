@@ -9,6 +9,7 @@ import Button from "../components/Button";
 import Link from "next/link";
 import axios from "axios";
 import toast from "react-hot-toast";
+import { API_PATHS } from "../../utils/apiPaths";
 
 export default function ResetPasswordForm() {
   const [isLoading, setIsLoading] = useState(false);
@@ -51,7 +52,7 @@ export default function ResetPasswordForm() {
     setIsLoading(true);
 
     try {
-      await axios.post("/api/reset-password", {
+      await axios.post(API_PATHS.AUTH.RESET_PASSWORD, {
         token,
         password: data.password,
       });

@@ -1,0 +1,7 @@
+feat(profile): add Cloudinary avatar upload and refactor API paths
+
+- feat(profile): integrate next-cloudinary and create ImageUpload component
+- refactor(api): centralize internal endpoints in utils/apiPaths.ts
+- refactor(api): separate external endpoints into utils/externalApiPaths.ts
+- chore(config): allow res.cloudinary.com domain in next.config.ts
+- chore(deps): add next-cloudinary library
