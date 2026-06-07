@@ -8,8 +8,13 @@ import Button from "../components/Button";
 import ItemContent from "./ItemContent";
 import { formatPrice } from "@/utils/formatPrice";
 import { useRouter } from "next/navigation";
+import { safeUser } from "@/types";
 
-export function CartClient() {
+interface CartClientProps {
+  currentUser: safeUser | null;
+}
+
+export function CartClient({ currentUser }: CartClientProps) {
   const { cartProducts } = useCart().context;
   const { handleClearCart } = useCart().context;
   const { cartTotalQtyAmount } = useCart().context;
@@ -66,11 +71,15 @@ export function CartClient() {
             Taxes and shipping calculated at checkout
           </p>
           <Button
-            label="Proceed to Checkout"
-            onClick={() => router.push("/checkout")}
+            label={currentUser ? "Proceed to Checkout" : "Login to Checkout"}
+            onClick={() => {
+              currentUser
+                ? router.push("/checkout")
+                : router.push("/login?callbackUrl=/checkout");
+            }}
           ></Button>
           <Link
-            href="/"
+            href="/"  
             className="text-slate-500 flex items-center gap-1 mt-2"
           >
             <MdArrowBack size={20} />

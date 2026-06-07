@@ -4,8 +4,7 @@ export default function FormWrap({ children }: { children: React.ReactNode }) {
   return (
     <div
       className="
-        min-h-fit
-        h-full
+        min-h-[65vh]
         flex
         items-center
         justify-center
