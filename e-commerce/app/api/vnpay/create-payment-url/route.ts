@@ -54,14 +54,29 @@ export async function POST(req: Request) {
   vnp_Params['vnp_IpAddr'] = ipAddr;
   vnp_Params['vnp_CreateDate'] = createDateStr;
 
-  vnp_Params = Object.keys(vnp_Params).sort().reduce((acc: any, key) => {
-    acc[key] = vnp_Params[key];
-    return acc;
-  }, {});
+  function sortObject(obj: any) {
+    let sorted: any = {};
+    let str = [];
+    let key;
+    for (key in obj){
+      if (obj.hasOwnProperty(key)) {
+        str.push(encodeURIComponent(key));
+      }
+    }
+    str.sort();
+    for (key = 0; key < str.length; key++) {
+      sorted[str[key]] = encodeURIComponent(obj[str[key]]).replace(/%20/g, "+");
+    }
+    return sorted;
+  }
 
+  vnp_Params = sortObject(vnp_Params);
   const signData = qs.stringify(vnp_Params, { encode: false });
+
+  // Bước 3: Tạo mã băm (hash)
   const hmac = crypto.createHmac("sha512", secretKey);
   const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest("hex"); 
+  
   vnp_Params['vnp_SecureHash'] = signed;
   vnpUrl += '?' + qs.stringify(vnp_Params, { encode: false });
 
