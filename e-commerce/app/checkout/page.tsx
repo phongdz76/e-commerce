@@ -2,6 +2,7 @@ import Container from "../components/Container";
 import FormWrap from "../components/FormWrap";
 import CheckoutClient from "./CheckoutClient";
 import { getCurrentUser } from "@/actions/getCurrentUser";
+import { Suspense } from "react";
 
 export default async function Checkout() {
   const currentUser = await getCurrentUser();
@@ -9,7 +10,9 @@ export default async function Checkout() {
     <div className="p-8">
       <Container>
         <FormWrap>
-          <CheckoutClient currentUser={currentUser} />
+          <Suspense fallback={<p>Loading checkout...</p>}>
+            <CheckoutClient currentUser={currentUser} />
+          </Suspense>
         </FormWrap>
       </Container>
     </div>

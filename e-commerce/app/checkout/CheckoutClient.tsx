@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { loadStripe, StripeElementsOptions } from "@stripe/stripe-js";
 import { useCart } from "../hooks/useCart";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { Elements } from "@stripe/react-stripe-js";
 import CheckoutForm from "../checkout/CheckoutForm";
@@ -21,7 +21,7 @@ interface CheckoutClientProps {
 }
 
 export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
-  const { cartProducts, paymentIntent, handleSetPaymentIntent } =
+  const { cartProducts, paymentIntent, handleSetPaymentIntent, handleClearCart } =
     useCart().context;
   const [loading, setLoading] = useState<boolean>(false);
   const [clientSecret, setClientSecret] = useState<string>("");
@@ -30,6 +30,21 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
   const [processedCartString, setProcessedCartString] = useState<string | null>(null);
 
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams?.get("vnpay") === "success") {
+      toast.success("Payment via VNPay successful!");
+      setPaymentSuccess(true);
+      handleSetPaymentIntent(null);
+      // Wait a moment for UI to mount before clearing cart
+      setTimeout(() => {
+        handleClearCart();
+      }, 500);
+    } else if (searchParams?.get("vnpay") === "failed") {
+      toast.error("Payment via VNPay failed.");
+    }
+  }, [searchParams, handleClearCart, handleSetPaymentIntent]);
 
   console.log("paymentIntent in CheckoutClient:", paymentIntent);
   console.log("clientSecret in CheckoutClient:", clientSecret);
@@ -101,6 +116,9 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
 
   const handlePaymentSuccess = useCallback((value: boolean) => {
     setPaymentSuccess(value);
+    if (value) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   }, []);
 
   return (

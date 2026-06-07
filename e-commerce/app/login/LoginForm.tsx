@@ -8,7 +8,7 @@ import Button from "../components/Button";
 import Link from "next/link";
 import { AiOutlineGoogle } from "react-icons/ai";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { safeUser } from "@/types";
 import { Checkbox } from "@mui/material";
@@ -49,17 +49,19 @@ export default function LoginForm({ currentUser }: LoginFormProps) {
   }, [setValue]);
 
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams?.get("callbackUrl") || "/";
 
   useEffect(() => {
     if (currentUser) {
       const timer = setTimeout(() => {
-        router.push("/");
+        router.push(callbackUrl);
         router.refresh();
       }, 3000);
 
       return () => clearTimeout(timer);
     }
-  }, [currentUser, router]);
+  }, [currentUser, router, callbackUrl]);
 
   const onSubmit: SubmitHandler<FieldValues> = (data) => {
     setIsLoading(true);
@@ -83,7 +85,7 @@ export default function LoginForm({ currentUser }: LoginFormProps) {
         setShowSuccessMessage(true);
 
         setTimeout(() => {
-          router.push("/");
+          router.push(callbackUrl);
           router.refresh();
         }, 3000);
       }

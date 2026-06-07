@@ -31,11 +31,12 @@ export default function CheckoutForm({
   handleSetPaymentSuccess,
   currentUser,
 }: CheckoutFormProps) {
-  const { cartTotalQtyAmount, handleClearCart, handleSetPaymentIntent } =
+  const { cartTotalQtyAmount, handleClearCart, handleSetPaymentIntent, cartProducts } =
     useCart().context;
   const stripe = useStripe();
   const elements = useElements();
   const [isLoading, setLoading] = useState<boolean>(false);
+  const [paymentMethod, setPaymentMethod] = useState<string>("VNPAY");
   const [fullName, setFullName] = useState(currentUser?.name || "");
   const hasSavedAddress = Boolean(currentUser?.address?.trim());
   const hasSavedPhone = Boolean(currentUser?.phoneNumber?.trim());
@@ -161,31 +162,90 @@ export default function CheckoutForm({
 
     setLoading(true);
 
-    stripe
-      .confirmPayment({
-        elements,
-        redirect: "if_required",
-      })
-      .then(async (result) => {
-        if (!result.error) {
-          toast.success("Payment successful!");
-          handleSetPaymentSuccess(true);
-          handleClearCart();
-          handleSetPaymentIntent(null);
+    if (paymentMethod === "STRIPE") {
+      stripe
+        .confirmPayment({
+          elements,
+          redirect: "if_required",
+        })
+        .then(async (result) => {
+          if (!result.error) {
+            toast.success("Payment successful!");
+            handleSetPaymentSuccess(true);
+            handleClearCart();
+            handleSetPaymentIntent(null);
 
-          if (currentUser && shouldSaveDeliveryInfo) {
-            try {
-              await axios.patch(API_PATHS.AUTH.PROFILE, {
-                address: finalAddress,
-                phoneNumber: finalPhone,
-              });
-            } catch (error) {
-              console.log("Failed to sync profile address", error);
+            if (currentUser && shouldSaveDeliveryInfo) {
+              try {
+                await axios.patch(API_PATHS.AUTH.PROFILE, {
+                  address: finalAddress,
+                  phoneNumber: finalPhone,
+                });
+              } catch (error) {
+                console.log("Failed to sync profile address", error);
+              }
             }
           }
+          setLoading(false);
+        });
+    } else if (paymentMethod === "VNPAY") {
+      try {
+        const response = await axios.post("/api/vnpay/create-payment-url", {
+          items: cartProducts,
+          amount: cartTotalQtyAmount,
+          address: finalAddress,
+          phone: finalPhone,
+        });
+
+        if (currentUser && shouldSaveDeliveryInfo) {
+          try {
+            await axios.patch(API_PATHS.AUTH.PROFILE, {
+              address: finalAddress,
+              phoneNumber: finalPhone,
+            });
+          } catch (error) {}
         }
+
+        if (response.data.url) {
+          window.location.href = response.data.url;
+        } else {
+          toast.error("Failed to create VNPay URL");
+          setLoading(false);
+        }
+      } catch (error) {
+        console.log(error);
+        toast.error("Error connecting to VNPay");
         setLoading(false);
-      });
+      }
+    } else if (paymentMethod === "COD") {
+      try {
+        await axios.post("/api/order/create-cod", {
+          items: cartProducts,
+          amount: cartTotalQtyAmount,
+          address: finalAddress,
+          phone: finalPhone,
+        });
+
+        if (currentUser && shouldSaveDeliveryInfo) {
+          try {
+            await axios.patch(API_PATHS.AUTH.PROFILE, {
+              address: finalAddress,
+              phoneNumber: finalPhone,
+            });
+          } catch (error) {}
+        }
+
+        toast.success("Order placed successfully!");
+        handleSetPaymentSuccess(true);
+        handleClearCart();
+        handleSetPaymentIntent(null);
+        setLoading(false);
+      } catch (error) {
+        console.log(error);
+        toast.error("Failed to place order");
+        setLoading(false);
+      }
+    }
   };
   return (
     <form onSubmit={handleSubmit} id="payment-form">
@@ -367,13 +427,55 @@ export default function CheckoutForm({
         )}
       </div>
       <h2 className="text-lg font-semibold mt-6 mb-4">Payment Information</h2>
-      <PaymentElement id="payment-element" options={{ layout: "tabs" }} />
+
+      <div className="flex flex-col gap-3 mb-6">
+        <label className="flex items-center gap-2 cursor-pointer border p-3 rounded-lg hover:bg-slate-50">
+          <input
+            type="radio"
+            name="paymentMethod"
+            value="VNPAY"
+            checked={paymentMethod === "VNPAY"}
+            onChange={(e) => setPaymentMethod(e.target.value)}
+            className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+          />
+          <span className="font-medium text-slate-700">Thanh toán qua VNPay</span>
+        </label>
+
+        <label className="flex items-center gap-2 cursor-pointer border p-3 rounded-lg hover:bg-slate-50">
+          <input
+            type="radio"
+            name="paymentMethod"
+            value="COD"
+            checked={paymentMethod === "COD"}
+            onChange={(e) => setPaymentMethod(e.target.value)}
+            className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+          />
+          <span className="font-medium text-slate-700">Thanh toán khi nhận hàng (COD)</span>
+        </label>
+
+        <label className="flex items-center gap-2 cursor-pointer border p-3 rounded-lg hover:bg-slate-50">
+          <input
+            type="radio"
+            name="paymentMethod"
+            value="STRIPE"
+            checked={paymentMethod === "STRIPE"}
+            onChange={(e) => setPaymentMethod(e.target.value)}
+            className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+          />
+          <span className="font-medium text-slate-700">Thanh toán bằng thẻ quốc tế (Stripe)</span>
+        </label>
+      </div>
+
+      {paymentMethod === "STRIPE" && (
+        <PaymentElement id="payment-element" options={{ layout: "tabs" }} />
+      )}
+
       <div className="py-4 text-center text-slate-700 text-xl font-bold">
         Total: {formattedPrice}
       </div>
       <Button
         label={isLoading ? "Processing..." : "Pay Now"}
-        disabled={isLoading || !stripe || !elements}
+        disabled={isLoading || (paymentMethod === "STRIPE" && (!stripe || !elements))}
         onClick={() => {}}
       />
     </form>
