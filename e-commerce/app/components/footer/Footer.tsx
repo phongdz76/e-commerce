@@ -16,12 +16,12 @@ const Footer = () => {
       <Container>
         <div className="w-full pt-10 pb-2">
           <div className="mb-4">
-            <div className="flex items-center gap-3 mb-2">
-              <span className="text-2xl font-bold text-white">Location</span>
+            <div className="flex items-center gap-2 mb-2">
               <div className="flex items-center">
                 <span className="text-2xl font-bold text-white">SG</span>
                 <span className="text-2xl font-bold text-teal-400">Tech</span>
               </div>
+              <span className="text-2xl font-bold text-white">Location</span>
             </div>
             <p className="text-slate-300 flex items-center gap-2">
                <span>387 Bình Thành, Quận Bình Tân, TP. Hồ Chí Minh</span>

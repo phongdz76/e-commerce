@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { loadStripe, StripeElementsOptions } from "@stripe/stripe-js";
 import { useCart } from "../hooks/useCart";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -32,17 +32,25 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  const hasHandledVNPay = useRef(false);
+
   useEffect(() => {
+    if (hasHandledVNPay.current) return;
+    
     if (searchParams?.get("vnpay") === "success") {
+      hasHandledVNPay.current = true;
       toast.success("Payment via VNPay successful!");
       setPaymentSuccess(true);
       handleSetPaymentIntent(null);
-      // Wait a moment for UI to mount before clearing cart
       setTimeout(() => {
         handleClearCart();
       }, 500);
     } else if (searchParams?.get("vnpay") === "failed") {
+      hasHandledVNPay.current = true;
       toast.error("Payment via VNPay failed.");
+    } else if (searchParams?.get("vnpay") === "invalid_signature") {
+      hasHandledVNPay.current = true;
+      toast.error("Payment via VNPay failed: Invalid Signature.");
     }
   }, [searchParams, handleClearCart, handleSetPaymentIntent]);
 

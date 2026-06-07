@@ -85,11 +85,19 @@ export const authOptions: AuthOptions = {
       // Khi Google account được link, cập nhật thông tin từ Google
       const googleProfileImage = getGoogleProfileImage(profile);
 
-      if (account.provider === "google" && googleProfileImage) {
+      if (account.provider === "google" && googleProfileImage && !user.image) {
         await prisma.user.update({
           where: { id: user.id },
           data: {
             image: googleProfileImage,
+            emailVerified: new Date(),
+          },
+        });
+      } else if (account.provider === "google") {
+        // Vẫn cập nhật emailVerified nếu linkAccount thành công, dù không update ảnh
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
             emailVerified: new Date(),
           },
         });
@@ -101,7 +109,8 @@ export const authOptions: AuthOptions = {
       if (account?.provider === "google" && user.id) {
         const googleProfileImage = getGoogleProfileImage(profile);
 
-        if (googleProfileImage && googleProfileImage !== user.image) {
+        // Chỉ lấy ảnh từ Google nếu người dùng chưa có ảnh đại diện
+        if (googleProfileImage && !user.image) {
           await prisma.user.update({
             where: { id: user.id },
             data: {
