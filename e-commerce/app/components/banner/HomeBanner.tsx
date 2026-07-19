@@ -168,9 +168,10 @@ const HomeBanner = () => {
     {
       id: 4,
       image: "/Image/banner4.jpg",
-      title: "Customer Service",
-      description: "We are always ready to support you 24/7",
-      buttonText: "Contact Us",
+      title: "Super Sale",
+      description: "Don't miss our biggest sale of the year!",
+      buttonText: "Shop Sale",
+      link: "/products",
     },
   ];
 
