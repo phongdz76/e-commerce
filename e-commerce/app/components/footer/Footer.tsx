@@ -94,7 +94,7 @@ const Footer = () => {
             <div className="font-bold text-lg">Follow Us</div>
             <div className="flex flex-col items-start space-y-3">
               <Image
-                src="/Image/qr_code.png"
+                src="/Image/qr_code_v2.png"
                 alt="QR Code - Follow Us"
                 width={120}
                 height={120}
