@@ -65,7 +65,7 @@ const HomeBanner = () => {
     },
     {
       id: 4,
-      image: "/Image/Banner4.png",
+      image: "/Image/Banner4.jpg",
       title: "Apple Collection",
       description: "Latest and trending Apple products",
       buttonText: "Shop Now",
