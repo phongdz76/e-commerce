@@ -1,5 +1,6 @@
 import NextAuth, { AuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import FacebookProvider from "next-auth/providers/facebook";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import prisma from "../../../libs/prismadb";
 import CredentialsProvider from "next-auth/providers/credentials";
@@ -35,6 +36,11 @@ export const authOptions: AuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+      allowDangerousEmailAccountLinking: true,
+    }),
+    FacebookProvider({
+      clientId: process.env.FACEBOOK_CLIENT_ID as string,
+      clientSecret: process.env.FACEBOOK_CLIENT_SECRET as string,
       allowDangerousEmailAccountLinking: true,
     }),
     CredentialsProvider({
@@ -102,6 +108,20 @@ export const authOptions: AuthOptions = {
           },
         });
       }
+
+      // Khi Facebook account được link
+      if (account.provider === "facebook") {
+        const fbProfile = profile as { picture?: { data?: { url?: string } } };
+        const fbImage = fbProfile?.picture?.data?.url;
+
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            ...(fbImage && !user.image ? { image: fbImage } : {}),
+            emailVerified: new Date(),
+          },
+        });
+      }
     },
   },
   callbacks: {
@@ -115,6 +135,22 @@ export const authOptions: AuthOptions = {
             where: { id: user.id },
             data: {
               image: googleProfileImage,
+              emailVerified: new Date(),
+            },
+          });
+        }
+      }
+
+      // Xử lý Facebook profile image
+      if (account?.provider === "facebook" && user.id) {
+        const fbProfile = profile as { picture?: { data?: { url?: string } } };
+        const fbImage = fbProfile?.picture?.data?.url;
+
+        if (fbImage && !user.image) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: {
+              image: fbImage,
               emailVerified: new Date(),
             },
           });

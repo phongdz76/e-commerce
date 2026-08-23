@@ -7,6 +7,7 @@ import { FieldValues, SubmitHandler, useForm } from "react-hook-form";
 import Button from "../components/Button";
 import Link from "next/link";
 import { AiOutlineGoogle } from "react-icons/ai";
+import { FaFacebook } from "react-icons/fa";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { signIn } from "next-auth/react";
@@ -135,6 +136,15 @@ export default function RegisterForm({ currentUser }: RegisterFormProps) {
         }}
         outline
         icon={AiOutlineGoogle}
+      ></Button>
+
+      <Button
+        label="Continue with Facebook"
+        onClick={() => {
+          signIn("facebook");
+        }}
+        outline
+        icon={FaFacebook}
       ></Button>
 
       <p className="text-center text-sm text-gray-600">

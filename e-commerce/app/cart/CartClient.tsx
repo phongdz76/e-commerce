@@ -22,15 +22,15 @@ export function CartClient({ currentUser }: CartClientProps) {
 
   if (!cartProducts || cartProducts.length === 0) {
     return (
-      <div className="flex flex-col items-center">
-        <div>Your cart is empty</div>
+      <div className="flex flex-col items-center justify-center min-h-[50vh]">
+        <div className="text-xl">Your cart is empty</div>
         <div>
           <Link
             href="/"
             className="text-slate-500 flex items-center gap-1 mt-2"
           >
-            <MdArrowBack size={20} />
-            <span>Start Shopping</span>
+            <MdArrowBack size={15} />
+            <span className="text-sm">Start Shopping</span>
           </Link>
         </div>
       </div>

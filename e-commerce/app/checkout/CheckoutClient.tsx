@@ -32,13 +32,14 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const hasHandledVNPay = useRef(false);
+  const hasHandledRedirect = useRef(false);
 
   useEffect(() => {
-    if (hasHandledVNPay.current) return;
+    if (hasHandledRedirect.current) return;
     
+    // Handle VNPay redirect
     if (searchParams?.get("vnpay") === "success") {
-      hasHandledVNPay.current = true;
+      hasHandledRedirect.current = true;
       toast.success("Payment via VNPay successful!");
       setPaymentSuccess(true);
       handleSetPaymentIntent(null);
@@ -46,11 +47,28 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
         handleClearCart();
       }, 500);
     } else if (searchParams?.get("vnpay") === "failed") {
-      hasHandledVNPay.current = true;
+      hasHandledRedirect.current = true;
       toast.error("Payment via VNPay failed.");
     } else if (searchParams?.get("vnpay") === "invalid_signature") {
-      hasHandledVNPay.current = true;
+      hasHandledRedirect.current = true;
       toast.error("Payment via VNPay failed: Invalid Signature.");
+    }
+
+    // Handle MoMo redirect
+    if (searchParams?.get("momo") === "success") {
+      hasHandledRedirect.current = true;
+      toast.success("Payment via MoMo successful!");
+      setPaymentSuccess(true);
+      handleSetPaymentIntent(null);
+      setTimeout(() => {
+        handleClearCart();
+      }, 500);
+    } else if (searchParams?.get("momo") === "failed") {
+      hasHandledRedirect.current = true;
+      toast.error("Payment via MoMo failed.");
+    } else if (searchParams?.get("momo") === "invalid_signature") {
+      hasHandledRedirect.current = true;
+      toast.error("Payment via MoMo failed: Invalid Signature.");
     }
   }, [searchParams, handleClearCart, handleSetPaymentIntent]);
 
