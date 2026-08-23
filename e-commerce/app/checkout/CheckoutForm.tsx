@@ -217,6 +217,35 @@ export default function CheckoutForm({
         toast.error("Error connecting to VNPay");
         setLoading(false);
       }
+    } else if (paymentMethod === "MOMO") {
+      try {
+        const response = await axios.post("/api/momo/create-payment-url", {
+          items: cartProducts,
+          amount: cartTotalQtyAmount,
+          address: finalAddress,
+          phone: finalPhone,
+        });
+
+        if (currentUser && shouldSaveDeliveryInfo) {
+          try {
+            await axios.patch(API_PATHS.AUTH.PROFILE, {
+              address: finalAddress,
+              phoneNumber: finalPhone,
+            });
+          } catch (error) {}
+        }
+
+        if (response.data.url) {
+          window.location.href = response.data.url;
+        } else {
+          toast.error("Failed to create MoMo payment URL");
+          setLoading(false);
+        }
+      } catch (error) {
+        console.log(error);
+        toast.error("Error connecting to MoMo");
+        setLoading(false);
+      }
     } else if (paymentMethod === "COD") {
       try {
         await axios.post("/api/order/create-cod", {
@@ -439,6 +468,18 @@ export default function CheckoutForm({
             className="w-4 h-4 text-blue-600 focus:ring-blue-500"
           />
           <span className="font-medium text-slate-700">Thanh toán qua VNPay</span>
+        </label>
+
+        <label className="flex items-center gap-2 cursor-pointer border p-3 rounded-lg hover:bg-slate-50">
+          <input
+            type="radio"
+            name="paymentMethod"
+            value="MOMO"
+            checked={paymentMethod === "MOMO"}
+            onChange={(e) => setPaymentMethod(e.target.value)}
+            className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+          />
+          <span className="font-medium text-slate-700">Thanh toán qua MoMo</span>
         </label>
 
         <label className="flex items-center gap-2 cursor-pointer border p-3 rounded-lg hover:bg-slate-50">

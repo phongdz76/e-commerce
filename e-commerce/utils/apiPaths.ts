@@ -9,5 +9,6 @@ export const API_PATHS = {
   },
   PAYMENT: {
     CREATE_INTENT: "/api/create-payment-intent",
+    MOMO_CREATE_URL: "/api/momo/create-payment-url",
   },
 };
