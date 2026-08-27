@@ -29,7 +29,8 @@ export async function POST(req: Request) {
   const orderId = partnerCode + new Date().getTime();
   const requestId = orderId;
   const orderInfo = "Thanh toan don hang SGTech #" + orderId;
-  const requestType = "captureWallet";
+  // const requestType = "captureWallet";
+  const requestType = "payWithATM";
   const extraData = "";
   const lang = "vi";
   const autoCapture = true;

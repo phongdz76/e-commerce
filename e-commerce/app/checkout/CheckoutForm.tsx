@@ -458,6 +458,18 @@ export default function CheckoutForm({
       <h2 className="text-lg font-semibold mt-6 mb-4">Payment Information</h2>
 
       <div className="flex flex-col gap-3 mb-6">
+         <label className="flex items-center gap-2 cursor-pointer border p-3 rounded-lg hover:bg-slate-50">
+          <input
+            type="radio"
+            name="paymentMethod"
+            value="COD"
+            checked={paymentMethod === "COD"}
+            onChange={(e) => setPaymentMethod(e.target.value)}
+            className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+          />
+          <span className="font-medium text-slate-700">Thanh toán khi nhận hàng (COD)</span>
+        </label>
+        
         <label className="flex items-center gap-2 cursor-pointer border p-3 rounded-lg hover:bg-slate-50">
           <input
             type="radio"
@@ -482,17 +494,7 @@ export default function CheckoutForm({
           <span className="font-medium text-slate-700">Thanh toán qua MoMo</span>
         </label>
 
-        <label className="flex items-center gap-2 cursor-pointer border p-3 rounded-lg hover:bg-slate-50">
-          <input
-            type="radio"
-            name="paymentMethod"
-            value="COD"
-            checked={paymentMethod === "COD"}
-            onChange={(e) => setPaymentMethod(e.target.value)}
-            className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-          />
-          <span className="font-medium text-slate-700">Thanh toán khi nhận hàng (COD)</span>
-        </label>
+       
 
         <label className="flex items-center gap-2 cursor-pointer border p-3 rounded-lg hover:bg-slate-50">
           <input
