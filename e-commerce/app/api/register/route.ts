@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // ✅ Validate password strength (chữ hoa, chữ thường, số, ký tự đặc biệt)
+  // Validate password strength (chữ hoa, chữ thường, số, ký tự đặc biệt)
   const passwordRegex =
     /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
   if (!passwordRegex.test(password)) {
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // ✅ Hash password and create user
+  // Hash password and create user
   const hashedPassword = await bcrypt.hash(password, 10);
   const user = await prisma.user.create({
     data: {

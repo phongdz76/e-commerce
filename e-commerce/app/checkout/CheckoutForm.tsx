@@ -36,7 +36,7 @@ export default function CheckoutForm({
   const stripe = useStripe();
   const elements = useElements();
   const [isLoading, setLoading] = useState<boolean>(false);
-  const [paymentMethod, setPaymentMethod] = useState<string>("VNPAY");
+  const [paymentMethod, setPaymentMethod] = useState<string>("COD");
   const [fullName, setFullName] = useState(currentUser?.name || "");
   const hasSavedAddress = Boolean(currentUser?.address?.trim());
   const hasSavedPhone = Boolean(currentUser?.phoneNumber?.trim());
