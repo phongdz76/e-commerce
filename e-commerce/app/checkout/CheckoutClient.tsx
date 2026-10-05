@@ -75,12 +75,21 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
   console.log("paymentIntent in CheckoutClient:", paymentIntent);
   console.log("clientSecret in CheckoutClient:", clientSecret);
 
+  const isCreatingIntent = useRef(false);
+
   useEffect(() => {
     const currentCartString = JSON.stringify(cartProducts);
 
-    if (cartProducts && cartProducts.length > 0 && currentCartString !== processedCartString) {
+    if (
+      cartProducts &&
+      cartProducts.length > 0 &&
+      currentCartString !== processedCartString &&
+      !isCreatingIntent.current
+    ) {
+      isCreatingIntent.current = true;
       setLoading(true);
       setError(false);
+
 
       fetch(API_PATHS.PAYMENT.CREATE_INTENT, {
         method: "POST",
@@ -118,11 +127,17 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
           setClientSecret(data.paymentIntent.client_secret);
         })
         .catch((err) => {
+
           console.log(err);
           setLoading(false);
           setError(true);
           toast.error("Something went wrong. Please try again.");
+        })
+        .finally(() => {
+          isCreatingIntent.current = false;
         });
+
+
     }
   }, [cartProducts, paymentIntent, handleSetPaymentIntent, router, processedCartString]);
 

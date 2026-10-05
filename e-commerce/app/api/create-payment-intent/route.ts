@@ -31,6 +31,7 @@ export async function POST(req: Request) {
     amount: total,
     currency: "vnd",
     paymentIntentId: payment_intent_id || "",
+    paymentMethod: "STRIPE",
     status: "pending",
     deliveryStatus: "pending",
     products: items,

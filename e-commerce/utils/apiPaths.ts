@@ -11,4 +11,9 @@ export const API_PATHS = {
     CREATE_INTENT: "/api/create-payment-intent",
     MOMO_CREATE_URL: "/api/momo/create-payment-url",
   },
+  ORDER: {
+    GET_ALL: "/api/order",
+    GET_BY_ID: (id: string) => `/api/order/${id}`,
+    CREATE_COD: "/api/order/create-cod",
+  },
 };

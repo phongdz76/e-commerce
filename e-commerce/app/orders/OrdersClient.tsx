@@ -1,0 +1,292 @@
+"use client";
+
+import { safeUser } from "@/types";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import axios from "axios";
+import toast from "react-hot-toast";
+import Link from "next/link";
+import Image from "next/image";
+import { formatPrice } from "@/utils/formatPrice";
+import { MdArrowBack } from "react-icons/md";
+import Heading from "@/app/components/Headinng";
+import { FaBoxOpen } from "react-icons/fa";
+
+interface OrderProduct {
+  id: string;
+  name: string;
+  selectedImg: {
+    color: string;
+    colorCode: string;
+    image: string;
+  };
+  quantity: number;
+  price: number;
+}
+
+interface OrderItem {
+  id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  deliveryStatus: string | null;
+  paymentMethod: string;
+  products: OrderProduct[];
+  createDate: string;
+}
+
+interface OrdersClientProps {
+  currentUser: safeUser | null;
+}
+
+const STATUS_LABELS: Record<string, { label: string; className: string }> = {
+  pending: { label: "Pending", className: "bg-amber-50 text-amber-700 border-amber-200" },
+  processing: { label: "Processing", className: "bg-blue-50 text-blue-700 border-blue-200" },
+  complete: { label: "Completed", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  cancelled: { label: "Cancelled", className: "bg-rose-50 text-rose-700 border-rose-200" },
+};
+
+const DELIVERY_LABELS: Record<string, { label: string; className: string }> = {
+  pending: { label: "Pending", className: "bg-amber-50 text-amber-700 border-amber-200" },
+  dispatched: { label: "Dispatched", className: "bg-blue-50 text-blue-700 border-blue-200" },
+  delivered: { label: "Delivered", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+};
+
+const PAYMENT_LABELS: Record<string, string> = {
+  COD: "COD",
+  VNPAY: "VNPay",
+  MOMO: "MoMo",
+  STRIPE: "Stripe",
+};
+
+export default function OrdersClient({ currentUser }: OrdersClientProps) {
+  const router = useRouter();
+  const [orders, setOrders] = useState<OrderItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!currentUser) {
+      router.push("/login");
+      return;
+    }
+
+    const fetchOrders = async () => {
+      try {
+        const res = await axios.get("/api/order");
+        setOrders(res.data);
+      } catch {
+        toast.error("Failed to load orders");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, [currentUser, router]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <p className="text-slate-500">Loading...</p>
+      </div>
+    );
+  }
+
+  if (orders.length === 0) {
+    return (
+      <div className="min-h-[50vh] flex flex-col items-center justify-center">
+        <div className="text-xl">You have no orders yet</div>
+        <Link
+          href="/"
+          className="text-slate-500 flex items-center gap-1 mt-2"
+        >
+          <MdArrowBack size={15} />
+          <span className="text-sm">Start Shopping</span>
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pb-10">
+      <Heading title="My Orders" />
+      <p className="text-sm text-slate-500 mt-1 mb-6">
+        {orders.length} order{orders.length > 1 ? "s" : ""}
+      </p>
+
+      {/* Table for desktop */}
+      <div className="hidden md:block overflow-x-auto rounded-lg border border-slate-200">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-200 text-left">
+              <th className="px-4 py-3 font-medium text-slate-600">Order ID</th>
+              <th className="px-4 py-3 font-medium text-slate-600">Product</th>
+              <th className="px-4 py-3 font-medium text-slate-600">Date</th>
+              <th className="px-4 py-3 font-medium text-slate-600">Payment</th>
+              <th className="px-4 py-3 font-medium text-slate-600">Status</th>
+              <th className="px-4 py-3 font-medium text-slate-600 text-right">Total</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {orders.map((order) => {
+              const date = new Date(order.createDate).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              });
+              const firstProduct = order.products[0];
+              const remaining = order.products.length - 1;
+              const status = STATUS_LABELS[order.status] || {
+                label: order.status,
+                className: "bg-slate-50 text-slate-600 border-slate-200",
+              };
+              const delivery = order.deliveryStatus
+                ? DELIVERY_LABELS[order.deliveryStatus]
+                : null;
+
+              return (
+                <tr
+                  key={order.id}
+                  onClick={() => router.push(`/orders/${order.id}`)}
+                  className="cursor-pointer hover:bg-slate-50 transition"
+                >
+                  <td className="px-4 py-3">
+                    <span className="font-mono text-xs text-slate-600">
+                      #{order.id.slice(-8).toUpperCase()}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 flex-shrink-0 rounded border border-slate-200 bg-white overflow-hidden relative">
+                        {firstProduct?.selectedImg?.image ? (
+                          <Image
+                            src={firstProduct.selectedImg.image}
+                            alt={firstProduct.name}
+                            fill
+                            sizes="40px"
+                            className="object-contain p-0.5"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-slate-50">
+                            <FaBoxOpen size={14} className="text-slate-300" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-slate-700 truncate max-w-[200px]">
+                          {firstProduct?.name || "—"}
+                        </p>
+                        {remaining > 0 && (
+                          <p className="text-xs text-slate-400">
+                            +{remaining} more item{remaining > 1 ? "s" : ""}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">{date}</td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {PAYMENT_LABELS[order.paymentMethod] || order.paymentMethod}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-1.5">
+                      <span
+                        className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${status.className}`}
+                      >
+                        {status.label}
+                      </span>
+                      {delivery && (
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${delivery.className}`}
+                        >
+                          {delivery.label}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-slate-800">
+                    {formatPrice(order.amount)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Cards for mobile */}
+      <div className="md:hidden flex flex-col gap-3">
+        {orders.map((order) => {
+          const date = new Date(order.createDate).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          });
+          const firstProduct = order.products[0];
+          const remaining = order.products.length - 1;
+          const totalQty = order.products.reduce((s, p) => s + p.quantity, 0);
+          const status = STATUS_LABELS[order.status] || {
+            label: order.status,
+            className: "bg-slate-50 text-slate-600 border-slate-200",
+          };
+
+          return (
+            <Link
+              key={order.id}
+              href={`/orders/${order.id}`}
+              className="block rounded-lg border border-slate-200 bg-white p-4 no-underline active:bg-slate-50"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-mono text-xs text-slate-500">
+                  #{order.id.slice(-8).toUpperCase()}
+                </span>
+                <span className="text-xs text-slate-400">{date}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-14 h-14 flex-shrink-0 rounded border border-slate-200 bg-white overflow-hidden relative">
+                  {firstProduct?.selectedImg?.image ? (
+                    <Image
+                      src={firstProduct.selectedImg.image}
+                      alt={firstProduct.name}
+                      fill
+                      sizes="56px"
+                      className="object-contain p-1"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-slate-50">
+                      <FaBoxOpen size={16} className="text-slate-300" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-slate-700 truncate">
+                    {firstProduct?.name || "—"}
+                  </p>
+                  {remaining > 0 && (
+                    <p className="text-xs text-slate-400">
+                      +{remaining} more item{remaining > 1 ? "s" : ""}
+                    </p>
+                  )}
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {totalQty} item{totalQty > 1 ? "s" : ""} ·{" "}
+                    {PAYMENT_LABELS[order.paymentMethod] || order.paymentMethod}
+                  </p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="text-sm font-semibold text-slate-800">
+                    {formatPrice(order.amount)}
+                  </p>
+                  <span
+                    className={`inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium border ${status.className}`}
+                  >
+                    {status.label}
+                  </span>
+                </div>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
