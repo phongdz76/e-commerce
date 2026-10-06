@@ -1,7 +1,6 @@
 "use client";
 
 import { CartProductProps } from "@/app/product/[productId]/ProductDetails";
-import { useState } from "react";
 
 interface SetQtyProps {
   cartCounter?: boolean;
@@ -10,7 +9,7 @@ interface SetQtyProps {
   handleQtyDecreaser: () => void;
 }
 
-const btnStyles = "border-[1.2px] border-slate-300 px-2 rounded";
+const btnStyles = "h-9 w-9 border border-slate-300 rounded transition hover:border-teal-500 disabled:opacity-40 disabled:cursor-not-allowed";
 
 export default function SetQuantity({
   cartCounter,
@@ -18,17 +17,15 @@ export default function SetQuantity({
   handleQtyIncreaser,
   handleQtyDecreaser,
 }: SetQtyProps) {
-  const [quantity, setQuantity] = useState(1);
-
   return (
-    <div className="flex gap-8 items-center">
+    <div className="flex flex-wrap gap-4 items-center">
       {cartCounter ? null : <div className="font-semibold">QUANTITY:</div>}
-      <div className="flex gap-4 items-center text-base">
-        <button onClick={handleQtyDecreaser} className={btnStyles}>
+      <div className="flex gap-3 items-center text-base">
+        <button type="button" aria-label={`Decrease quantity of ${cartProduct.name}`} disabled={cartProduct.quantity <= 1} onClick={handleQtyDecreaser} className={btnStyles}>
           -
         </button>
-        <div>{cartProduct.quantity}</div>
-        <button onClick={handleQtyIncreaser} className={btnStyles}>
+        <div className="min-w-5 text-center" aria-live="polite">{cartProduct.quantity}</div>
+        <button type="button" aria-label={`Increase quantity of ${cartProduct.name}`} disabled={cartProduct.quantity >= 20} onClick={handleQtyIncreaser} className={btnStyles}>
           +
         </button>
       </div>

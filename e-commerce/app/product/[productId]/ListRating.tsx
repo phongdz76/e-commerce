@@ -1,26 +1,26 @@
 "use client";
 
 import Avatar from "@/app/components/Avatar";
-import Heading from "@/app/components/Headinng";
 import { Rating } from "@mui/material";
 import moment from "moment";
+import type { CatalogProduct } from "@/utils/productFilters";
 
 interface ListRatingProps {
-  product: any;
+  product: CatalogProduct;
 }
 
 export default function ListRating({ product }: ListRatingProps) {
   return (
     <div>
-      <Heading title="Product View"></Heading>
-      <div className="text-sm mt-4">
+      <h2 className="text-2xl font-bold">Customer reviews</h2>
+      <div className="text-base mt-4">
         {product.reviews && product.reviews.length > 0 ? (
-          product.reviews.map((review: any) => (
+          product.reviews.map((review) => (
             <div key={review.id} className="max-w-[500px]">
               <div className="flex gap-2 items-center">
                 <Avatar src={review?.user.image} />
                 <div className="font-semibold">{review?.user.name}</div>
-                <div className="font-light">
+                <div className="text-sm text-slate-500">
                   {moment(review?.createdDate).fromNow()}
                 </div>
               </div>
@@ -35,7 +35,7 @@ export default function ListRating({ product }: ListRatingProps) {
             </div>
           ))
         ) : (
-          <div>No reviews yet.</div>
+          <p className="text-slate-500">No reviews yet for this product.</p>
         )}
       </div>
     </div>

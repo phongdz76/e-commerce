@@ -2,7 +2,7 @@
 
 import { Rating } from "@mui/material";
 import { formatPrice } from "@/utils/formatPrice";
-import { use, useCallback, useState, useEffect } from "react";
+import { useCallback, useState } from "react";
 import SetColor from "@/app/components/products/SetColor";
 import SetQuantity from "@/app/components/products/SetQuantity";
 import Button from "@/app/components/Button";
@@ -10,9 +10,10 @@ import ProductImage from "@/app/components/products/ProductImage";
 import { useCart } from "@/app/hooks/useCart";
 import { MdCheckCircle } from "react-icons/md";
 import Link from "next/link";
+import { catalogCategories, type CatalogProduct } from "@/utils/productFilters";
 
 interface ProductDetailsProps {
-  product: any;
+  product: CatalogProduct;
 }
 
 export interface CartProductProps {
@@ -44,7 +45,7 @@ const Horizontal = () => (
 
 export default function ProductDetails({ product }: ProductDetailsProps) {
   const { handleAddProductToCart, cartProducts } = useCart().context;
-  const [isProductInCart, setIsProductInCart] = useState<boolean>(false);
+  const isProductInCart = Boolean(cartProducts?.some((item) => item.id === product.id));
   const [cartProduct, setCartProduct] = useState<CartProductProps>({
     id: product.id,
     name: product.name,
@@ -58,21 +59,6 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
     price: product.price ?? 0,
   });
 
-  console.log(cartProducts);
-
-  useEffect(() => {
-    setIsProductInCart(false);
-
-    if (cartProducts) {
-      const existingIndex = cartProducts.findIndex(
-        (item) => item.id === product.id
-      );
-      if (existingIndex > -1) {
-        setIsProductInCart(true);
-      }
-    }
-  }, [cartProducts]);
-
   const handColorSelect = useCallback(
     (value: SelectedImgProps) => {
       setCartProduct((prev) => ({
@@ -80,7 +66,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
         selectedImg: value,
       }));
     },
-    [cartProduct.selectedImg]
+    []
   );
 
   const handleQtyDecreaser = useCallback(() => {
@@ -104,8 +90,8 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
   }, [cartProduct.quantity]);
 
   const productRating =
-    product.reviews.reduce((acc: number, item: any) => acc + item.rating, 0) /
-    product.reviews.length;
+    product.reviews.reduce((acc, item) => acc + item.rating, 0) /
+    Math.max(product.reviews.length, 1);
 
   return (
     <div
@@ -119,8 +105,8 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
         handleColorSelect={handColorSelect}
       ></ProductImage>
 
-      <div className="flex flex-col gap-1 text-slate-700 text-sm">
-        <h2 className="text-3xl font-medium">{product.name}</h2>
+      <div className="flex flex-col gap-2 text-slate-700 text-base">
+        <h1 className="text-2xl md:text-3xl font-bold leading-snug">{product.name}</h1>
         <div className="flex items-center gap-2">
           <Rating value={productRating} readOnly />
           <div>{product.reviews.length} reviews</div>
@@ -129,10 +115,10 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
           {formatPrice(product.price)}
         </div>
         <Horizontal />
-        <div>{product.description}</div>
+        <div className="whitespace-pre-line leading-7">{product.description}</div>
         <Horizontal />
         <div>
-          <span className="font-semibold">CATEGORY:</span> {product.category}
+          <span className="font-semibold">CATEGORY:</span>{" "}<Link href={`/products?category=${encodeURIComponent(product.category)}`} className="hover:text-teal-700 hover:underline">{catalogCategories.find((category) => category.value === product.category)?.label ?? product.category}</Link>
         </div>
         <div>
           <span className="font-semibold">BRAND:</span> {product.brand}
@@ -152,13 +138,9 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
                 size={20}
                 className="text-teal-400"
               ></MdCheckCircle>
-              <span>Product add to Cart</span>
+              <span>Added to your cart</span>
             </p>
-            <Link href="/cart" className="block max-w-[300px]">
-              <div className="hover:opacity-80 transition-opacity">
-                <Button label="View Cart" outline onClick={() => {}}></Button>
-              </div>
-            </Link>
+            <Link href="/cart" className="block max-w-[300px] rounded-md border border-slate-700 px-6 py-3 text-center transition hover:bg-slate-50">View Cart</Link>
           </>
         ) : (
           <>
@@ -176,7 +158,8 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
             <Horizontal />
             <div className="max-w-[300px]">
               <Button
-                label="ADD TO CART"
+                label={product.inStock ? "Add to Cart" : "Out of Stock"}
+                disabled={!product.inStock}
                 onClick={() => handleAddProductToCart(cartProduct)}
               />
             </div>

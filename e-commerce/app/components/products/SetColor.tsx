@@ -36,7 +36,10 @@ export default function SetColor({
       <div className="flex gap-1">
         {images.map((image) => {
           return (
-            <div
+            <button
+              type="button"
+              aria-label={`Select ${image.color}`}
+              aria-pressed={cartProduct.selectedImg.color === image.color}
               key={image.color}
               onClick={() => handColorSelect(image)}
               className={`w-7 h-7 m-1 rounded-full border-teal-300 flex items-center justify-center ${
@@ -48,10 +51,8 @@ export default function SetColor({
               <div
                 style={{ background: image.colorCode }}
                 className="h-5 w-5 rounded-full border-[1.2px] border-slate-300 cursor-pointer"
-                onClick={() => handColorSelect(image)}
-                aria-label={`Select color ${image.colorCode}`}
               ></div>
-            </div>
+            </button>
           );
         })}
       </div>
