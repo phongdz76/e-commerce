@@ -1,15 +1,13 @@
 "use client";
 import { useCart } from "@/app/hooks/useCart";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { CiShoppingCart } from "react-icons/ci";
 
 export default function CartCount() {
   const { cartTotalQty } = useCart().context;
-  const router = useRouter();
   return (
-    <div
+    <Link href="/cart" aria-label={`Shopping cart, ${cartTotalQty} item${cartTotalQty === 1 ? "" : "s"}`}
       className="relative cursor-pointer"
-      onClick={() => router.push("/cart")}
     >
       <div>
         <CiShoppingCart size={28} />
@@ -19,6 +17,6 @@ export default function CartCount() {
           {cartTotalQty}
         </div>
       )}
-    </div>
+    </Link>
   );
 }

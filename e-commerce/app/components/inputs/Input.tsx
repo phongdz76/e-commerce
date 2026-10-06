@@ -8,6 +8,8 @@ interface InputProps {
   id: string;
   label: string;
   type?: string;
+  autoComplete?: string;
+  passwordHint?: boolean;
   disabled?: boolean;
   required?: boolean;
   register: UseFormRegister<FieldValues>;
@@ -18,6 +20,8 @@ export default function Input({
   id,
   label,
   type = "text",
+  autoComplete,
+  passwordHint = true,
   disabled,
   required,
   register,
@@ -27,17 +31,20 @@ export default function Input({
   const [isPasswordFieldFocused, setIsPasswordFieldFocused] = useState(false);
   const isPasswordField = type === "password";
   const inputType = isPasswordField && showPassword ? "text" : type;
-  const fieldRegistration = register(id, { required });
+  const fieldRegistration = register(id, { required: required ? `${label} is required` : false });
+  const showHint = isPasswordField && isPasswordFieldFocused && passwordHint;
 
   return (
     <div className="w-full">
       <div className="relative">
         <input
-          autoComplete="off"
+          autoComplete={autoComplete}
           id={id}
           type={inputType}
           placeholder=""
           disabled={disabled}
+          aria-invalid={Boolean(errors[id])}
+          aria-describedby={[errors[id] ? `${id}-error` : "", showHint ? `${id}-hint` : ""].filter(Boolean).join(" ") || undefined}
           {...fieldRegistration}
           onFocus={() => {
             if (isPasswordField) {
@@ -96,6 +103,8 @@ export default function Input({
         {isPasswordField && (
           <button
             type="button"
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            aria-pressed={showPassword}
             onClick={() => setShowPassword(!showPassword)}
             className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-800 transition"
             disabled={disabled}
@@ -109,8 +118,9 @@ export default function Input({
         )}
       </div>
 
-      {isPasswordField && isPasswordFieldFocused && (
-        <p className="mt-2 text-sm text-slate-600">
+      {errors[id] && <p id={`${id}-error`} role="alert" className="mt-2 text-sm text-rose-600">{String(errors[id]?.message || `Please check ${label.toLowerCase()}`)}</p>}
+      {showHint && (
+        <p id={`${id}-hint`} className="mt-2 text-sm text-slate-600">
           Password must be at least 8 characters and include uppercase,
           lowercase, number, and special character.
         </p>

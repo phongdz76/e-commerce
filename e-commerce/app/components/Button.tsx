@@ -5,6 +5,7 @@ import { IconType } from "react-icons";
 
 interface ButtonProps {
   label: string;
+  type?: "button" | "submit" | "reset";
   disabled?: boolean;
   outline?: boolean;
   small?: boolean;
@@ -15,6 +16,7 @@ interface ButtonProps {
 
 export default function Button({
   label,
+  type = "button",
   disabled,
   outline,
   small,
@@ -25,6 +27,7 @@ export default function Button({
   return (
     <>
       <button
+        type={type}
         disabled={disabled}
         onClick={onClick}
         className={`

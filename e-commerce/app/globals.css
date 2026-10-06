@@ -1,1 +1,67 @@
 @import "tailwindcss";
+
+.sgtech-search {
+  border-color: #cbd5e1;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.sgtech-search:hover {
+  border-color: #94a3b8;
+}
+
+.sgtech-search:focus-within {
+  border-color: #14b8a6;
+  box-shadow: 0 0 0 3px rgb(20 184 166 / 10%);
+}
+
+.sgtech-search input,
+.sgtech-search input:focus,
+.sgtech-search input:focus-visible {
+  border: 0;
+  outline: none;
+  box-shadow: none;
+}
+
+.sgtech-search select,
+.sgtech-search option {
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 400;
+  color: #334155;
+}
+
+.sgtech-filter-control {
+  transition: border-color 200ms ease, background-color 200ms ease, box-shadow 200ms ease;
+}
+
+.sgtech-filter-control:hover {
+  border-color: #94a3b8;
+  background-color: #fff;
+}
+
+.sgtech-filter-control:focus {
+  border-color: #14b8a6;
+  background-color: #fff;
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(20 184 166 / 10%);
+}
+
+.sgtech-catalog {
+  animation: sgtech-catalog-enter 180ms ease-out;
+}
+
+@keyframes sgtech-catalog-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sgtech-catalog {
+    animation: none;
+  }
+
+  .sgtech-search,
+  .sgtech-filter-control {
+    transition: none;
+  }
+}

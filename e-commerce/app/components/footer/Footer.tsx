@@ -3,7 +3,8 @@ import Container from "../Container";
 import FooterList from "./FooterList";
 import Image from "next/image";
 import { MdFacebook } from "react-icons/md";
-import { FaTwitter, FaInstagram, FaYoutube } from "react-icons/fa";
+import { FaInstagram, FaYoutube } from "react-icons/fa";
+import { catalogCategories } from "@/utils/productFilters";
 
 const Footer = () => {
   return (
@@ -48,44 +49,31 @@ const Footer = () => {
               <span className="text-teal-400">Tech</span>
             </Link>
             <p>Free support hotline</p>
-            <p>Call for purchase: 1900 2004</p>
-            <p className="whitespace-nowrap">Email: sgtech@gmail.com</p>
+            <a href="tel:19002004" className="hover:text-teal-400">Call for purchase: 1900 2004</a>
+            <a href="mailto:sgtech@gmail.com" className="hover:text-teal-400">Email: sgtech@gmail.com</a>
           </FooterList>
 
           <FooterList>
             <div className="font-bold text-lg">Shop Categories</div>
-            <Link href="#" className="hover:text-teal-400 transition-colors">
-              Phones
-            </Link>
-            <Link href="#" className="hover:text-teal-400 transition-colors">
-              Laptops
-            </Link>
-            <Link href="#" className="hover:text-teal-400 transition-colors">
-              Desktops
-            </Link>
-            <Link href="#" className="hover:text-teal-400 transition-colors">
-              Watches
-            </Link>
-            <Link href="#" className="hover:text-teal-400 transition-colors">
-              TVs
-            </Link>
-            <Link href="#" className="hover:text-teal-400 transition-colors">
-              Accessories
-            </Link>
+            {catalogCategories.map((category) => (
+              <Link key={category.value} href={`/products?category=${encodeURIComponent(category.value)}`} className="hover:text-teal-400 transition-colors">
+                {category.label}
+              </Link>
+            ))}
           </FooterList>
 
           <FooterList>
             <div className="font-bold text-lg">Customer Service</div>
-            <Link href="#" className="hover:text-teal-400 transition-colors">
+            <Link href="/help/contact" className="hover:text-teal-400 transition-colors">
               Contact Us
             </Link>
-            <Link href="#" className="hover:text-teal-400 transition-colors">
+            <Link href="/help/returns" className="hover:text-teal-400 transition-colors">
               Returns & Exchanges
             </Link>
-            <Link href="#" className="hover:text-teal-400 transition-colors">
-              Shipping Policy
+            <Link href="/help/shipping" className="hover:text-teal-400 transition-colors">
+              Shipping & Delivery
             </Link>
-            <Link href="#" className="hover:text-teal-400 transition-colors">
+            <Link href="/help/faq" className="hover:text-teal-400 transition-colors">
               FAQs
             </Link>
           </FooterList>
@@ -99,33 +87,29 @@ const Footer = () => {
                 width={120}
                 height={120}
                 className="bg-white p-2 rounded"
-                priority={true}
               />
-              <p className="text-xs">Scan to follow us</p>
+              <p className="text-sm">Scan to follow us</p>
 
               <div className="flex gap-4 items-center">
                 <Link
                   href="https://www.facebook.com/profile.php?id=100058767700619&mibextid=LQQJ4d"
                   target="_blank"
                   rel="noopener noreferrer"
+                  aria-label="Follow SGTech on Facebook"
                   className="text-teal-400 hover:text-white transition-colors"
                 >
                   <MdFacebook size={24} />
                 </Link>
                 <Link
-                  href="#"
-                  className="text-teal-400 hover:text-white transition-colors flex items-center gap-1"
-                >
-                  <FaTwitter size={24} />
-                </Link>
-                <Link
                   href="https://www.instagram.com/__tphong7684/"
+                  aria-label="Follow SGTech on Instagram"
                   className="text-teal-400 hover:text-white transition-colors flex items-center gap-1"
                 >
                   <FaInstagram size={24} />
                 </Link>
                 <Link
                   href="https://www.youtube.com/@PhongNguyen-ch9hv"
+                  aria-label="Follow SGTech on YouTube"
                   className="text-teal-400 hover:text-white transition-colors flex items-center gap-1"
                 >
                   <FaYoutube size={24} />
