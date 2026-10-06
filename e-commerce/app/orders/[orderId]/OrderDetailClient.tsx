@@ -186,6 +186,8 @@ export default function OrderDetailClient({ currentUser, orderId }: OrderDetailC
   ]
     .filter(Boolean)
     .join(", ");
+  const deliverySteps = ["pending", "dispatched", "delivered"];
+  const deliveryStep = deliverySteps.indexOf(order.deliveryStatus ?? "");
 
   return (
     <div className="pb-10">
@@ -326,6 +328,12 @@ export default function OrderDetailClient({ currentUser, orderId }: OrderDetailC
               <MdLocalShipping size={16} className="text-slate-400" />
               Delivery
             </h3>
+            {deliveryStep >= 0 && <ol aria-label="Delivery progress" className="mb-5 flex gap-2 border-b border-slate-100 pb-4">
+              {deliverySteps.map((step, index) => <li key={step} aria-current={index === deliveryStep ? "step" : undefined} className={`flex min-w-0 flex-1 flex-col items-center gap-2 text-center text-xs ${index <= deliveryStep ? "text-teal-700" : "text-slate-400"}`}>
+                <span aria-hidden="true" className={`flex h-7 w-7 items-center justify-center rounded-full border font-medium ${index <= deliveryStep ? "border-teal-200 bg-teal-50" : "border-slate-200 bg-slate-50"}`}>{index + 1}</span>
+                {DELIVERY_MAP[step].label}
+              </li>)}
+            </ol>}
             <dl className="space-y-2 text-sm">
               {deliveryInfo && (
                 <div className="flex justify-between">

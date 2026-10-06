@@ -7,7 +7,7 @@ import {
   useStripe,
   PaymentElement,
 } from "@stripe/react-stripe-js";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import toast from "react-hot-toast";
 import Heading from "../components/Headinng";
 import Link from "next/link";
@@ -19,6 +19,9 @@ import { API_PATHS } from "../../utils/apiPaths";
 import { PROVINCES_API } from "../../utils/externalApiPaths";
 
 const PHONE_REGEX = /^\+?[0-9]{9,15}$/;
+type LocationLevel = "province" | "district" | "ward";
+type DeliveryField = LocationLevel | "fullName" | "houseNumber" | "phoneNumber";
+interface LocationOption { code: number; name: string }
 
 interface CheckoutFormProps {
   clientSecret: string;
@@ -49,56 +52,94 @@ export default function CheckoutForm({
     useState(!hasSavedDeliveryInfo);
 
   const [houseNumber, setHouseNumber] = useState("");
-  const [provinces, setProvinces] = useState<any[]>([]);
-  const [districts, setDistricts] = useState<any[]>([]);
-  const [wards, setWards] = useState<any[]>([]);
-  const [province, setProvince] = useState<any>(null);
-  const [district, setDistrict] = useState<any>(null);
-  const [ward, setWard] = useState<any>(null);
+  const [provinces, setProvinces] = useState<LocationOption[]>([]);
+  const [districts, setDistricts] = useState<LocationOption[]>([]);
+  const [wards, setWards] = useState<LocationOption[]>([]);
+  const [province, setProvince] = useState<LocationOption | null>(null);
+  const [district, setDistrict] = useState<LocationOption | null>(null);
+  const [ward, setWard] = useState<LocationOption | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<DeliveryField, string>>>({});
+  const [locationErrors, setLocationErrors] = useState<Partial<Record<LocationLevel, string>>>({});
+  const [locationLoading, setLocationLoading] = useState<Partial<Record<LocationLevel, boolean>>>({});
+  const locationRequests = useRef({ province: 0, district: 0, ward: 0 });
 
   const [phoneNumber, setPhoneNumber] = useState(
     currentUser?.phoneNumber || "",
   );
   const formattedPrice = formatPrice(cartTotalQtyAmount);
 
-  useEffect(() => {
-    fetch(PROVINCES_API.GET_ALL)
-      .then((res) => res.json())
-      .then((data) => setProvinces(data))
-      .catch((err) => console.log(err));
+  const loadLocations = useCallback(async (level: LocationLevel, url: string) => {
+    const request = ++locationRequests.current[level];
+    setLocationLoading((previous) => ({ ...previous, [level]: true }));
+    setLocationErrors((previous) => ({ ...previous, [level]: undefined }));
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Address lookup failed");
+      const data = await response.json();
+      const options = level === "province" ? data : level === "district" ? data.districts : data.wards;
+      if (!Array.isArray(options)) throw new Error("Invalid address response");
+      if (request !== locationRequests.current[level]) return;
+      if (level === "province") setProvinces(options);
+      else if (level === "district") setDistricts(options);
+      else setWards(options);
+    } catch {
+      if (request === locationRequests.current[level]) setLocationErrors((previous) => ({ ...previous, [level]: "We couldn't load these locations. Please try again." }));
+    } finally {
+      if (request === locationRequests.current[level]) setLocationLoading((previous) => ({ ...previous, [level]: false }));
+    }
   }, []);
 
+  useEffect(() => {
+    void loadLocations("province", PROVINCES_API.GET_ALL);
+    return () => { locationRequests.current.province++; locationRequests.current.district++; locationRequests.current.ward++; };
+  }, [loadLocations]);
+
+  const clearFieldError = (field: DeliveryField) => setFieldErrors((previous) => ({ ...previous, [field]: undefined }));
+  const renderFieldError = (field: DeliveryField) => fieldErrors[field] && <p id={`${field}-error`} role="alert" className="text-sm text-rose-600">{fieldErrors[field]}</p>;
+  const renderLocationStatus = (level: LocationLevel, retry: () => void) => (
+    <div id={`${level}-status`}>
+      {locationLoading[level] && <p role="status" className="text-sm text-slate-500">Loading locations...</p>}
+      {locationErrors[level] && <div role="alert" className="flex flex-wrap items-center gap-2 text-sm text-rose-600">
+        <p>{locationErrors[level]}</p><button type="button" onClick={retry} className="min-h-11 font-medium text-teal-700 underline">Try again</button>
+      </div>}
+    </div>
+  );
+
   const handleProvinceChange = (code: string) => {
-    const p = provinces.find((x) => x.code == code);
-    setProvince(p);
+    const p = provinces.find((x) => String(x.code) === code);
+    setProvince(p ?? null);
+    clearFieldError("province");
+    locationRequests.current.district++;
+    locationRequests.current.ward++;
+    setLocationErrors((previous) => ({ ...previous, district: undefined, ward: undefined }));
+    setLocationLoading((previous) => ({ ...previous, district: false, ward: false }));
     setDistrict(null);
     setWard(null);
     setDistricts([]);
     setWards([]);
     if (p) {
-      fetch(PROVINCES_API.GET_PROVINCE(p.code))
-        .then((res) => res.json())
-        .then((data) => setDistricts(data.districts))
-        .catch((err) => console.log(err));
+      void loadLocations("district", PROVINCES_API.GET_PROVINCE(p.code));
     }
   };
 
   const handleDistrictChange = (code: string) => {
-    const d = districts.find((x) => x.code == code);
-    setDistrict(d);
+    const d = districts.find((x) => String(x.code) === code);
+    setDistrict(d ?? null);
+    clearFieldError("district");
+    locationRequests.current.ward++;
+    setLocationErrors((previous) => ({ ...previous, ward: undefined }));
+    setLocationLoading((previous) => ({ ...previous, ward: false }));
     setWard(null);
     setWards([]);
     if (d) {
-      fetch(PROVINCES_API.GET_DISTRICT(d.code))
-        .then((res) => res.json())
-        .then((data) => setWards(data.wards))
-        .catch((err) => console.log(err));
+      void loadLocations("ward", PROVINCES_API.GET_DISTRICT(d.code));
     }
   };
 
   const handleWardChange = (code: string) => {
-    const w = wards.find((x) => x.code == code);
-    setWard(w);
+    const w = wards.find((x) => String(x.code) === code);
+    setWard(w ?? null);
+    clearFieldError("ward");
   };
 
   const getFinalAddress = () => {
@@ -125,6 +166,9 @@ export default function CheckoutForm({
   };
 
   const handleCancelEditingDeliveryInfo = () => {
+    setFieldErrors({});
+    locationRequests.current.district++;
+    locationRequests.current.ward++;
     setIsEditingDeliveryInfo(false);
     setShouldSaveDeliveryInfo(false);
     setHouseNumber("");
@@ -153,13 +197,19 @@ export default function CheckoutForm({
       ? normalizedPhone
       : (currentUser?.phoneNumber || normalizedPhone).replace(/\s+/g, "");
 
-    if (!finalAddress) {
-      toast.error("Address is required");
-      return;
+    const errors: Partial<Record<DeliveryField, string>> = {};
+    if (!fullName.trim()) errors.fullName = "Please enter the recipient's full name.";
+    if (isEditingDeliveryInfo) {
+      if (!province) errors.province = "Please select a province or city.";
+      if (!district) errors.district = "Please select a district.";
+      if (!ward) errors.ward = "Please select a ward.";
+      if (!houseNumber.trim()) errors.houseNumber = "Please enter your house number and street.";
     }
-
-    if (!PHONE_REGEX.test(finalPhone)) {
-      toast.error("Invalid phone number format");
+    if (!finalAddress.trim()) errors.houseNumber = "Please enter a delivery address.";
+    if (!PHONE_REGEX.test(finalPhone)) errors.phoneNumber = "Enter a valid phone number with 9–15 digits.";
+    setFieldErrors(errors);
+    if (Object.keys(errors).length) {
+      document.getElementById(Object.keys(errors)[0])?.focus();
       return;
     }
 
@@ -306,7 +356,7 @@ export default function CheckoutForm({
     }
   };
   return (
-    <form onSubmit={handleSubmit} id="payment-form">
+    <form onSubmit={handleSubmit} id="payment-form" noValidate>
       <Link
         href="/cart"
         className="text-slate-500 flex items-center gap-1 mt-2 mb-4"
@@ -320,17 +370,22 @@ export default function CheckoutForm({
       <h2 className="text-lg font-semibold mt-4 mb-4">Delivery Information</h2>
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-slate-700">
+          <label htmlFor="fullName" className="text-sm font-medium text-slate-700">
             Full Name
           </label>
           <input
             type="text"
             value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
+            id="fullName"
+            autoComplete="name"
+            aria-invalid={Boolean(fieldErrors.fullName)}
+            aria-describedby="fullName-error"
+            onChange={(e) => { setFullName(e.target.value); clearFieldError("fullName"); }}
             placeholder="e.g., John Doe"
             required
             className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base outline-none transition focus:border-slate-400"
           />
+          {renderFieldError("fullName")}
         </div>
 
         {hasSavedDeliveryInfo && !isEditingDeliveryInfo ? (
@@ -357,14 +412,20 @@ export default function CheckoutForm({
                 Change
               </button>
             </div>
+            {renderFieldError("phoneNumber")}
+            {renderFieldError("houseNumber")}
           </div>
         ) : (
           <>
             <div className="flex flex-col gap-2 mt-2">
-              <label className="text-sm font-medium text-slate-700">
+              <label htmlFor="province" className="text-sm font-medium text-slate-700">
                 Province / City
               </label>
               <select
+                id="province"
+                disabled={locationLoading.province}
+                aria-invalid={Boolean(fieldErrors.province)}
+                aria-describedby="province-error province-status"
                 required
                 value={province?.code || ""}
                 onChange={(e) => handleProvinceChange(e.target.value)}
@@ -379,16 +440,21 @@ export default function CheckoutForm({
                   </option>
                 ))}
               </select>
+              {renderFieldError("province")}
+              {renderLocationStatus("province", () => { void loadLocations("province", PROVINCES_API.GET_ALL); })}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-slate-700">
+                <label htmlFor="district" className="text-sm font-medium text-slate-700">
                   District
                 </label>
                 <select
                   required
-                  disabled={!province}
+                  id="district"
+                  aria-invalid={Boolean(fieldErrors.district)}
+                  aria-describedby="district-error district-status"
+                  disabled={!province || locationLoading.district}
                   value={district?.code || ""}
                   onChange={(e) => handleDistrictChange(e.target.value)}
                   className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base outline-none transition focus:border-slate-400 disabled:opacity-50 disabled:bg-slate-50"
@@ -402,15 +468,20 @@ export default function CheckoutForm({
                     </option>
                   ))}
                 </select>
+                {renderFieldError("district")}
+                {renderLocationStatus("district", () => { if (province) void loadLocations("district", PROVINCES_API.GET_PROVINCE(province.code)); })}
               </div>
 
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-slate-700">
+                <label htmlFor="ward" className="text-sm font-medium text-slate-700">
                   Ward
                 </label>
                 <select
                   required
-                  disabled={!district}
+                  id="ward"
+                  aria-invalid={Boolean(fieldErrors.ward)}
+                  aria-describedby="ward-error ward-status"
+                  disabled={!district || locationLoading.ward}
                   value={ward?.code || ""}
                   onChange={(e) => handleWardChange(e.target.value)}
                   className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base outline-none transition focus:border-slate-400 disabled:opacity-50 disabled:bg-slate-50"
@@ -424,35 +495,47 @@ export default function CheckoutForm({
                     </option>
                   ))}
                 </select>
+                {renderFieldError("ward")}
+                {renderLocationStatus("ward", () => { if (district) void loadLocations("ward", PROVINCES_API.GET_DISTRICT(district.code)); })}
               </div>
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-slate-700">
+              <label htmlFor="houseNumber" className="text-sm font-medium text-slate-700">
                 House Number, Street Name
               </label>
               <input
                 type="text"
                 value={houseNumber}
-                onChange={(e) => setHouseNumber(e.target.value)}
+                id="houseNumber"
+                autoComplete="address-line1"
+                aria-invalid={Boolean(fieldErrors.houseNumber)}
+                aria-describedby="houseNumber-error"
+                onChange={(e) => { setHouseNumber(e.target.value); clearFieldError("houseNumber"); }}
                 placeholder="e.g., 387/57 1st Street..."
                 required
                 className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base outline-none transition focus:border-slate-400"
               />
+              {renderFieldError("houseNumber")}
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-slate-700">
+              <label htmlFor="phoneNumber" className="text-sm font-medium text-slate-700">
                 Phone Number
               </label>
               <input
                 type="tel"
                 value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
+                id="phoneNumber"
+                autoComplete="tel"
+                aria-invalid={Boolean(fieldErrors.phoneNumber)}
+                aria-describedby="phoneNumber-error"
+                onChange={(e) => { setPhoneNumber(e.target.value); clearFieldError("phoneNumber"); }}
                 placeholder="+84901234567"
                 required
                 className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:opacity-70"
               />
+              {renderFieldError("phoneNumber")}
             </div>
 
             <div className="mt-1 flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">

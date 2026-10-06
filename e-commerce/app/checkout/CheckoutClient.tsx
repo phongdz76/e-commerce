@@ -243,6 +243,7 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
         <div className="flex items-center justify-center flex-col gap-4">
           <FiCheckCircle size={40} className="text-teal-600" aria-hidden="true" />
           <h1 className="text-2xl font-bold text-center">Order received</h1>
+          {recentOrderId && <p className="text-base text-slate-700">Order <span className="font-mono font-medium">#{recentOrderId.slice(-8).toUpperCase()}</span></p>}
           <p className="text-base text-center text-slate-500">View your orders for payment and delivery updates.</p>
           <div className="max-w-[220px] w-full mx-auto mt-4">
             <Button

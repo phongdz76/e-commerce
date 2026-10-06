@@ -12,6 +12,7 @@ import { MdArrowBack } from "react-icons/md";
 import Heading from "@/app/components/Headinng";
 import { FaBoxOpen } from "react-icons/fa";
 import Button from "@/app/components/Button";
+import SelectMenu from "@/app/components/inputs/SelectMenu";
 
 interface OrderProduct {
   id: string;
@@ -69,6 +70,13 @@ export default function OrdersClient({ currentUser }: OrdersClientProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [retryAttempt, setRetryAttempt] = useState(0);
+  const [paymentFilter, setPaymentFilter] = useState("all");
+  const [deliveryFilter, setDeliveryFilter] = useState("all");
+  const filteredOrders = orders.filter((order) => {
+    const paymentStatus = ["complete", "paid", "done"].includes(order.status) ? "complete" : order.status;
+    return (paymentFilter === "all" || paymentStatus === paymentFilter) && (deliveryFilter === "all" || order.deliveryStatus === deliveryFilter);
+  });
+  const hasFilters = paymentFilter !== "all" || deliveryFilter !== "all";
 
   useEffect(() => {
     if (!currentUser) {
@@ -128,9 +136,22 @@ export default function OrdersClient({ currentUser }: OrdersClientProps) {
       <p className="text-sm text-slate-500 mt-1 mb-6">
         {orders.length} order{orders.length > 1 ? "s" : ""}
       </p>
+      <div className="mb-6 flex flex-wrap items-end gap-3">
+        <div className="w-full sm:w-56">
+          <label htmlFor="order-payment-filter" className="mb-2 block text-sm font-medium">Payment status</label>
+          <SelectMenu id="order-payment-filter" label="Payment status" value={paymentFilter} onChange={setPaymentFilter} options={[{ value: "all", label: "All payments" }, ...["pending", "processing", "complete", "failed", "cancelled"].map((value) => ({ value, label: STATUS_LABELS[value].label }))]} />
+        </div>
+        <div className="w-full sm:w-56">
+          <label htmlFor="order-delivery-filter" className="mb-2 block text-sm font-medium">Delivery status</label>
+          <SelectMenu id="order-delivery-filter" label="Delivery status" value={deliveryFilter} onChange={setDeliveryFilter} options={[{ value: "all", label: "All deliveries" }, ...Object.entries(DELIVERY_LABELS).map(([value, info]) => ({ value, label: info.label }))]} />
+        </div>
+        {hasFilters && <button type="button" onClick={() => { setPaymentFilter("all"); setDeliveryFilter("all"); }} className="min-h-11 text-base text-teal-700 hover:underline">Clear filters</button>}
+      </div>
+      {hasFilters && <p role="status" className="mb-4 text-base text-slate-500">{filteredOrders.length} order{filteredOrders.length === 1 ? "" : "s"} found</p>}
+      {!filteredOrders.length && <div className="rounded-lg border border-slate-200 p-6 text-center text-base text-slate-500">No orders match these filters.</div>}
 
       {/* Table for desktop */}
-      <div className="hidden md:block overflow-x-auto rounded-lg border border-slate-200">
+      <div className={`${filteredOrders.length ? "hidden md:block" : "hidden"} overflow-x-auto rounded-lg border border-slate-200`}>
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200 text-left">
@@ -143,7 +164,7 @@ export default function OrdersClient({ currentUser }: OrdersClientProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {orders.map((order) => {
+            {filteredOrders.map((order) => {
               const date = new Date(order.createDate).toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
@@ -231,7 +252,7 @@ export default function OrdersClient({ currentUser }: OrdersClientProps) {
 
       {/* Cards for mobile */}
       <div className="md:hidden flex flex-col gap-3">
-        {orders.map((order) => {
+        {filteredOrders.map((order) => {
           const date = new Date(order.createDate).toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
