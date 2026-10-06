@@ -23,6 +23,15 @@ type LocationLevel = "province" | "district" | "ward";
 type DeliveryField = LocationLevel | "fullName" | "houseNumber" | "phoneNumber";
 interface LocationOption { code: number; name: string }
 
+function LocationStatus({ level, loading, error, onRetry }: { level: LocationLevel; loading?: boolean; error?: string; onRetry: () => void }) {
+  return <div id={`${level}-status`}>
+    {loading && <p role="status" className="text-sm text-slate-500">Loading locations...</p>}
+    {error && <div role="alert" className="flex flex-wrap items-center gap-2 text-sm text-rose-600">
+      <p>{error}</p><button type="button" onClick={onRetry} className="min-h-11 font-medium text-teal-700 underline">Try again</button>
+    </div>}
+  </div>;
+}
+
 interface CheckoutFormProps {
   clientSecret: string;
   handleSetPaymentSuccess: (value: boolean, orderId?: string) => void;
@@ -60,7 +69,7 @@ export default function CheckoutForm({
   const [ward, setWard] = useState<LocationOption | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<DeliveryField, string>>>({});
   const [locationErrors, setLocationErrors] = useState<Partial<Record<LocationLevel, string>>>({});
-  const [locationLoading, setLocationLoading] = useState<Partial<Record<LocationLevel, boolean>>>({});
+  const [locationLoading, setLocationLoading] = useState<Partial<Record<LocationLevel, boolean>>>({ province: true });
   const locationRequests = useRef({ province: 0, district: 0, ward: 0 });
 
   const [phoneNumber, setPhoneNumber] = useState(
@@ -90,20 +99,14 @@ export default function CheckoutForm({
   }, []);
 
   useEffect(() => {
-    void loadLocations("province", PROVINCES_API.GET_ALL);
-    return () => { locationRequests.current.province++; locationRequests.current.district++; locationRequests.current.ward++; };
+    let active = true;
+    const requests = locationRequests.current;
+    void Promise.resolve().then(() => { if (active) return loadLocations("province", PROVINCES_API.GET_ALL); });
+    return () => { active = false; requests.province++; requests.district++; requests.ward++; };
   }, [loadLocations]);
 
   const clearFieldError = (field: DeliveryField) => setFieldErrors((previous) => ({ ...previous, [field]: undefined }));
   const renderFieldError = (field: DeliveryField) => fieldErrors[field] && <p id={`${field}-error`} role="alert" className="text-sm text-rose-600">{fieldErrors[field]}</p>;
-  const renderLocationStatus = (level: LocationLevel, retry: () => void) => (
-    <div id={`${level}-status`}>
-      {locationLoading[level] && <p role="status" className="text-sm text-slate-500">Loading locations...</p>}
-      {locationErrors[level] && <div role="alert" className="flex flex-wrap items-center gap-2 text-sm text-rose-600">
-        <p>{locationErrors[level]}</p><button type="button" onClick={retry} className="min-h-11 font-medium text-teal-700 underline">Try again</button>
-      </div>}
-    </div>
-  );
 
   const handleProvinceChange = (code: string) => {
     const p = provinces.find((x) => String(x.code) === code);
@@ -441,7 +444,7 @@ export default function CheckoutForm({
                 ))}
               </select>
               {renderFieldError("province")}
-              {renderLocationStatus("province", () => { void loadLocations("province", PROVINCES_API.GET_ALL); })}
+              <LocationStatus level="province" loading={locationLoading.province} error={locationErrors.province} onRetry={() => { void loadLocations("province", PROVINCES_API.GET_ALL); }} />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -469,7 +472,7 @@ export default function CheckoutForm({
                   ))}
                 </select>
                 {renderFieldError("district")}
-                {renderLocationStatus("district", () => { if (province) void loadLocations("district", PROVINCES_API.GET_PROVINCE(province.code)); })}
+                <LocationStatus level="district" loading={locationLoading.district} error={locationErrors.district} onRetry={() => { if (province) void loadLocations("district", PROVINCES_API.GET_PROVINCE(province.code)); }} />
               </div>
 
               <div className="flex flex-col gap-2">
@@ -496,7 +499,7 @@ export default function CheckoutForm({
                   ))}
                 </select>
                 {renderFieldError("ward")}
-                {renderLocationStatus("ward", () => { if (district) void loadLocations("ward", PROVINCES_API.GET_DISTRICT(district.code)); })}
+                <LocationStatus level="ward" loading={locationLoading.ward} error={locationErrors.ward} onRetry={() => { if (district) void loadLocations("ward", PROVINCES_API.GET_DISTRICT(district.code)); }} />
               </div>
             </div>
 
