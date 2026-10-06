@@ -1,6 +1,7 @@
 import prisma from "@/libs/prismadb";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/actions/getCurrentUser";
+import { syncStripeOrder } from "@/libs/syncStripeOrder";
 
 export async function GET() {
   const currentUser = await getCurrentUser();
@@ -14,7 +15,11 @@ export async function GET() {
       orderBy: { createDate: "desc" },
     });
 
-    const safeOrders = orders.map((order) => ({
+    const reconciled = await Promise.all(orders.map(async (order) => {
+      if (order.paymentMethod !== "STRIPE" || ["complete", "paid", "done"].includes(order.status)) return order;
+      try { return await syncStripeOrder(order); } catch { return order; }
+    }));
+    const safeOrders = reconciled.filter((order) => order.status !== "draft").map((order) => ({
       id: order.id,
       amount: order.amount,
       currency: order.currency,

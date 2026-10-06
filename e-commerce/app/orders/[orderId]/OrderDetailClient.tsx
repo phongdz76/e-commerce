@@ -66,7 +66,10 @@ const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> =
   {
     pending: { label: "Pending", color: "text-amber-700", bg: "bg-amber-50 border-amber-200" },
     processing: { label: "Processing", color: "text-blue-700", bg: "bg-blue-50 border-blue-200" },
-    complete: { label: "Completed", color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
+    complete: { label: "Done", color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
+    paid: { label: "Done", color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
+    done: { label: "Done", color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
+    failed: { label: "Failed", color: "text-rose-700", bg: "bg-rose-50 border-rose-200" },
     cancelled: { label: "Cancelled", color: "text-rose-700", bg: "bg-rose-50 border-rose-200" },
   };
 
@@ -187,13 +190,18 @@ export default function OrderDetailClient({ currentUser, orderId }: OrderDetailC
   return (
     <div className="pb-10">
       {/* Back */}
+      <div className="mb-5 flex flex-wrap items-center gap-4">
       <Link
         href="/orders"
-        className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 mb-5"
+        className="inline-flex min-h-11 items-center gap-1 text-base text-slate-500 hover:text-slate-700"
       >
         <MdArrowBack size={18} />
         Back to Orders
       </Link>
+      <Link href="/" className="inline-flex min-h-11 items-center gap-2 rounded-md border border-slate-300 px-4 py-2 text-base text-slate-700 transition hover:bg-slate-50 focus-visible:outline-teal-600">
+        <MdArrowBack size={20} aria-hidden="true" />Back to Home
+      </Link>
+      </div>
 
       {/* Header card */}
       <div className="rounded-lg border border-slate-200 bg-white p-5 md:p-6 mb-5">
@@ -210,8 +218,8 @@ export default function OrderDetailClient({ currentUser, orderId }: OrderDetailC
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Badge {...statusInfo} />
-            {deliveryInfo && <Badge {...deliveryInfo} />}
+            <Badge {...statusInfo} label={`Payment: ${statusInfo.label}`} />
+            {deliveryInfo && <Badge {...deliveryInfo} label={`Delivery: ${deliveryInfo.label}`} />}
           </div>
         </div>
       </div>

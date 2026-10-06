@@ -1,6 +1,7 @@
 import prisma from "@/libs/prismadb";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/actions/getCurrentUser";
+import { syncStripeOrder } from "@/libs/syncStripeOrder";
 
 export async function GET(
   request: Request,
@@ -14,7 +15,7 @@ export async function GET(
   try {
     const { orderId } = await params;
 
-    const order = await prisma.order.findUnique({
+    let order = await prisma.order.findUnique({
       where: { id: orderId },
       include: { user: true },
     });
@@ -26,6 +27,10 @@ export async function GET(
     // Only allow the order owner or an admin to view
     if (order.userId !== currentUser.id && currentUser.role !== "ADMIN") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    if (order.paymentMethod === "STRIPE" && !["complete", "paid", "done"].includes(order.status)) {
+      try { order = await syncStripeOrder(order); } catch { /* Keep the stored status if Stripe is temporarily unavailable. */ }
     }
 
     return NextResponse.json({

@@ -9,6 +9,7 @@ export const API_PATHS = {
   },
   PAYMENT: {
     CREATE_INTENT: "/api/create-payment-intent",
+    SYNC_STRIPE_ORDER: "/api/order/stripe-status",
     MOMO_CREATE_URL: "/api/momo/create-payment-url",
   },
   ORDER: {

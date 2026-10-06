@@ -11,6 +11,7 @@ import { formatPrice } from "@/utils/formatPrice";
 import { MdArrowBack } from "react-icons/md";
 import Heading from "@/app/components/Headinng";
 import { FaBoxOpen } from "react-icons/fa";
+import Button from "@/app/components/Button";
 
 interface OrderProduct {
   id: string;
@@ -42,7 +43,10 @@ interface OrdersClientProps {
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   pending: { label: "Pending", className: "bg-amber-50 text-amber-700 border-amber-200" },
   processing: { label: "Processing", className: "bg-blue-50 text-blue-700 border-blue-200" },
-  complete: { label: "Completed", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  complete: { label: "Done", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  paid: { label: "Done", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  done: { label: "Done", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  failed: { label: "Failed", className: "bg-rose-50 text-rose-700 border-rose-200" },
   cancelled: { label: "Cancelled", className: "bg-rose-50 text-rose-700 border-rose-200" },
 };
 
@@ -63,10 +67,12 @@ export default function OrdersClient({ currentUser }: OrdersClientProps) {
   const router = useRouter();
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const [retryAttempt, setRetryAttempt] = useState(0);
 
   useEffect(() => {
     if (!currentUser) {
-      router.push("/login");
+      router.push("/login?callbackUrl=/orders");
       return;
     }
 
@@ -75,6 +81,7 @@ export default function OrdersClient({ currentUser }: OrdersClientProps) {
         const res = await axios.get("/api/order");
         setOrders(res.data);
       } catch {
+        setHasError(true);
         toast.error("Failed to load orders");
       } finally {
         setIsLoading(false);
@@ -82,14 +89,22 @@ export default function OrdersClient({ currentUser }: OrdersClientProps) {
     };
 
     fetchOrders();
-  }, [currentUser, router]);
+  }, [currentUser, router, retryAttempt]);
 
   if (isLoading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <p className="text-slate-500">Loading...</p>
+        <p role="status" className="text-base text-slate-500">Loading your orders...</p>
       </div>
     );
+  }
+
+  if (hasError) {
+    return <div role="alert" className="min-h-[50vh] flex flex-col items-center justify-center gap-4 text-center">
+      <h1 className="text-2xl font-bold">We couldn’t load your orders</h1>
+      <p className="text-base text-slate-500">Please try again in a moment.</p>
+      <div className="w-full max-w-[220px]"><Button label="Try again" onClick={() => { setHasError(false); setIsLoading(true); setRetryAttempt((attempt) => attempt + 1); }} /></div>
+    </div>;
   }
 
   if (orders.length === 0) {
@@ -97,11 +112,11 @@ export default function OrdersClient({ currentUser }: OrdersClientProps) {
       <div className="min-h-[50vh] flex flex-col items-center justify-center">
         <div className="text-xl">You have no orders yet</div>
         <Link
-          href="/"
+          href="/products"
           className="text-slate-500 flex items-center gap-1 mt-2"
         >
           <MdArrowBack size={15} />
-          <span className="text-sm">Start Shopping</span>
+          <span className="text-base">Start Shopping</span>
         </Link>
       </div>
     );
@@ -151,9 +166,9 @@ export default function OrdersClient({ currentUser }: OrdersClientProps) {
                   className="cursor-pointer hover:bg-slate-50 transition"
                 >
                   <td className="px-4 py-3">
-                    <span className="font-mono text-xs text-slate-600">
+                    <Link href={`/orders/${order.id}`} className="font-mono text-sm text-slate-600 hover:text-teal-700">
                       #{order.id.slice(-8).toUpperCase()}
-                    </span>
+                    </Link>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -193,13 +208,13 @@ export default function OrdersClient({ currentUser }: OrdersClientProps) {
                       <span
                         className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${status.className}`}
                       >
-                        {status.label}
+                        Payment: {status.label}
                       </span>
                       {delivery && (
                         <span
                           className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${delivery.className}`}
                         >
-                          {delivery.label}
+                          Delivery: {delivery.label}
                         </span>
                       )}
                     </div>
@@ -276,12 +291,17 @@ export default function OrdersClient({ currentUser }: OrdersClientProps) {
                   <p className="text-sm font-semibold text-slate-800">
                     {formatPrice(order.amount)}
                   </p>
-                  <span
-                    className={`inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium border ${status.className}`}
-                  >
-                    {status.label}
-                  </span>
                 </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <span className={`inline-block rounded border px-2 py-1 text-xs font-medium ${status.className}`}>
+                  Payment: {status.label}
+                </span>
+                {order.deliveryStatus && DELIVERY_LABELS[order.deliveryStatus] && (
+                  <span className={`inline-block rounded border px-2 py-1 text-xs font-medium ${DELIVERY_LABELS[order.deliveryStatus].className}`}>
+                    Delivery: {DELIVERY_LABELS[order.deliveryStatus].label}
+                  </span>
+                )}
               </div>
             </Link>
           );
