@@ -59,16 +59,18 @@ export async function GET(req: Request) {
 
   if (resultCode === "0") {
     // Payment success
+    let savedOrderId: string | undefined;
     try {
-      await prisma.order.update({
+      const order = await prisma.order.update({
         where: { paymentIntentId: orderId },
         data: { status: "paid" },
       });
+      savedOrderId = order.id;
     } catch (error) {
       console.log("MoMo Return: Failed to update order", error);
     }
     return NextResponse.redirect(
-      new URL("/checkout?momo=success", baseUrl),
+      new URL(`/checkout?momo=success${savedOrderId ? `&order=${savedOrderId}` : ""}`, baseUrl),
     );
   } else {
     // Payment failed

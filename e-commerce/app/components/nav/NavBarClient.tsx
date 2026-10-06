@@ -19,6 +19,16 @@ export default function NavBarClient({ currentUser, logoClassName }: NavBarClien
   const searchTrigger = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+    // A tab restored after leaving for payment can retain UI from before a code edit.
+    const reloadRestoredPage = (event: PageTransitionEvent) => {
+      if (event.persisted) window.location.reload();
+    };
+    window.addEventListener("pageshow", reloadRestoredPage);
+    return () => window.removeEventListener("pageshow", reloadRestoredPage);
+  }, []);
+
+  useEffect(() => {
     if (!isSearchOpen) return;
     searchPanel.current?.querySelector<HTMLInputElement>("input[type=search]")?.focus();
     const closeOutside = (event: PointerEvent) => {

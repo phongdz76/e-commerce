@@ -1,6 +1,8 @@
 import prisma from "@/libs/prismadb";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/actions/getCurrentUser";
+import { getOrderDelivery } from "@/libs/orderDelivery";
+import { getOrderItems } from "@/libs/orderItems";
 
 export async function POST(req: Request) {
   const currentUser = await getCurrentUser();
@@ -10,64 +12,31 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { items, address, phone } = body;
+    const delivery = getOrderDelivery(body);
+    if (!delivery) return NextResponse.json({ error: "Please provide a valid recipient name, phone number and delivery address." }, { status: 400 });
 
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return NextResponse.json(
-        { error: "No items provided" },
-        { status: 400 },
-      );
-    }
-
-    // Sanitize products to match Prisma CartProductProps schema exactly
-    const sanitizedProducts = items.map((item: any) => ({
-      id: item.id,
-      name: item.name,
-      description: item.description || "",
-      category: item.category || "",
-      brand: item.brand || "",
-      selectedImg: {
-        color: item.selectedImg?.color || "",
-        colorCode: item.selectedImg?.colorCode || "",
-        image: item.selectedImg?.image || "",
-      },
-      quantity: item.quantity,
-      price: item.price,
-    }));
-
-    const totalPrice = sanitizedProducts.reduce(
-      (acc: number, item: any) => acc + item.price * item.quantity,
-      0,
-    );
-    const total = Math.round(totalPrice);
+    const cart = getOrderItems(body?.items);
+    if (!cart) return NextResponse.json({ error: "Please review the products and quantities in your cart" }, { status: 400 });
 
     const order = await prisma.order.create({
       data: {
         userId: currentUser.id,
-        amount: total,
+        amount: cart.amount,
         currency: "vnd",
         paymentMethod: "COD",
         status: "pending",
         deliveryStatus: "pending",
-        products: sanitizedProducts,
+        products: cart.items,
         paymentIntentId: `COD_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-        address: address
-          ? {
-              city: "",
-              country: "VN",
-              line1: address,
-              postal_code: "",
-              state: "",
-            }
-          : undefined,
+        ...delivery,
       },
     });
 
     return NextResponse.json({ success: true, order });
-  } catch (error: any) {
-    console.error("COD Create Error:", error?.message || error);
+  } catch (error: unknown) {
+    console.error("COD Create Error:", error instanceof Error ? error.message : "Unknown error");
     return NextResponse.json(
-      { error: "Internal Error", details: error?.message },
+      { error: "Unable to place your order. Please try again." },
       { status: 500 },
     );
   }

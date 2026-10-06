@@ -226,7 +226,7 @@ export const products = [
     "id": "670000000000000000000003",
     "name": "Apple iMac 24-inch, 8GB RAM, 256GB SSD",
     "description": "An all-in-one Mac workspace for everyday documents, media and creative projects.",
-    "price": 26990000,
+    "price": 269900000,
     "brand": "Apple",
     "category": "Desktop",
     "inStock": true,

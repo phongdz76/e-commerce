@@ -6,7 +6,7 @@ import prisma from "@/libs/prismadb";
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const searchParams = url.searchParams;
-  let vnp_Params: any = {};
+  let vnp_Params: Record<string, string> = {};
 
   for (const [key, value] of searchParams.entries()) {
     vnp_Params[key] = value;
@@ -16,9 +16,9 @@ export async function GET(req: Request) {
   delete vnp_Params['vnp_SecureHash'];
   delete vnp_Params['vnp_SecureHashType'];
 
-  function sortObject(obj: any) {
-    let sorted: any = {};
-    let str = [];
+  function sortObject(obj: Record<string, string>) {
+    const sorted: Record<string, string> = {};
+    const str: string[] = [];
     let key;
     for (key in obj){
       if (obj.hasOwnProperty(key)) {
@@ -44,11 +44,11 @@ export async function GET(req: Request) {
     
     if (rspCode === '00') {
       // Payment success
-      await prisma.order.update({
+      const order = await prisma.order.update({
         where: { paymentIntentId: orderId },
         data: { status: "paid" },
       });
-      return NextResponse.redirect(new URL("/checkout?vnpay=success", req.url)); 
+      return NextResponse.redirect(new URL(`/checkout?vnpay=success&order=${order.id}`, req.url));
     } else {
       // Payment failed
       await prisma.order.update({

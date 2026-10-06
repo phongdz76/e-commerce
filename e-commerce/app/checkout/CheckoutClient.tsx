@@ -6,10 +6,11 @@ import { useCart } from "../hooks/useCart";
 import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { Elements } from "@stripe/react-stripe-js";
-import CheckoutForm from "../checkout/CheckoutForm";
+import CheckoutForm, { type CheckoutReceipt } from "../checkout/CheckoutForm";
 import Button from "../components/Button";
 import Link from "next/link";
 import { FiCheckCircle } from "react-icons/fi";
+import { formatPrice } from "@/utils/formatPrice";
 
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY as string,
@@ -42,6 +43,7 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
   const [processedCartString, setProcessedCartString] = useState<string | null>(null);
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [recentOrderId, setRecentOrderId] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<CheckoutReceipt | null>(null);
   const [stripeReturnStatus, setStripeReturnStatus] = useState("loading");
   const [returnRetry, setReturnRetry] = useState(0);
 
@@ -49,7 +51,10 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
   const searchParams = useSearchParams();
   const isStripeReturn = searchParams?.get("stripe") === "return";
   const stripeReturnIntent = searchParams?.get("payment_intent");
-  const paymentSuccess = submittedSuccess || searchParams?.get("vnpay") === "success" || searchParams?.get("momo") === "success";
+  const returnedPaymentMethod = searchParams?.get("vnpay") === "success" ? "VNPAY" : searchParams?.get("momo") === "success" ? "MOMO" : null;
+  const returnedOrderId = searchParams?.get("order");
+  const isPaymentReturn = isStripeReturn || Boolean(returnedPaymentMethod);
+  const paymentSuccess = submittedSuccess;
 
   const hasHandledRedirect = useRef(false);
 
@@ -61,6 +66,7 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
       .then(({ order }) => {
         if (!active) return;
         setRecentOrderId(order.id);
+        setReceipt({ amount: order.amount, paymentMethod: order.paymentMethod });
         if (order.status === "complete") {
           setStripeReturnStatus("done");
           setPaymentSuccess(true);
@@ -71,17 +77,33 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
   }, [isStripeReturn, stripeReturnIntent, returnRetry, handleClearCart]);
 
   useEffect(() => {
+    if (!returnedPaymentMethod) return;
+    let active = true;
+    const verifyOrder = async () => {
+      if (!returnedOrderId) throw new Error("Missing order reference");
+      const response = await fetch(`/api/order/${encodeURIComponent(returnedOrderId)}`);
+      if (!response.ok) throw new Error("Unable to load the returned order");
+      const order = await response.json();
+      if (order.paymentMethod !== returnedPaymentMethod) throw new Error("Payment method mismatch");
+      if (!active) return;
+      setRecentOrderId(order.id);
+      setReceipt({ amount: order.amount, paymentMethod: order.paymentMethod });
+      if (["complete", "paid", "done"].includes(order.status)) {
+        setStripeReturnStatus("done");
+        setPaymentSuccess(true);
+        handleClearCart();
+        handleSetPaymentIntent(null);
+      } else setStripeReturnStatus(order.status === "failed" ? "error" : "pending");
+    };
+    void verifyOrder().catch(() => { if (active) setStripeReturnStatus("error"); });
+    return () => { active = false; };
+  }, [returnedPaymentMethod, returnedOrderId, returnRetry, handleClearCart, handleSetPaymentIntent]);
+
+  useEffect(() => {
     if (hasHandledRedirect.current) return;
     
     // Handle VNPay redirect
-    if (searchParams?.get("vnpay") === "success") {
-      hasHandledRedirect.current = true;
-      toast.success("Payment via VNPay successful!");
-      handleSetPaymentIntent(null);
-      setTimeout(() => {
-        handleClearCart();
-      }, 500);
-    } else if (searchParams?.get("vnpay") === "failed") {
+    if (searchParams?.get("vnpay") === "failed") {
       hasHandledRedirect.current = true;
       toast.error("Payment via VNPay failed.");
     } else if (searchParams?.get("vnpay") === "invalid_signature") {
@@ -90,14 +112,7 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
     }
 
     // Handle MoMo redirect
-    if (searchParams?.get("momo") === "success") {
-      hasHandledRedirect.current = true;
-      toast.success("Payment via MoMo successful!");
-      handleSetPaymentIntent(null);
-      setTimeout(() => {
-        handleClearCart();
-      }, 500);
-    } else if (searchParams?.get("momo") === "failed") {
+    if (searchParams?.get("momo") === "failed") {
       hasHandledRedirect.current = true;
       toast.error("Payment via MoMo failed.");
     } else if (searchParams?.get("momo") === "invalid_signature") {
@@ -115,7 +130,7 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
       cartProducts &&
       cartProducts.length > 0 &&
       !paymentSuccess &&
-      !isStripeReturn &&
+      !isPaymentReturn &&
       currentCartString !== processedCartString &&
       !isCreatingIntent.current
     ) {
@@ -136,8 +151,6 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
         }),
       })
         .then(async (res) => {
-          setLoading(false);
-
           if (res.status === 401) {
             router.push("/login?callbackUrl=/checkout");
             throw new Error("Unauthorized");
@@ -158,6 +171,7 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
         .then((data) => {
           if (data.alreadyPaid && data.order?.status === "complete") {
             setRecentOrderId(data.order.id);
+            setReceipt({ amount: data.order.amount, paymentMethod: data.order.paymentMethod });
             setPaymentSuccess(true);
             handleClearCart();
             return;
@@ -180,11 +194,12 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
         })
         .finally(() => {
           isCreatingIntent.current = false;
+          setLoading(false);
         });
 
 
     }
-  }, [cartProducts, paymentIntent, handleSetPaymentIntent, handleClearCart, router, processedCartString, retryAttempt, paymentSuccess, isStripeReturn]);
+  }, [cartProducts, paymentIntent, handleSetPaymentIntent, handleClearCart, router, processedCartString, retryAttempt, paymentSuccess, isPaymentReturn]);
 
   const options: StripeElementsOptions = {
     clientSecret,
@@ -200,8 +215,9 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
     },
   };
 
-  const handlePaymentSuccess = useCallback((value: boolean, orderId?: string) => {
+  const handlePaymentSuccess = useCallback((value: boolean, orderId?: string, orderReceipt?: CheckoutReceipt) => {
     if (orderId) setRecentOrderId(orderId);
+    if (orderReceipt) setReceipt(orderReceipt);
     setPaymentSuccess(value);
     if (value) {
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -210,7 +226,7 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
 
   return (
     <div className="w-full">
-      {clientSecret && !loading && !error && !paymentSuccess && !isStripeReturn && cartProducts && cartProducts.length > 0 && (
+      {clientSecret && !loading && !error && !paymentSuccess && !isPaymentReturn && cartProducts && cartProducts.length > 0 && (
         <Elements options={options} stripe={stripePromise}>
           <CheckoutForm
             clientSecret={clientSecret}
@@ -219,9 +235,9 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
           />
         </Elements>
       )}
-      {isStripeReturn && !paymentSuccess && <div className="flex flex-col items-center gap-4 py-6 text-center">
-        <h1 className="text-2xl font-bold">{stripeReturnStatus === "loading" && stripeReturnIntent ? "Checking your payment..." : stripeReturnStatus === "pending" ? "Payment is being confirmed" : "We couldn’t refresh your payment status"}</h1>
-        <p role="status" className="text-base text-slate-500">Your order status is verified with Stripe. You can check it in Your Orders.</p>
+      {isPaymentReturn && !paymentSuccess && <div className="flex flex-col items-center gap-4 py-6 text-center">
+        <h1 className="text-2xl font-bold">{stripeReturnStatus === "loading" && (stripeReturnIntent || returnedOrderId) ? "Checking your payment..." : stripeReturnStatus === "pending" ? "Payment is being confirmed" : "We couldn’t refresh your payment status"}</h1>
+        <p role="status" className="text-base text-slate-500">Check Your Orders for payment and delivery updates.</p>
         {stripeReturnStatus !== "loading" && <div className="w-full max-w-[220px]"><Button label="Check again" onClick={() => { setStripeReturnStatus("loading"); setReturnRetry((retry) => retry + 1); }} /></div>}
         <Link href={recentOrderId ? `/orders/${recentOrderId}` : "/orders"} className="text-base text-teal-700 hover:underline">View your order</Link>
         <Link href="/" className="text-base text-slate-600 hover:underline">Back to Home</Link>
@@ -237,6 +253,7 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
           <p className="text-base text-slate-500">Your cart is still saved. Please try again.</p>
           <div className="w-full max-w-[220px]"><Button label="Try again" onClick={() => { setError(false); setRetryAttempt((attempt) => attempt + 1); }} /></div>
           <Link href="/cart" className="text-base text-teal-700 hover:underline">Back to cart</Link>
+          <Link href="/orders" className="text-base text-slate-600 hover:underline">View Your Orders</Link>
         </div>
       )}
       {paymentSuccess && (
@@ -244,6 +261,7 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
           <FiCheckCircle size={40} className="text-teal-600" aria-hidden="true" />
           <h1 className="text-2xl font-bold text-center">Order received</h1>
           {recentOrderId && <p className="text-base text-slate-700">Order <span className="font-mono font-medium">#{recentOrderId.slice(-8).toUpperCase()}</span></p>}
+          {receipt && <p className="text-base text-center text-slate-600">{formatPrice(receipt.amount)} · {receipt.paymentMethod === "STRIPE" ? "Credit or debit card (Stripe)" : receipt.paymentMethod === "COD" ? "Cash on Delivery (COD)" : receipt.paymentMethod}</p>}
           <p className="text-base text-center text-slate-500">View your orders for payment and delivery updates.</p>
           <div className="max-w-[220px] w-full mx-auto mt-4">
             <Button
@@ -255,7 +273,7 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
           <Link href="/" className="text-base text-slate-600 hover:underline">Back to Home</Link>
         </div>
       )}
-      {!paymentSuccess && !loading && !isStripeReturn && !cartProducts?.length && <div className="flex flex-col items-center gap-4 py-8 text-center">
+      {!paymentSuccess && !loading && !isPaymentReturn && !cartProducts?.length && <div className="flex flex-col items-center gap-4 py-8 text-center">
         <h1 className="text-2xl font-bold">Your cart is empty</h1>
         <p className="text-base text-slate-500">Add a product to your cart to start checkout.</p>
         <Link href="/products" className="rounded-md bg-slate-700 px-6 py-3 text-base text-white hover:opacity-80">Browse products</Link>

@@ -48,6 +48,8 @@ interface OrderDetail {
   paymentIntentId: string | null;
   products: OrderProduct[];
   address: OrderAddress | null;
+  recipientName?: string | null;
+  recipientPhone?: string | null;
   createDate: string;
   user: {
     id: string;
@@ -200,9 +202,6 @@ export default function OrderDetailClient({ currentUser, orderId }: OrderDetailC
         <MdArrowBack size={18} />
         Back to Orders
       </Link>
-      <Link href="/" className="inline-flex min-h-11 items-center gap-2 rounded-md border border-slate-300 px-4 py-2 text-base text-slate-700 transition hover:bg-slate-50 focus-visible:outline-teal-600">
-        <MdArrowBack size={20} aria-hidden="true" />Back to Home
-      </Link>
       </div>
 
       {/* Header card */}
@@ -343,6 +342,8 @@ export default function OrderDetailClient({ currentUser, orderId }: OrderDetailC
                   </dd>
                 </div>
               )}
+              {order.recipientName && <div><dt className="text-slate-500 mb-1">Recipient</dt><dd className="text-slate-700 break-words">{order.recipientName}</dd></div>}
+              {order.recipientPhone && <div><dt className="text-slate-500 mb-1">Phone</dt><dd><a href={`tel:${order.recipientPhone}`} className="text-teal-700 hover:underline">{order.recipientPhone}</a></dd></div>}
               {addressText && (
                 <div>
                   <dt className="text-slate-500 mb-1">Address</dt>

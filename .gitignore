@@ -1,2 +1,11 @@
 # Root gitignore
 .sixth/
+
+# Local testing directories
+test/
+tests/
+
+# Next.js generates these agent files at the app root.
+# Keep Markdown instructions in skills or local docs instead.
+AGENTS.md
+CLAUDE.md

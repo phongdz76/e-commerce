@@ -26,7 +26,7 @@ export async function syncStripeOrder<T extends StripeOrder>(order: T) {
   // An older event must never move a confirmed payment back to Pending.
   if (["complete", "paid", "done"].includes(order.status) && status !== "complete") return order;
   const shipping = intent.shipping?.address;
-  if (order.status !== status || shipping?.line1) {
+  if (order.status !== status || shipping?.line1 || intent.shipping?.name || intent.shipping?.phone) {
     await prisma.order.updateMany({
       where: {
         id: order.id,
@@ -35,6 +35,8 @@ export async function syncStripeOrder<T extends StripeOrder>(order: T) {
       },
       data: {
         status,
+        ...(intent.shipping?.name ? { recipientName: intent.shipping.name } : {}),
+        ...(intent.shipping?.phone ? { recipientPhone: intent.shipping.phone } : {}),
         ...(shipping?.line1 ? { address: {
           city: shipping.city ?? "",
           country: shipping.country ?? "VN",

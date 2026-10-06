@@ -79,11 +79,6 @@ export default function UserMenu({ currentUser }: UserMenuProps) {
                 <Link href="/profile" onClick={toggleOpen} className="block px-4 py-3 hover:bg-slate-50">
                   Profile
                 </Link>
-                {currentUser?.role === "ADMIN" && (
-                  <Link href="/admin" onClick={toggleOpen} className="block px-4 py-3 hover:bg-slate-50">
-                    Admin Dashboard
-                  </Link>
-                )}
                 <hr />
                 <button
                   type="button"

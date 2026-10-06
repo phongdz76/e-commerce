@@ -43,6 +43,8 @@ export async function GET(
       paymentIntentId: order.paymentIntentId,
       products: order.products,
       address: order.address,
+      recipientName: order.recipientName,
+      recipientPhone: order.recipientPhone,
       createDate: order.createDate.toISOString(),
       user: {
         id: order.user.id,

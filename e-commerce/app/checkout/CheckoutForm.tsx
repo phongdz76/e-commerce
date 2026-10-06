@@ -17,6 +17,7 @@ import { safeUser } from "@/types";
 import axios from "axios";
 import { API_PATHS } from "../../utils/apiPaths";
 import { PROVINCES_API } from "../../utils/externalApiPaths";
+import MoMoPayment, { type MoMoPaymentDetails } from "./MoMoPayment";
 
 const PHONE_REGEX = /^\+?[0-9]{9,15}$/;
 type LocationLevel = "province" | "district" | "ward";
@@ -34,9 +35,11 @@ function LocationStatus({ level, loading, error, onRetry }: { level: LocationLev
 
 interface CheckoutFormProps {
   clientSecret: string;
-  handleSetPaymentSuccess: (value: boolean, orderId?: string) => void;
+  handleSetPaymentSuccess: (value: boolean, orderId?: string, receipt?: CheckoutReceipt) => void;
   currentUser: safeUser | null;
 }
+
+export interface CheckoutReceipt { amount: number; paymentMethod: string }
 
 export default function CheckoutForm({
   clientSecret,
@@ -75,6 +78,7 @@ export default function CheckoutForm({
   const [phoneNumber, setPhoneNumber] = useState(
     currentUser?.phoneNumber || "",
   );
+  const [momoPayment, setMoMoPayment] = useState<MoMoPaymentDetails | null>(null);
   const formattedPrice = formatPrice(cartTotalQtyAmount);
 
   const loadLocations = useCallback(async (level: LocationLevel, url: string) => {
@@ -202,6 +206,7 @@ export default function CheckoutForm({
 
     const errors: Partial<Record<DeliveryField, string>> = {};
     if (!fullName.trim()) errors.fullName = "Please enter the recipient's full name.";
+    else if (fullName.trim().length > 100) errors.fullName = "Use no more than 100 characters for the recipient's name.";
     if (isEditingDeliveryInfo) {
       if (!province) errors.province = "Please select a province or city.";
       if (!district) errors.district = "Please select a district.";
@@ -209,6 +214,7 @@ export default function CheckoutForm({
       if (!houseNumber.trim()) errors.houseNumber = "Please enter your house number and street.";
     }
     if (!finalAddress.trim()) errors.houseNumber = "Please enter a delivery address.";
+    else if (finalAddress.trim().length > 500) errors.houseNumber = "Use no more than 500 characters for the delivery address.";
     if (!PHONE_REGEX.test(finalPhone)) errors.phoneNumber = "Enter a valid phone number with 9–15 digits.";
     setFieldErrors(errors);
     if (Object.keys(errors).length) {
@@ -233,16 +239,19 @@ export default function CheckoutForm({
         .then(async (result) => {
           if (result.error) {
             toast.error(result.error.message || "Payment failed. Please try again.");
-          } else if (result.paymentIntent?.status === "succeeded") {
+          } else if (result.paymentIntent && ["succeeded", "processing", "requires_capture"].includes(result.paymentIntent.status)) {
             let orderId: string | undefined;
+            let amount = cartTotalQtyAmount;
             try {
               const response = await axios.post(API_PATHS.PAYMENT.SYNC_STRIPE_ORDER, { payment_intent_id: result.paymentIntent.id });
               orderId = response.data.order?.id;
-              toast.success("Payment successful!");
+              amount = response.data.order?.amount ?? amount;
+              if (response.data.order?.status === "complete") toast.success("Payment successful!");
+              else toast("Payment is processing. Check Your Orders for updates.");
             } catch {
-              toast("Payment received. Check Your Orders for the latest status.");
+              toast("Check Your Orders for the latest payment status.");
             }
-            handleSetPaymentSuccess(true, orderId);
+            handleSetPaymentSuccess(true, orderId, { amount, paymentMethod: "STRIPE" });
             handleClearCart();
             handleSetPaymentIntent(null);
 
@@ -271,6 +280,7 @@ export default function CheckoutForm({
           amount: cartTotalQtyAmount,
           address: finalAddress,
           phone: finalPhone,
+          fullName: fullName.trim(),
         });
 
         if (currentUser && shouldSaveDeliveryInfo) {
@@ -279,7 +289,7 @@ export default function CheckoutForm({
               address: finalAddress,
               phoneNumber: finalPhone,
             });
-          } catch (error) {}
+          } catch { /* The order can proceed if saving the profile fails. */ }
         }
 
         if (response.data.url) {
@@ -291,7 +301,8 @@ export default function CheckoutForm({
         }
       } catch (error) {
         console.log(error);
-        toast.error("Error connecting to VNPay");
+        const message = axios.isAxiosError(error) ? error.response?.data?.error : undefined;
+        toast.error(typeof message === "string" ? message : "Error connecting to VNPay");
         setLoading(false);
         submitting.current = false;
       }
@@ -302,6 +313,7 @@ export default function CheckoutForm({
           amount: cartTotalQtyAmount,
           address: finalAddress,
           phone: finalPhone,
+          fullName: fullName.trim(),
         });
 
         if (currentUser && shouldSaveDeliveryInfo) {
@@ -310,19 +322,20 @@ export default function CheckoutForm({
               address: finalAddress,
               phoneNumber: finalPhone,
             });
-          } catch (error) {}
+          } catch { /* The order can proceed if saving the profile fails. */ }
         }
 
-        if (response.data.url) {
-          window.location.href = response.data.url;
+        if (response.data.url && response.data.orderId) {
+          setMoMoPayment(response.data);
+          window.scrollTo({ top: 0, behavior: "smooth" });
         } else {
           toast.error("Failed to create MoMo payment URL");
-          setLoading(false);
-          submitting.current = false;
         }
       } catch (error) {
         console.log(error);
-        toast.error("Error connecting to MoMo");
+        const message = axios.isAxiosError(error) ? error.response?.data?.error : undefined;
+        toast.error(typeof message === "string" ? message : "Error connecting to MoMo");
+      } finally {
         setLoading(false);
         submitting.current = false;
       }
@@ -333,6 +346,7 @@ export default function CheckoutForm({
           amount: cartTotalQtyAmount,
           address: finalAddress,
           phone: finalPhone,
+          fullName: fullName.trim(),
         });
 
         if (currentUser && shouldSaveDeliveryInfo) {
@@ -341,11 +355,11 @@ export default function CheckoutForm({
               address: finalAddress,
               phoneNumber: finalPhone,
             });
-          } catch (error) {}
+          } catch { /* The order can proceed if saving the profile fails. */ }
         }
 
         toast.success("Order placed successfully!");
-        handleSetPaymentSuccess(true, response.data.order?.id);
+        handleSetPaymentSuccess(true, response.data.order?.id, { amount: response.data.order?.amount ?? cartTotalQtyAmount, paymentMethod: "COD" });
         handleClearCart();
         handleSetPaymentIntent(null);
         setLoading(false);
@@ -358,6 +372,8 @@ export default function CheckoutForm({
       }
     }
   };
+  if (momoPayment) return <MoMoPayment payment={momoPayment} />;
+
   return (
     <form onSubmit={handleSubmit} id="payment-form" noValidate>
       <Link
@@ -381,6 +397,7 @@ export default function CheckoutForm({
             value={fullName}
             id="fullName"
             autoComplete="name"
+            maxLength={100}
             aria-invalid={Boolean(fieldErrors.fullName)}
             aria-describedby="fullName-error"
             onChange={(e) => { setFullName(e.target.value); clearFieldError("fullName"); }}
@@ -631,9 +648,10 @@ export default function CheckoutForm({
       <div className="py-4 text-center text-slate-700 text-xl font-bold">
         Total: {formattedPrice}
       </div>
+      {paymentMethod === "VNPAY" || paymentMethod === "MOMO" ? <p className="mb-3 text-center text-sm text-slate-500">You will continue to {paymentMethod === "VNPAY" ? "VNPay" : "MoMo"} to complete payment.</p> : null}
       <Button
         type="submit"
-        label={isLoading ? "Processing..." : paymentMethod === "COD" ? "Place Order" : "Pay Now"}
+        label={isLoading ? "Processing..." : paymentMethod === "COD" ? "Place Order" : paymentMethod === "VNPAY" ? "Continue with VNPay" : paymentMethod === "MOMO" ? "Continue with MoMo" : "Pay Now"}
         disabled={isLoading || (paymentMethod === "STRIPE" && (!stripe || !elements))}
         onClick={() => {}}
       />

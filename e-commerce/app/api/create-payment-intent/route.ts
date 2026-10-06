@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/actions/getCurrentUser";
 import prisma from "@/libs/prismadb";
 import { getStripe } from "@/libs/stripe";
 import { syncStripeOrder } from "@/libs/syncStripeOrder";
-import { products } from "@/utils/products";
+import { getOrderItems } from "@/libs/orderItems";
 
 function cartFingerprint(items: CartProductProps[]) {
   return JSON.stringify(items.map((item) => [item.id, item.quantity, item.selectedImg.color, item.price]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
@@ -16,16 +16,9 @@ export async function POST(req: Request) {
   if (!currentUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const body = await req.json();
-    if (!Array.isArray(body.items) || !body.items.length) return NextResponse.json({ error: "Your cart is empty" }, { status: 400 });
-    const items: CartProductProps[] = [];
-    for (const item of body.items) {
-      const product = products.find((product) => product.id === item?.id);
-      const image = product?.images.find((image) => image.color === item?.selectedImg?.color);
-      if (!product?.inStock || !image || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 20) return NextResponse.json({ error: "Please review the products and quantities in your cart" }, { status: 400 });
-      items.push({ id: product.id, name: product.name, description: product.description, category: product.category, brand: product.brand, price: product.price, quantity: item.quantity, selectedImg: image });
-    }
-    if (new Set(items.map((item) => item.id)).size !== items.length) return NextResponse.json({ error: "Your cart contains duplicate products. Please review it." }, { status: 400 });
-    const total = Math.round(items.reduce((sum, item) => sum + item.price * item.quantity, 0));
+    const cart = getOrderItems(body?.items);
+    if (!cart) return NextResponse.json({ error: "Please review the products and quantities in your cart" }, { status: 400 });
+    const { items, amount: total } = cart;
     const fingerprint = cartFingerprint(items);
     const stripe = getStripe();
     let intent;

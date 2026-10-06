@@ -10,7 +10,7 @@ import ProductImage from "@/app/components/products/ProductImage";
 import { useCart } from "@/app/hooks/useCart";
 import { MdCheckCircle } from "react-icons/md";
 import Link from "next/link";
-import { catalogCategories, type CatalogProduct } from "@/utils/productFilters";
+import { catalogCategories, getBrandLabel, type CatalogProduct } from "@/utils/productFilters";
 
 interface ProductDetailsProps {
   product: CatalogProduct;
@@ -117,12 +117,14 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
         <Horizontal />
         <div className="whitespace-pre-line leading-7">{product.description}</div>
         <Horizontal />
-        <div>
-          <span className="font-semibold">CATEGORY:</span>{" "}<Link href={`/products?category=${encodeURIComponent(product.category)}`} className="hover:text-teal-700 hover:underline">{catalogCategories.find((category) => category.value === product.category)?.label ?? product.category}</Link>
-        </div>
-        <div>
-          <span className="font-semibold">BRAND:</span> {product.brand}
-        </div>
+        <section aria-labelledby="product-information" className="my-2">
+          <h2 id="product-information" className="mb-3 text-lg font-semibold">Product details</h2>
+          <dl className="divide-y divide-slate-200 rounded-md border border-slate-200">
+            <div className="grid grid-cols-[100px_minmax(0,1fr)] gap-3 px-4 py-3"><dt className="text-slate-500">Brand</dt><dd>{getBrandLabel(product.brand)}</dd></div>
+            <div className="grid grid-cols-[100px_minmax(0,1fr)] gap-3 px-4 py-3"><dt className="text-slate-500">Category</dt><dd><Link href={`/products?category=${encodeURIComponent(product.category)}`} className="hover:text-teal-700 hover:underline">{catalogCategories.find((category) => category.value === product.category)?.label ?? product.category}</Link></dd></div>
+            <div className="grid grid-cols-[100px_minmax(0,1fr)] gap-3 px-4 py-3"><dt className="text-slate-500">Colors</dt><dd className="break-words">{product.images.map((image) => image.color).join(", ")}</dd></div>
+          </dl>
+        </section>
         <div>
           {product.inStock ? (
             <span className="text-green-600 font-semibold">In Stock</span>
@@ -165,6 +167,11 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
             </div>
           </>
         )}
+        <nav aria-label="Product support" className="mt-4 flex flex-wrap gap-x-5 gap-y-3 text-base">
+          <Link href="/help/shipping" className="text-teal-700 hover:underline">Shipping &amp; delivery</Link>
+          <Link href="/help/returns" className="text-teal-700 hover:underline">Returns &amp; exchanges</Link>
+          <Link href="/help/contact" className="text-teal-700 hover:underline">Ask about warranty</Link>
+        </nav>
       </div>
     </div>
   );

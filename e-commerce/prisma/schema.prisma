@@ -42,6 +42,8 @@ model Order {
     paymentMethod   String             @default("VNPAY")
     products        CartProductProps[]
     address         Address?
+    recipientName   String?
+    recipientPhone  String?
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

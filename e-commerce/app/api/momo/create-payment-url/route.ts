@@ -2,6 +2,8 @@ import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/actions/getCurrentUser";
 import prisma from "@/libs/prismadb";
+import { getOrderDelivery } from "@/libs/orderDelivery";
+import { getOrderItems } from "@/libs/orderItems";
 
 export async function POST(req: Request) {
   const currentUser = await getCurrentUser();
@@ -10,7 +12,17 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { items, amount, address, phone } = body;
+  const delivery = getOrderDelivery(body);
+  if (!delivery) return NextResponse.json({ error: "Please provide a valid recipient name, phone number and delivery address." }, { status: 400 });
+  const cart = getOrderItems(body?.items);
+  if (!cart) return NextResponse.json({ error: "Please review the products and quantities in your cart" }, { status: 400 });
+  const { items, amount } = cart;
+  if (amount < 1000 || amount > 50000000) {
+    return NextResponse.json({ error: "MoMo payments must be between 1,000 and 50,000,000 VND." }, { status: 400 });
+  }
+  if (items.length > 50) {
+    return NextResponse.json({ error: "MoMo supports up to 50 different products per payment." }, { status: 400 });
+  }
 
   const partnerCode = process.env.MOMO_PARTNER_CODE || "MOMO";
   const accessKey = process.env.MOMO_ACCESS_KEY || "F8BBA842ECF85";
@@ -28,14 +40,14 @@ export async function POST(req: Request) {
 
   const orderId = partnerCode + new Date().getTime();
   const requestId = orderId;
-  const orderInfo = "Thanh toan don hang SGTech #" + orderId;
+  const orderInfo = "SGTech order #" + orderId;
   const requestType = body.requestType || "captureWallet";
   const extraData = "";
-  const lang = "vi";
+  const lang = "en";
   const autoCapture = true;
 
   // Tạo pending order trong DB
-  await prisma.order.create({
+  const order = await prisma.order.create({
     data: {
       userId: currentUser.id,
       amount: amount,
@@ -45,15 +57,7 @@ export async function POST(req: Request) {
       deliveryStatus: "pending",
       products: items,
       paymentIntentId: orderId,
-      address: address
-        ? {
-            city: "",
-            country: "VN",
-            line1: address,
-            postal_code: "",
-            state: "",
-          }
-        : undefined,
+      ...delivery,
     },
   });
 
@@ -95,6 +99,17 @@ export async function POST(req: Request) {
     autoCapture,
     extraData,
     signature,
+    items: items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      manufacturer: item.brand,
+      imageUrl: item.selectedImg.image,
+      price: item.price,
+      currency: "VND",
+      quantity: item.quantity,
+      totalPrice: item.price * item.quantity,
+    })),
   };
 
   try {
@@ -110,7 +125,13 @@ export async function POST(req: Request) {
     const momoData = await momoResponse.json();
 
     if (momoData.resultCode === 0 && momoData.payUrl) {
-      return NextResponse.json({ url: momoData.payUrl });
+      let deeplink: string | null = null;
+      if (typeof momoData.deeplink === "string") {
+        try {
+          if (new URL(momoData.deeplink).protocol === "momo:") deeplink = momoData.deeplink;
+        } catch { /* The browser payment URL remains available without an app link. */ }
+      }
+      return NextResponse.json({ url: momoData.payUrl, deeplink, orderId: order.id, amount });
     } else {
       console.log("MoMo API Error:", momoData);
       return NextResponse.json(
