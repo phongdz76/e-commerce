@@ -6,8 +6,7 @@ import {
   useState,
 } from "react";
 import { CartProductProps } from "../product/[productId]/ProductDetails";
-import toast, { Toast } from "react-hot-toast";
-import { set } from "react-hook-form";
+import toast from "react-hot-toast";
 
 type CartContextType = {
   cartTotalQty: number;
@@ -50,6 +49,7 @@ export const CartContextProvider = (props: Props) => {
     const getTotals = () => {
       if (!cartProducts) {
         setCartTotalQty(0);
+        setCartTotalQtyAmount(0);
         return;
       }
       const { total, qty } = cartProducts?.reduce(
@@ -57,7 +57,6 @@ export const CartContextProvider = (props: Props) => {
           const itemTotal = item.price * item.quantity;
           acc.total += itemTotal;
           acc.qty += item.quantity;
-          setCartTotalQty(acc.qty);
           return acc;
         },
         {
@@ -156,15 +155,17 @@ export const CartContextProvider = (props: Props) => {
     setPaymentIntent(null);
     localStorage.removeItem("CartItems");
     localStorage.removeItem("savedPaymentIntent");
+    localStorage.removeItem("checkoutRequest");
     setCartTotalQty(0);
-  }, [cartProducts]);
+    setCartTotalQtyAmount(0);
+  }, []);
 
   const handleSetPaymentIntent = useCallback(
     (val: string | null) => {
       setPaymentIntent(val);
       localStorage.setItem("savedPaymentIntent", JSON.stringify(val));
     },
-    [paymentIntent],
+    [],
   );
 
   const value = {

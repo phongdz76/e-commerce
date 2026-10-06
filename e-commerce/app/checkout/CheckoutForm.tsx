@@ -7,7 +7,7 @@ import {
   useStripe,
   PaymentElement,
 } from "@stripe/react-stripe-js";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
 import Heading from "../components/Headinng";
 import Link from "next/link";
@@ -22,7 +22,7 @@ const PHONE_REGEX = /^\+?[0-9]{9,15}$/;
 
 interface CheckoutFormProps {
   clientSecret: string;
-  handleSetPaymentSuccess: (value: boolean) => void;
+  handleSetPaymentSuccess: (value: boolean, orderId?: string) => void;
   currentUser: safeUser | null;
 }
 
@@ -36,6 +36,7 @@ export default function CheckoutForm({
   const stripe = useStripe();
   const elements = useElements();
   const [isLoading, setLoading] = useState<boolean>(false);
+  const submitting = useRef(false);
   const [paymentMethod, setPaymentMethod] = useState<string>("COD");
   const [fullName, setFullName] = useState(currentUser?.name || "");
   const hasSavedAddress = Boolean(currentUser?.address?.trim());
@@ -137,8 +138,10 @@ export default function CheckoutForm({
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (submitting.current) return;
 
-    if (!stripe || !elements) {
+    if (paymentMethod === "STRIPE" && (!stripe || !elements)) {
+      toast.error("Card payment is still loading. Please try again in a moment.");
       return;
     }
 
@@ -161,17 +164,32 @@ export default function CheckoutForm({
     }
 
     setLoading(true);
+    submitting.current = true;
 
     if (paymentMethod === "STRIPE") {
+      if (!stripe || !elements) return;
       stripe
         .confirmPayment({
           elements,
           redirect: "if_required",
+          confirmParams: {
+            return_url: `${window.location.origin}/checkout?stripe=return`,
+            shipping: { name: fullName.trim(), phone: finalPhone, address: { line1: finalAddress, country: "VN" } },
+          },
         })
         .then(async (result) => {
-          if (!result.error) {
-            toast.success("Payment successful!");
-            handleSetPaymentSuccess(true);
+          if (result.error) {
+            toast.error(result.error.message || "Payment failed. Please try again.");
+          } else if (result.paymentIntent?.status === "succeeded") {
+            let orderId: string | undefined;
+            try {
+              const response = await axios.post(API_PATHS.PAYMENT.SYNC_STRIPE_ORDER, { payment_intent_id: result.paymentIntent.id });
+              orderId = response.data.order?.id;
+              toast.success("Payment successful!");
+            } catch {
+              toast("Payment received. Check Your Orders for the latest status.");
+            }
+            handleSetPaymentSuccess(true, orderId);
             handleClearCart();
             handleSetPaymentIntent(null);
 
@@ -187,6 +205,11 @@ export default function CheckoutForm({
             }
           }
           setLoading(false);
+          submitting.current = false;
+        }).catch(() => {
+          toast.error("Unable to complete card payment. Please try again.");
+          setLoading(false);
+          submitting.current = false;
         });
     } else if (paymentMethod === "VNPAY") {
       try {
@@ -211,11 +234,13 @@ export default function CheckoutForm({
         } else {
           toast.error("Failed to create VNPay URL");
           setLoading(false);
+          submitting.current = false;
         }
       } catch (error) {
         console.log(error);
         toast.error("Error connecting to VNPay");
         setLoading(false);
+        submitting.current = false;
       }
     } else if (paymentMethod === "MOMO") {
       try {
@@ -240,15 +265,17 @@ export default function CheckoutForm({
         } else {
           toast.error("Failed to create MoMo payment URL");
           setLoading(false);
+          submitting.current = false;
         }
       } catch (error) {
         console.log(error);
         toast.error("Error connecting to MoMo");
         setLoading(false);
+        submitting.current = false;
       }
     } else if (paymentMethod === "COD") {
       try {
-        await axios.post("/api/order/create-cod", {
+        const response = await axios.post("/api/order/create-cod", {
           items: cartProducts,
           amount: cartTotalQtyAmount,
           address: finalAddress,
@@ -265,14 +292,16 @@ export default function CheckoutForm({
         }
 
         toast.success("Order placed successfully!");
-        handleSetPaymentSuccess(true);
+        handleSetPaymentSuccess(true, response.data.order?.id);
         handleClearCart();
         handleSetPaymentIntent(null);
         setLoading(false);
+        submitting.current = false;
       } catch (error) {
         console.log(error);
         toast.error("Failed to place order");
         setLoading(false);
+        submitting.current = false;
       }
     }
   };
@@ -467,7 +496,7 @@ export default function CheckoutForm({
             onChange={(e) => setPaymentMethod(e.target.value)}
             className="w-4 h-4 text-blue-600 focus:ring-blue-500"
           />
-          <span className="font-medium text-slate-700">Thanh toán khi nhận hàng (COD)</span>
+          <span className="font-medium text-slate-700">Cash on Delivery (COD)</span>
         </label>
         
         <label className="flex items-center gap-2 cursor-pointer border p-3 rounded-lg hover:bg-slate-50">
@@ -479,7 +508,7 @@ export default function CheckoutForm({
             onChange={(e) => setPaymentMethod(e.target.value)}
             className="w-4 h-4 text-blue-600 focus:ring-blue-500"
           />
-          <span className="font-medium text-slate-700">Thanh toán qua VNPay</span>
+          <span className="font-medium text-slate-700">Pay with VNPay</span>
         </label>
 
         <label className="flex items-center gap-2 cursor-pointer border p-3 rounded-lg hover:bg-slate-50">
@@ -491,7 +520,7 @@ export default function CheckoutForm({
             onChange={(e) => setPaymentMethod(e.target.value)}
             className="w-4 h-4 text-blue-600 focus:ring-blue-500"
           />
-          <span className="font-medium text-slate-700">Thanh toán qua MoMo</span>
+          <span className="font-medium text-slate-700">Pay with MoMo</span>
         </label>
 
        
@@ -505,7 +534,7 @@ export default function CheckoutForm({
             onChange={(e) => setPaymentMethod(e.target.value)}
             className="w-4 h-4 text-blue-600 focus:ring-blue-500"
           />
-          <span className="font-medium text-slate-700">Thanh toán bằng thẻ quốc tế (Stripe)</span>
+          <span className="font-medium text-slate-700">Credit or debit card (Stripe)</span>
         </label>
       </div>
 
@@ -517,7 +546,8 @@ export default function CheckoutForm({
         Total: {formattedPrice}
       </div>
       <Button
-        label={isLoading ? "Processing..." : "Pay Now"}
+        type="submit"
+        label={isLoading ? "Processing..." : paymentMethod === "COD" ? "Place Order" : "Pay Now"}
         disabled={isLoading || (paymentMethod === "STRIPE" && (!stripe || !elements))}
         onClick={() => {}}
       />

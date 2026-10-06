@@ -26,11 +26,11 @@ export function CartClient({ currentUser }: CartClientProps) {
         <div className="text-xl">Your cart is empty</div>
         <div>
           <Link
-            href="/"
+            href="/products"
             className="text-slate-500 flex items-center gap-1 mt-2"
           >
             <MdArrowBack size={15} />
-            <span className="text-sm">Start Shopping</span>
+            <span className="text-base">Start Shopping</span>
           </Link>
         </div>
       </div>
@@ -39,7 +39,7 @@ export function CartClient({ currentUser }: CartClientProps) {
   return (
     <div>
       <Heading title="Shopping Cart" center />
-      <div className="grid grid-cols-5 text-xs gap-4 pb-2 items-center mt-10">
+      <div className="hidden md:grid grid-cols-5 text-sm gap-4 pb-2 items-center mt-8">
         <div className="col-span-2 justify-self-start">PRODUCT</div>
         <div className="justify-self-center">PRICE</div>
         <div className="justify-self-center">QUANTITY</div>
@@ -47,11 +47,11 @@ export function CartClient({ currentUser }: CartClientProps) {
       </div>
       <div>
         {cartProducts &&
-          cartProducts.map((item: any) => {
+          cartProducts.map((item) => {
             return <ItemContent key={item.id} item={item}></ItemContent>;
           })}
       </div>
-      <div className="border-t-[1.5px] border-slate-200 pt-4 flex justify-between gap-4">
+      <div className="border-t-[1.5px] border-slate-200 pt-6 flex flex-col md:flex-row justify-between gap-6">
         <div className="w-[150px]">
           <Button
             label="Clear Cart"
@@ -62,24 +62,22 @@ export function CartClient({ currentUser }: CartClientProps) {
             outline
           ></Button>
         </div>
-        <div className="text-sm flex flex-col gap-1 items-start">
-          <div className="w-full flex justify-between text-base font-semibold">
+        <div className="w-full md:max-w-sm text-base flex flex-col gap-4 items-start rounded-md border border-slate-200 bg-slate-50 p-5">
+          <div className="w-full flex justify-between gap-4 text-lg font-bold">
             <span>Subtotal:</span>
             <span>{formatPrice(cartTotalQtyAmount)}</span>
           </div>
-          <p className="text-slate-500">
-            Taxes and shipping calculated at checkout
+          <p className="text-sm text-slate-500">
+            Review your items and delivery details at checkout.
           </p>
           <Button
             label={currentUser ? "Proceed to Checkout" : "Login to Checkout"}
             onClick={() => {
-              currentUser
-                ? router.push("/checkout")
-                : router.push("/login?callbackUrl=/checkout");
+              router.push(currentUser ? "/checkout" : "/login?callbackUrl=/checkout");
             }}
           ></Button>
           <Link
-            href="/"  
+            href="/products"
             className="text-slate-500 flex items-center gap-1 mt-2"
           >
             <MdArrowBack size={20} />
