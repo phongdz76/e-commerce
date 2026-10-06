@@ -44,8 +44,8 @@ export default function ResetPasswordForm() {
       return;
     }
 
-    if (data.password.length < 6) {
-      toast.error("Password must be at least 6 characters");
+    if (data.password.length < 8) {
+      toast.error("Password must be at least 8 characters");
       return;
     }
 
@@ -111,7 +111,7 @@ export default function ResetPasswordForm() {
   const password = watch("password");
 
   return (
-    <div className="w-full items-center flex flex-col gap-6">
+    <form onSubmit={handleSubmit(onSubmit)} className="w-full items-center flex flex-col gap-6">
       <Heading title="Reset Password" />
 
       <p className="text-center text-gray-600">
@@ -122,6 +122,7 @@ export default function ResetPasswordForm() {
         id="password"
         label="New Password"
         type="password"
+        autoComplete="new-password"
         disabled={isLoading}
         required
         register={register}
@@ -132,6 +133,8 @@ export default function ResetPasswordForm() {
         id="confirmPassword"
         label="Confirm New Password"
         type="password"
+        autoComplete="new-password"
+        passwordHint={false}
         disabled={isLoading}
         required
         register={register}
@@ -145,13 +148,15 @@ export default function ResetPasswordForm() {
       )}
 
       <Button
+        type="submit"
+        disabled={isLoading}
         label={isLoading ? "Resetting..." : "Reset Password"}
-        onClick={handleSubmit(onSubmit)}
+        onClick={() => {}}
       />
 
       <Link href="/login" className="text-sm text-gray-600 hover:underline">
         Back to Login
       </Link>
-    </div>
+    </form>
   );
 }

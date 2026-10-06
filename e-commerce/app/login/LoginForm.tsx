@@ -39,13 +39,10 @@ export default function LoginForm({ currentUser }: LoginFormProps) {
   // Load saved credentials nếu có
   useEffect(() => {
     const savedEmail = localStorage.getItem("rememberedEmail");
-    const savedPassword = localStorage.getItem("rememberedPassword");
+    localStorage.removeItem("rememberedPassword");
     if (savedEmail) {
       setValue("emailOrUsername", savedEmail);
       setRememberMe(true);
-    }
-    if (savedPassword) {
-      setValue("password", savedPassword);
     }
   }, [setValue]);
 
@@ -70,7 +67,6 @@ export default function LoginForm({ currentUser }: LoginFormProps) {
     // Lưu thông tin nếu chọn Remember Me
     if (rememberMe) {
       localStorage.setItem("rememberedEmail", data.emailOrUsername);
-      localStorage.setItem("rememberedPassword", data.password);
     } else {
       localStorage.removeItem("rememberedEmail");
       localStorage.removeItem("rememberedPassword");
@@ -93,6 +89,9 @@ export default function LoginForm({ currentUser }: LoginFormProps) {
       if (callback?.error) {
         toast.error(callback.error);
       }
+    }).catch(() => {
+      setIsLoading(false);
+      toast.error("Unable to sign in. Please try again.");
     });
   };
 
@@ -100,19 +99,20 @@ export default function LoginForm({ currentUser }: LoginFormProps) {
     return (
       <div className="w-full text-center py-6 flex flex-col gap-4">
         <p className="text-lg">You are already logged in</p>
-        <p className="text-sm text-gray-500">Redirecting to home page...</p>
+        <p className="text-sm text-gray-500">Taking you back to your page...</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full items-center flex flex-col gap-6">
+    <form onSubmit={handleSubmit(onSubmit)} noValidate className="w-full items-center flex flex-col gap-6">
       <Heading title="Login" />
 
       <Input
         id="emailOrUsername"
         label="Email or Username"
         type="text"
+        autoComplete="username"
         disabled={isLoading}
         required
         register={register}
@@ -123,15 +123,18 @@ export default function LoginForm({ currentUser }: LoginFormProps) {
         id="password"
         label="Password"
         type="password"
+        autoComplete="current-password"
+        passwordHint={false}
         disabled={isLoading}
         required
         register={register}
         errors={errors}
       ></Input>
 
-      <div className="w-full flex items-center justify-between">
+      <div className="w-full flex flex-wrap gap-3 items-center justify-between">
         <div className="flex items-center gap-2">
           <Checkbox
+            slotProps={{ input: { "aria-label": "Remember my email" } }}
             checked={rememberMe}
             onChange={(e) => setRememberMe(e.target.checked)}
             disabled={isLoading}
@@ -143,7 +146,7 @@ export default function LoginForm({ currentUser }: LoginFormProps) {
               },
             }}
           />
-          <span className="text-sm text-gray-600 select-none">Remember me</span>
+          <span className="text-sm text-gray-600 select-none">Remember my email</span>
         </div>
 
         <Link
@@ -155,14 +158,17 @@ export default function LoginForm({ currentUser }: LoginFormProps) {
       </div>
 
       <Button
+        type="submit"
+        disabled={isLoading}
         label={isLoading ? "Loading" : "Login"}
-        onClick={handleSubmit(onSubmit)}
+        onClick={() => {}}
       ></Button>
 
       <Button
         label="Continue with Google"
+        disabled={isLoading}
         onClick={() => {
-          signIn("google");
+          signIn("google", { callbackUrl });
         }}
         outline
         icon={AiOutlineGoogle}
@@ -170,8 +176,9 @@ export default function LoginForm({ currentUser }: LoginFormProps) {
 
       <Button
         label="Continue with Facebook"
+        disabled={isLoading}
         onClick={() => {
-          signIn("facebook");
+          signIn("facebook", { callbackUrl });
         }}
         outline
         icon={FaFacebook}
@@ -183,6 +190,6 @@ export default function LoginForm({ currentUser }: LoginFormProps) {
           Sign Up
         </Link>
       </p>
-    </div>
+    </form>
   );
 }

@@ -15,7 +15,7 @@ export default async function ProfilePage() {
         ) : (
           <div className="w-full text-center py-6 flex flex-col gap-4">
             <p className="text-lg">Please login to view your profile</p>
-            <Link href="/login" className="text-blue-500 hover:underline">
+            <Link href="/login?callbackUrl=/profile" className="text-blue-500 hover:underline">
               Go to Login
             </Link>
           </div>

@@ -118,9 +118,10 @@ export default function Profile({ currentUser }: ProfileProps) {
     newPassword: "",
   };
 
-  const { register, handleSubmit, watch, reset, setValue } = useForm<ProfileFormValues>({
-    defaultValues: defaultFormValues,
-  });
+  const { register, handleSubmit, watch, reset, setValue } =
+    useForm<ProfileFormValues>({
+      defaultValues: defaultFormValues,
+    });
 
   const currentPasswordField = register("currentPassword");
   const newPasswordField = register("newPassword");
@@ -131,7 +132,9 @@ export default function Profile({ currentUser }: ProfileProps) {
     const username = data.username.trim();
     const email = data.email.trim().toLowerCase();
     const profileImageUrl = data.profileImageUrl.trim();
-    const finalAddress = useNewAddress ? getFinalAddress().trim() : currentUser?.address;
+    const finalAddress = useNewAddress
+      ? getFinalAddress().trim()
+      : currentUser?.address;
     const phoneNumber = data.phoneNumber.trim().replace(/\s+/g, "");
     const currentPassword = data.currentPassword;
     const newPassword = data.newPassword.trim();
@@ -230,6 +233,9 @@ export default function Profile({ currentUser }: ProfileProps) {
 
   return (
     <div className="w-full max-w-[760px] mx-auto rounded-2xl border border-slate-300 bg-slate-50 px-5 py-6 md:px-8 md:py-8">
+      <h1 className="mb-6 text-2xl font-bold text-center">
+        Your Profile
+      </h1>
       <form
         className="w-full flex flex-col gap-5"
         onSubmit={handleSubmit(onSubmit)}
@@ -314,7 +320,9 @@ export default function Profile({ currentUser }: ProfileProps) {
 
         {!useNewAddress && currentUser?.address ? (
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-slate-700">Address</label>
+            <label className="text-sm font-medium text-slate-700">
+              Address
+            </label>
             <div className="p-4 rounded-lg border border-slate-300 bg-slate-50 flex justify-between items-center shadow-sm">
               <span className="text-slate-700">{currentUser.address}</span>
               <button
@@ -330,7 +338,9 @@ export default function Profile({ currentUser }: ProfileProps) {
         ) : (
           <>
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-slate-700">Province / City</label>
+              <label className="text-sm font-medium text-slate-700">
+                Province / City
+              </label>
               <select
                 required
                 value={province?.code || ""}
@@ -338,16 +348,22 @@ export default function Profile({ currentUser }: ProfileProps) {
                 className={inputClassName}
                 disabled={isLoading}
               >
-                <option value="" disabled>Select Province / City</option>
+                <option value="" disabled>
+                  Select Province / City
+                </option>
                 {provinces.map((p) => (
-                  <option key={p.code} value={p.code}>{p.name}</option>
+                  <option key={p.code} value={p.code}>
+                    {p.name}
+                  </option>
                 ))}
               </select>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-slate-700">District</label>
+                <label className="text-sm font-medium text-slate-700">
+                  District
+                </label>
                 <select
                   required
                   disabled={!province || isLoading}
@@ -355,15 +371,21 @@ export default function Profile({ currentUser }: ProfileProps) {
                   onChange={(e) => handleDistrictChange(e.target.value)}
                   className={inputClassName}
                 >
-                  <option value="" disabled>Select District</option>
+                  <option value="" disabled>
+                    Select District
+                  </option>
                   {districts.map((d) => (
-                    <option key={d.code} value={d.code}>{d.name}</option>
+                    <option key={d.code} value={d.code}>
+                      {d.name}
+                    </option>
                   ))}
                 </select>
               </div>
-              
+
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-slate-700">Ward</label>
+                <label className="text-sm font-medium text-slate-700">
+                  Ward
+                </label>
                 <select
                   required
                   disabled={!district || isLoading}
@@ -371,9 +393,13 @@ export default function Profile({ currentUser }: ProfileProps) {
                   onChange={(e) => handleWardChange(e.target.value)}
                   className={inputClassName}
                 >
-                  <option value="" disabled>Select Ward</option>
+                  <option value="" disabled>
+                    Select Ward
+                  </option>
                   {wards.map((w) => (
-                    <option key={w.code} value={w.code}>{w.name}</option>
+                    <option key={w.code} value={w.code}>
+                      {w.name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -499,7 +525,7 @@ export default function Profile({ currentUser }: ProfileProps) {
           ) : null}
         </div>
 
-        <div className="flex items-center gap-3 pt-2">
+        <div className="flex flex-wrap items-center gap-3 pt-2">
           <button
             type="submit"
             disabled={isLoading}

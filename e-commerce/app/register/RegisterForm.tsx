@@ -92,12 +92,13 @@ export default function RegisterForm({ currentUser }: RegisterFormProps) {
   }
 
   return (
-    <div className="w-full items-center flex flex-col gap-6">
+    <form onSubmit={handleSubmit(onSubmit)} className="w-full items-center flex flex-col gap-6">
       <Heading title="Create an account" />
       <Input
         id="name"
         label="Name"
         type="text"
+        autoComplete="name"
         disabled={isLoading}
         required
         register={register}
@@ -108,6 +109,7 @@ export default function RegisterForm({ currentUser }: RegisterFormProps) {
         id="email"
         label="Email"
         type="email"
+        autoComplete="email"
         disabled={isLoading}
         required
         register={register}
@@ -118,6 +120,7 @@ export default function RegisterForm({ currentUser }: RegisterFormProps) {
         id="password"
         label="Password"
         type="password"
+        autoComplete="new-password"
         disabled={isLoading}
         required
         register={register}
@@ -125,12 +128,15 @@ export default function RegisterForm({ currentUser }: RegisterFormProps) {
       ></Input>
 
       <Button
+        type="submit"
+        disabled={isLoading}
         label={isLoading ? "Loading" : "Sign Up"}
-        onClick={handleSubmit(onSubmit)}
+        onClick={() => {}}
       ></Button>
 
       <Button
         label="Continue with Google"
+        disabled={isLoading}
         onClick={() => {
           signIn("google");
         }}
@@ -140,6 +146,7 @@ export default function RegisterForm({ currentUser }: RegisterFormProps) {
 
       <Button
         label="Continue with Facebook"
+        disabled={isLoading}
         onClick={() => {
           signIn("facebook");
         }}
@@ -153,6 +160,6 @@ export default function RegisterForm({ currentUser }: RegisterFormProps) {
           Log in
         </Link>
       </p>
-    </div>
+    </form>
   );
 }

@@ -66,7 +66,7 @@ export default function ForgotPasswordForm() {
   }
 
   return (
-    <div className="w-full items-center flex flex-col gap-6">
+    <form onSubmit={handleSubmit(onSubmit)} className="w-full items-center flex flex-col gap-6">
       <Heading title="Forgot Password" />
 
       <p className="text-center text-gray-600">
@@ -78,6 +78,7 @@ export default function ForgotPasswordForm() {
         id="email"
         label="Email Address"
         type="email"
+        autoComplete="email"
         disabled={isLoading}
         required
         register={register}
@@ -85,13 +86,15 @@ export default function ForgotPasswordForm() {
       />
 
       <Button
+        type="submit"
+        disabled={isLoading}
         label={isLoading ? "Sending..." : "Send Reset Link"}
-        onClick={handleSubmit(onSubmit)}
+        onClick={() => {}}
       />
 
       <Link href="/login" className="text-sm text-gray-600 hover:underline">
         Back to Login
       </Link>
-    </div>
+    </form>
   );
 }
