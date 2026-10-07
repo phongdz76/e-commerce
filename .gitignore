@@ -9,3 +9,12 @@ tests/
 # Keep Markdown instructions in skills or local docs instead.
 AGENTS.md
 CLAUDE.md
+
+# Local machine settings and temporary files
+.codex/
+.aws/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.tmp
+*.temp
