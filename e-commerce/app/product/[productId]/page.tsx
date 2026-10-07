@@ -19,7 +19,7 @@ export default async function ProductPage({ params }: { params: Promise<IPrams> 
   );
   if (!product) notFound();
   const category = catalogCategories.find((item) => item.value === product.category);
-  const relatedProducts = products.filter((item) => item.category === product.category && item.id !== product.id).slice(0, 4);
+  const relatedProducts = products.filter((item) => item.category === product.category && item.id !== product.id).slice(0, 6);
   
   return (
     <div className="py-8">
@@ -38,7 +38,9 @@ export default async function ProductPage({ params }: { params: Promise<IPrams> 
             <h2 id="related-products-title" className="text-2xl font-bold">You may also like</h2>
             <Link href={`/products?category=${encodeURIComponent(product.category)}`} className="text-base text-teal-700 hover:underline">Browse {category?.label.toLowerCase() ?? product.category.toLowerCase()}</Link>
           </div>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">{relatedProducts.map((item) => <ProductCard key={item.id} data={item} />)}</div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+            {relatedProducts.map((item) => <ProductCard key={item.id} data={item} />)}
+          </div>
         </section>}
       </Container>
     </div>

@@ -1,4 +1,4 @@
-//I am changing the image links from firebase to amazon, firebase has issues with these direct links. Please remember to add the amazon link(that will show up at the error) instead of firebase at the cofig for it to work out.
+// Local catalog photograph sources are recorded in scripts/product-image-sources.json.
 
 export const products = [
   {
@@ -11,17 +11,10 @@ export const products = [
     inStock: true,
     images: [
       {
-        color: "White",
-        colorCode: "#FFFFFF",
-        image:
-          "https://m.media-amazon.com/images/I/71p-tHQ0u1L._AC_SX679_.jpg",
-      },
-      {
-        color: "Gray",
-        colorCode: "#808080",
-        image:
-          "https://m.media-amazon.com/images/I/417tEj3iJ8L._AC_.jpg",
-      },
+        "color": "White",
+        "colorCode": "#FFFFFF",
+        "image": "/products/iphone14-white.webp"
+      }
     ],
     reviews: [],
   },
@@ -182,7 +175,7 @@ export const products = [
     ],
     reviews: [],
   },
-  // Sample catalog entries. Prices and configurations are illustrative; existing category photos are placeholders.
+  // Sample catalog entries. Prices and configurations are illustrative; photograph sources are in scripts/product-image-sources.json.
   {
     "id": "670000000000000000000001",
     "name": "Apple iPhone 14, 128GB, White",
@@ -195,12 +188,7 @@ export const products = [
       {
         "color": "White",
         "colorCode": "#FFFFFF",
-        "image": "https://m.media-amazon.com/images/I/71p-tHQ0u1L._AC_SX679_.jpg"
-      },
-      {
-        "color": "Gray",
-        "colorCode": "#808080",
-        "image": "https://m.media-amazon.com/images/I/417tEj3iJ8L._AC_.jpg"
+        "image": "/products/iphone14-white.webp"
       }
     ],
     "reviews": []
@@ -217,7 +205,7 @@ export const products = [
       {
         "color": "Silver",
         "colorCode": "#C0C0C0",
-        "image": "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&auto=format&fit=crop&q=80"
+        "image": "/products/macbook-air-silver.webp"
       }
     ],
     "reviews": []
@@ -232,9 +220,9 @@ export const products = [
     "inStock": true,
     "images": [
       {
-        "color": "Black",
-        "colorCode": "#000000",
-        "image": "https://images.unsplash.com/photo-1642655825268-137758d008e8?w=800&auto=format&fit=crop&q=80"
+        "color": "Silver",
+        "colorCode": "#C0C0C0",
+        "image": "/products/imac24-silver.webp"
       }
     ],
     "reviews": []
@@ -250,13 +238,13 @@ export const products = [
     "images": [
       {
         "color": "Black",
-        "colorCode": "#000000",
-        "image": "https://m.media-amazon.com/images/I/71s4mjiit3L.__AC_SX300_SY300_QL70_FMwebp_.jpg"
+        "colorCode": "#171717",
+        "image": "/products/apple-watch-se-black.webp"
       },
       {
         "color": "Silver",
         "colorCode": "#C0C0C0",
-        "image": "https://m.media-amazon.com/images/I/71zbWSRMaYL.__AC_SX300_SY300_QL70_FMwebp_.jpg"
+        "image": "/products/apple-watch-se-silver.webp"
       }
     ],
     "reviews": []
@@ -273,7 +261,7 @@ export const products = [
       {
         "color": "Black",
         "colorCode": "#000000",
-        "image": "https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=800&auto=format&fit=crop&q=80"
+        "image": "/products/samsung-tv32.webp"
       }
     ],
     "reviews": []
@@ -305,14 +293,9 @@ export const products = [
     "inStock": true,
     "images": [
       {
-        "color": "Gray",
-        "colorCode": "#808080",
-        "image": "https://m.media-amazon.com/images/I/417tEj3iJ8L._AC_.jpg"
-      },
-      {
-        "color": "White",
-        "colorCode": "#FFFFFF",
-        "image": "https://m.media-amazon.com/images/I/71p-tHQ0u1L._AC_SX679_.jpg"
+        "color": "Black",
+        "colorCode": "#171717",
+        "image": "/products/samsung-galaxy-a15-black.webp"
       }
     ],
     "reviews": []
@@ -329,7 +312,7 @@ export const products = [
       {
         "color": "Silver",
         "colorCode": "#C0C0C0",
-        "image": "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&auto=format&fit=crop&q=80"
+        "image": "/products/dell-inspiron15-silver.webp"
       }
     ],
     "reviews": []
@@ -346,7 +329,7 @@ export const products = [
       {
         "color": "Black",
         "colorCode": "#000000",
-        "image": "https://images.unsplash.com/photo-1642655825268-137758d008e8?w=800&auto=format&fit=crop&q=80"
+        "image": "/products/dell-optiplex-black.webp"
       }
     ],
     "reviews": []
@@ -362,13 +345,13 @@ export const products = [
     "images": [
       {
         "color": "Black",
-        "colorCode": "#000000",
-        "image": "https://m.media-amazon.com/images/I/71s4mjiit3L.__AC_SX300_SY300_QL70_FMwebp_.jpg"
+        "colorCode": "#171717",
+        "image": "/products/samsung-watch6-black.webp"
       },
       {
         "color": "Silver",
         "colorCode": "#C0C0C0",
-        "image": "https://m.media-amazon.com/images/I/71zbWSRMaYL.__AC_SX300_SY300_QL70_FMwebp_.jpg"
+        "image": "/products/samsung-watch6-silver.webp"
       }
     ],
     "reviews": []
@@ -385,7 +368,7 @@ export const products = [
       {
         "color": "Black",
         "colorCode": "#000000",
-        "image": "https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=800&auto=format&fit=crop&q=80"
+        "image": "/products/lg-tv43.webp"
       }
     ],
     "reviews": []
@@ -402,7 +385,7 @@ export const products = [
       {
         "color": "Black",
         "colorCode": "#000000",
-        "image": "https://m.media-amazon.com/images/I/71gOLg2-kqL.__AC_SX300_SY300_QL70_FMwebp_.jpg"
+        "image": "/products/razer-blackwidow-v3.webp"
       }
     ],
     "reviews": []
@@ -418,18 +401,8 @@ export const products = [
     "images": [
       {
         "color": "Black",
-        "colorCode": "#000000",
-        "image": "https://m.media-amazon.com/images/I/61g+McQpg7L._AC_SX679_.jpg"
-      },
-      {
-        "color": "Blue",
-        "colorCode": " #0000FF",
-        "image": "https://m.media-amazon.com/images/I/713Om9vCHUL._AC_SX679_.jpg"
-      },
-      {
-        "color": "Red",
-        "colorCode": "#FF0000",
-        "image": "https://m.media-amazon.com/images/I/61thdjmfHcL.__AC_SX300_SY300_QL70_FMwebp_.jpg"
+        "colorCode": "#171717",
+        "image": "/products/redmi-note13-black.webp"
       }
     ],
     "reviews": []
@@ -446,7 +419,7 @@ export const products = [
       {
         "color": "Silver",
         "colorCode": "#C0C0C0",
-        "image": "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&auto=format&fit=crop&q=80"
+        "image": "/products/hp-pavilion15-silver.webp"
       }
     ],
     "reviews": []
@@ -463,7 +436,7 @@ export const products = [
       {
         "color": "Black",
         "colorCode": "#000000",
-        "image": "https://images.unsplash.com/photo-1642655825268-137758d008e8?w=800&auto=format&fit=crop&q=80"
+        "image": "/products/hp-prodesk-black.webp"
       }
     ],
     "reviews": []
@@ -479,13 +452,8 @@ export const products = [
     "images": [
       {
         "color": "Black",
-        "colorCode": "#000000",
-        "image": "https://m.media-amazon.com/images/I/71s4mjiit3L.__AC_SX300_SY300_QL70_FMwebp_.jpg"
-      },
-      {
-        "color": "Silver",
-        "colorCode": "#C0C0C0",
-        "image": "https://m.media-amazon.com/images/I/71zbWSRMaYL.__AC_SX300_SY300_QL70_FMwebp_.jpg"
+        "colorCode": "#171717",
+        "image": "/products/garmin-venu-sq2-black.webp"
       }
     ],
     "reviews": []
@@ -502,7 +470,7 @@ export const products = [
       {
         "color": "Black",
         "colorCode": "#000000",
-        "image": "https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=800&auto=format&fit=crop&q=80"
+        "image": "/products/sony-tv43.webp"
       }
     ],
     "reviews": []
@@ -519,7 +487,7 @@ export const products = [
       {
         "color": "Black",
         "colorCode": "#000000",
-        "image": "https://m.media-amazon.com/images/I/71gOLg2-kqL.__AC_SX300_SY300_QL70_FMwebp_.jpg"
+        "image": "/products/corsair-k55-rgb.webp"
       }
     ],
     "reviews": []
@@ -535,18 +503,8 @@ export const products = [
     "images": [
       {
         "color": "Black",
-        "colorCode": "#000000",
-        "image": "https://m.media-amazon.com/images/I/61g+McQpg7L._AC_SX679_.jpg"
-      },
-      {
-        "color": "Blue",
-        "colorCode": " #0000FF",
-        "image": "https://m.media-amazon.com/images/I/713Om9vCHUL._AC_SX679_.jpg"
-      },
-      {
-        "color": "Red",
-        "colorCode": "#FF0000",
-        "image": "https://m.media-amazon.com/images/I/61thdjmfHcL.__AC_SX300_SY300_QL70_FMwebp_.jpg"
+        "colorCode": "#171717",
+        "image": "/products/oppo-reno11-black.webp"
       }
     ],
     "reviews": []
@@ -563,7 +521,7 @@ export const products = [
       {
         "color": "Silver",
         "colorCode": "#C0C0C0",
-        "image": "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&auto=format&fit=crop&q=80"
+        "image": "/products/asus-vivobook15-silver.webp"
       }
     ],
     "reviews": []
@@ -580,7 +538,7 @@ export const products = [
       {
         "color": "Black",
         "colorCode": "#000000",
-        "image": "https://images.unsplash.com/photo-1642655825268-137758d008e8?w=800&auto=format&fit=crop&q=80"
+        "image": "/products/lenovo-thinkcentre-black.webp"
       }
     ],
     "reviews": []
@@ -596,13 +554,8 @@ export const products = [
     "images": [
       {
         "color": "Black",
-        "colorCode": "#000000",
-        "image": "https://m.media-amazon.com/images/I/71s4mjiit3L.__AC_SX300_SY300_QL70_FMwebp_.jpg"
-      },
-      {
-        "color": "Silver",
-        "colorCode": "#C0C0C0",
-        "image": "https://m.media-amazon.com/images/I/71zbWSRMaYL.__AC_SX300_SY300_QL70_FMwebp_.jpg"
+        "colorCode": "#171717",
+        "image": "/products/huawei-watch-fit3-black.webp"
       }
     ],
     "reviews": []
@@ -619,7 +572,7 @@ export const products = [
       {
         "color": "Black",
         "colorCode": "#000000",
-        "image": "https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=800&auto=format&fit=crop&q=80"
+        "image": "/products/tcl-tv50.webp"
       }
     ],
     "reviews": []
@@ -634,9 +587,9 @@ export const products = [
     "inStock": true,
     "images": [
       {
-        "color": "Graphite",
-        "colorCode": " #383838",
-        "image": "https://m.media-amazon.com/images/I/61ni3t1ryQL.__AC_SX300_SY300_QL70_FMwebp_.jpg"
+        "color": "Black",
+        "colorCode": "#000000",
+        "image": "/products/anker-vertical-mouse.webp"
       }
     ],
     "reviews": []
@@ -651,14 +604,9 @@ export const products = [
     "inStock": true,
     "images": [
       {
-        "color": "Gray",
-        "colorCode": "#808080",
-        "image": "https://m.media-amazon.com/images/I/417tEj3iJ8L._AC_.jpg"
-      },
-      {
-        "color": "White",
-        "colorCode": "#FFFFFF",
-        "image": "https://m.media-amazon.com/images/I/71p-tHQ0u1L._AC_SX679_.jpg"
+        "color": "Black",
+        "colorCode": "#171717",
+        "image": "/products/vivo-v30-black.webp"
       }
     ],
     "reviews": []
@@ -675,7 +623,7 @@ export const products = [
       {
         "color": "Silver",
         "colorCode": "#C0C0C0",
-        "image": "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&auto=format&fit=crop&q=80"
+        "image": "/products/lenovo-ideapad-slim3-silver.webp"
       }
     ],
     "reviews": []
@@ -692,7 +640,7 @@ export const products = [
       {
         "color": "Black",
         "colorCode": "#000000",
-        "image": "https://images.unsplash.com/photo-1642655825268-137758d008e8?w=800&auto=format&fit=crop&q=80"
+        "image": "/products/asus-expertcenter-black.webp"
       }
     ],
     "reviews": []
@@ -708,13 +656,8 @@ export const products = [
     "images": [
       {
         "color": "Black",
-        "colorCode": "#000000",
-        "image": "https://m.media-amazon.com/images/I/71s4mjiit3L.__AC_SX300_SY300_QL70_FMwebp_.jpg"
-      },
-      {
-        "color": "Silver",
-        "colorCode": "#C0C0C0",
-        "image": "https://m.media-amazon.com/images/I/71zbWSRMaYL.__AC_SX300_SY300_QL70_FMwebp_.jpg"
+        "colorCode": "#171717",
+        "image": "/products/redmi-watch4-black.webp"
       }
     ],
     "reviews": []
@@ -731,7 +674,7 @@ export const products = [
       {
         "color": "Black",
         "colorCode": "#000000",
-        "image": "https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=800&auto=format&fit=crop&q=80"
+        "image": "/products/hisense-tv55.webp"
       }
     ],
     "reviews": []
@@ -746,9 +689,9 @@ export const products = [
     "inStock": true,
     "images": [
       {
-        "color": "Graphite",
-        "colorCode": " #383838",
-        "image": "https://m.media-amazon.com/images/I/61ni3t1ryQL.__AC_SX300_SY300_QL70_FMwebp_.jpg"
+        "color": "Black",
+        "colorCode": "#000000",
+        "image": "/products/baseus-f02-mouse.webp"
       }
     ],
     "reviews": []
@@ -764,18 +707,8 @@ export const products = [
     "images": [
       {
         "color": "Black",
-        "colorCode": "#000000",
-        "image": "https://m.media-amazon.com/images/I/61g+McQpg7L._AC_SX679_.jpg"
-      },
-      {
-        "color": "Red",
-        "colorCode": "#FF0000",
-        "image": "https://m.media-amazon.com/images/I/61thdjmfHcL.__AC_SX300_SY300_QL70_FMwebp_.jpg"
-      },
-      {
-        "color": "Blue",
-        "colorCode": " #0000FF",
-        "image": "https://m.media-amazon.com/images/I/713Om9vCHUL._AC_SX679_.jpg"
+        "colorCode": "#171717",
+        "image": "/products/samsung-galaxy-a55-black.webp"
       }
     ],
     "reviews": []
@@ -792,7 +725,7 @@ export const products = [
       {
         "color": "Silver",
         "colorCode": "#C0C0C0",
-        "image": "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&auto=format&fit=crop&q=80"
+        "image": "/products/acer-aspire5-silver.webp"
       }
     ],
     "reviews": []
@@ -809,7 +742,7 @@ export const products = [
       {
         "color": "Black",
         "colorCode": "#000000",
-        "image": "https://images.unsplash.com/photo-1642655825268-137758d008e8?w=800&auto=format&fit=crop&q=80"
+        "image": "/products/acer-aspire-desktop-black.webp"
       }
     ],
     "reviews": []
@@ -825,13 +758,8 @@ export const products = [
     "images": [
       {
         "color": "Black",
-        "colorCode": "#000000",
-        "image": "https://m.media-amazon.com/images/I/71s4mjiit3L.__AC_SX300_SY300_QL70_FMwebp_.jpg"
-      },
-      {
-        "color": "Silver",
-        "colorCode": "#C0C0C0",
-        "image": "https://m.media-amazon.com/images/I/71zbWSRMaYL.__AC_SX300_SY300_QL70_FMwebp_.jpg"
+        "colorCode": "#171717",
+        "image": "/products/amazfit-bip5-black.webp"
       }
     ],
     "reviews": []
@@ -848,7 +776,7 @@ export const products = [
       {
         "color": "Black",
         "colorCode": "#000000",
-        "image": "https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=800&auto=format&fit=crop&q=80"
+        "image": "/products/panasonic-tv55.webp"
       }
     ],
     "reviews": []
@@ -863,9 +791,9 @@ export const products = [
     "inStock": true,
     "images": [
       {
-        "color": "Graphite",
-        "colorCode": " #383838",
-        "image": "https://m.media-amazon.com/images/I/61ni3t1ryQL.__AC_SX300_SY300_QL70_FMwebp_.jpg"
+        "color": "Black",
+        "colorCode": "#000000",
+        "image": "/products/belkin-wired-mouse.webp"
       }
     ],
     "reviews": []
@@ -880,14 +808,9 @@ export const products = [
     "inStock": true,
     "images": [
       {
-        "color": "White",
-        "colorCode": "#FFFFFF",
-        "image": "https://m.media-amazon.com/images/I/71p-tHQ0u1L._AC_SX679_.jpg"
-      },
-      {
-        "color": "Gray",
-        "colorCode": "#808080",
-        "image": "https://m.media-amazon.com/images/I/417tEj3iJ8L._AC_.jpg"
+        "color": "Black",
+        "colorCode": "#171717",
+        "image": "/products/xiaomi14-black.webp"
       }
     ],
     "reviews": []
@@ -902,9 +825,9 @@ export const products = [
     "inStock": true,
     "images": [
       {
-        "color": "Silver",
-        "colorCode": "#C0C0C0",
-        "image": "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&auto=format&fit=crop&q=80"
+        "color": "Gray",
+        "colorCode": "#808080",
+        "image": "/products/msi-thin15-gray.webp"
       }
     ],
     "reviews": []
@@ -921,7 +844,7 @@ export const products = [
       {
         "color": "Black",
         "colorCode": "#000000",
-        "image": "https://images.unsplash.com/photo-1642655825268-137758d008e8?w=800&auto=format&fit=crop&q=80"
+        "image": "/products/dell-optiplex-black.webp"
       }
     ],
     "reviews": []
@@ -937,13 +860,13 @@ export const products = [
     "images": [
       {
         "color": "Black",
-        "colorCode": "#000000",
-        "image": "https://m.media-amazon.com/images/I/71s4mjiit3L.__AC_SX300_SY300_QL70_FMwebp_.jpg"
+        "colorCode": "#171717",
+        "image": "/products/samsung-watch6-classic-black.webp"
       },
       {
         "color": "Silver",
         "colorCode": "#C0C0C0",
-        "image": "https://m.media-amazon.com/images/I/71zbWSRMaYL.__AC_SX300_SY300_QL70_FMwebp_.jpg"
+        "image": "/products/samsung-watch6-classic-silver.webp"
       }
     ],
     "reviews": []
@@ -960,7 +883,7 @@ export const products = [
       {
         "color": "Black",
         "colorCode": "#000000",
-        "image": "https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=800&auto=format&fit=crop&q=80"
+        "image": "/products/samsung-tv65.webp"
       }
     ],
     "reviews": []
@@ -1004,7 +927,7 @@ export const products = [
       {
         "color": "Silver",
         "colorCode": "#C0C0C0",
-        "image": "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&auto=format&fit=crop&q=80"
+        "image": "/products/macbook-air-silver.webp"
       }
     ],
     "reviews": []
@@ -1021,7 +944,7 @@ export const products = [
       {
         "color": "Black",
         "colorCode": "#000000",
-        "image": "https://images.unsplash.com/photo-1642655825268-137758d008e8?w=800&auto=format&fit=crop&q=80"
+        "image": "/products/hp-prodesk-black.webp"
       }
     ],
     "reviews": []
@@ -1038,7 +961,7 @@ export const products = [
       {
         "color": "Black",
         "colorCode": "#000000",
-        "image": "https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=800&auto=format&fit=crop&q=80"
+        "image": "/products/lg-tv75.webp"
       }
     ],
     "reviews": []
@@ -1051,7 +974,13 @@ export const products = [
     brand: "Sony",
     category: "Headphone",
     inStock: true,
-    images: [{ color: "Black", colorCode: "#000000", image: "https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=800&auto=format&fit=crop&q=80" }],
+    images: [
+      {
+        "color": "Black",
+        "colorCode": "#000000",
+        "image": "/products/sony-wh1000xm5-black.webp"
+      }
+    ],
     reviews: [],
   },
   {
@@ -1062,7 +991,13 @@ export const products = [
     brand: "Bose",
     category: "Headphone",
     inStock: true,
-    images: [{ color: "Black", colorCode: "#000000", image: "https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=800&auto=format&fit=crop&q=80" }],
+    images: [
+      {
+        "color": "Black",
+        "colorCode": "#000000",
+        "image": "/products/bose-quietcomfort-black.webp"
+      }
+    ],
     reviews: [],
   },
   {
@@ -1073,7 +1008,13 @@ export const products = [
     brand: "JBL",
     category: "Headphone",
     inStock: true,
-    images: [{ color: "Black", colorCode: "#000000", image: "https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=800&auto=format&fit=crop&q=80" }],
+    images: [
+      {
+        "color": "Black",
+        "colorCode": "#000000",
+        "image": "/products/jbl-tune720bt-black.webp"
+      }
+    ],
     reviews: [],
   },
   {
@@ -1084,7 +1025,13 @@ export const products = [
     brand: "Sennheiser",
     category: "Headphone",
     inStock: true,
-    images: [{ color: "Black", colorCode: "#000000", image: "https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=800&auto=format&fit=crop&q=80" }],
+    images: [
+      {
+        "color": "Black",
+        "colorCode": "#000000",
+        "image": "/products/sennheiser-accentum-black.webp"
+      }
+    ],
     reviews: [],
   },
 ];

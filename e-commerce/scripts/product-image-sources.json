@@ -1,0 +1,714 @@
+{
+  "description": "Product photograph sources for the catalog. Reuse across RAM/storage variants is intentional; color variants require their own photograph.",
+  "assets": [
+    {
+      "key": "iphone14-white",
+      "productIds": [
+        "64a654593e91b8e73a351e9b",
+        "670000000000000000000001"
+      ],
+      "color": "White",
+      "colorCode": "#FFFFFF",
+      "candidates": [
+        {
+          "url": "https://image.alza.cz/products/RI041c2/RI041c2.jpg",
+          "source": "https://www.alza.sk/iphone-14-256-gb-biely-d7403180.htm",
+          "title": "Apple iPhone 14 256 GB White"
+        }
+      ]
+    },
+    {
+      "key": "samsung-galaxy-a15-black",
+      "productIds": [
+        "670000000000000000000007"
+      ],
+      "color": "Black",
+      "colorCode": "#171717",
+      "candidates": [
+        {
+          "url": "https://www.graiet.tn/media/catalog/product/cache/fb4fbd9d41acbe50a1e96292a8b8604b/s/m/smartphone-samsung-galaxy-a15-4-128go-bleu-noir.jpg",
+          "source": "https://www.graiet.tn/samsung-smartphone-galaxy-a15-4-128go.html",
+          "title": "Samsung Galaxy A15 Blue Black"
+        }
+      ]
+    },
+    {
+      "key": "redmi-note13-black",
+      "productIds": [
+        "67000000000000000000000d"
+      ],
+      "color": "Black",
+      "colorCode": "#171717",
+      "candidates": [
+        {
+          "url": "https://i.mi.ua/media/catalog/product/cache/1/image/710x600/602f0fa2c1f0d1ba5e241f914e856ff9/1/1/1111_32_4.webp",
+          "source": "https://mi.ua/ru/products/mobile/xiaomi-redmi-note-13-8-512-midnight-black.html",
+          "title": "Xiaomi Redmi Note 13 Midnight Black"
+        }
+      ]
+    },
+    {
+      "key": "oppo-reno11-black",
+      "productIds": [
+        "670000000000000000000013"
+      ],
+      "color": "Black",
+      "colorCode": "#171717",
+      "candidates": [
+        {
+          "url": "https://cdn.mobilecity.vn/mobilecity-vn/images/2023/11/oppo-reno11-den.jpg",
+          "source": "https://mobilecity.vn/dien-thoai/oppo-reno11-5g-dimensity-8200.html",
+          "title": "OPPO Reno11 5G in Black"
+        }
+      ]
+    },
+    {
+      "key": "vivo-v30-black",
+      "productIds": [
+        "670000000000000000000019"
+      ],
+      "color": "Black",
+      "colorCode": "#171717",
+      "candidates": [
+        {
+          "url": "https://asia-exstatic-vivofs.vivo.com/PSee2l50xoirPK7y/1708507738959/32493d98c6fd298b3a5bbef4135b55a6.png",
+          "source": "https://www.vivo.com/th/products/param/v30",
+          "title": "vivo V30 Night Sky Black Smartphone"
+        }
+      ]
+    },
+    {
+      "key": "samsung-galaxy-a55-black",
+      "productIds": [
+        "67000000000000000000001f"
+      ],
+      "color": "Black",
+      "colorCode": "#171717",
+      "candidates": [
+        {
+          "url": "https://cdn.cimri.io/image/1000x1000/samsung-galaxy-a55-256gb-8gb-ram-siyah_872409907.jpg",
+          "source": "https://www.cimri.com/cep-telefonlari/en-ucuz-samsung-galaxy-a55-256gb-8gb-ram-siyah-fiyatlari%2C2336654872",
+          "title": "Samsung Galaxy A55 Smartphone"
+        }
+      ]
+    },
+    {
+      "key": "xiaomi14-black",
+      "productIds": [
+        "670000000000000000000025"
+      ],
+      "color": "Black",
+      "colorCode": "#171717",
+      "candidates": [
+        {
+          "url": "https://external.webstorage.gr/mmimages/image/57/45/96/14/1906635-XIAOMI-MZB0G1BEU-hero-560x560.jpg",
+          "source": "https://www.public.gr/product/tilefonia/kinita-smartphones/xiaomi-14-512gb--black/1906635",
+          "title": "Xiaomi 14 512GB Black Smartphone"
+        }
+      ]
+    },
+    {
+      "key": "macbook-air-silver",
+      "productIds": [
+        "670000000000000000000002",
+        "67000000000000000000002b"
+      ],
+      "color": "Silver",
+      "colorCode": "#C0C0C0",
+      "candidates": [
+        {
+          "url": "https://tekreplay.com/cdn/shop/files/bc56f38a-e720-4b77-94d6-c65457583b77.jpg?v=1734551222",
+          "source": "https://tekreplay.com/products/apple-macbook-air-13-inch-m2-chip-2022-silver",
+          "title": "Apple MacBook Air 13-inch M2 in Silver"
+        }
+      ]
+    },
+    {
+      "key": "dell-inspiron15-silver",
+      "productIds": [
+        "670000000000000000000008"
+      ],
+      "color": "Silver",
+      "colorCode": "#C0C0C0",
+      "candidates": [
+        {
+          "url": "https://dellstatic.luroconnect.com/media/catalog/product/cache/74ae05ef3745aec30d7f5a287debd7f5/i/n/inspiron-3530-sl.png",
+          "source": "https://www.dellstore.com/inspiron-15-laptop-oin353010031rins1m.html",
+          "title": "Dell Inspiron 15 (3530) Platinum Silver Laptop"
+        }
+      ]
+    },
+    {
+      "key": "hp-pavilion15-silver",
+      "productIds": [
+        "67000000000000000000000e"
+      ],
+      "color": "Silver",
+      "colorCode": "#C0C0C0",
+      "candidates": [
+        {
+          "url": "https://microport.in/cdn/shop/files/7S4N6PA-1_T1682044771_5df324f7-a299-4ffa-9518-bca5713095ef.png?v=1687244306",
+          "source": "https://microport.in/cdn/shop/files/7S4N6PA-1_T1682044771_5df324f7-a299-4ffa-9518-bca5713095ef.png?v=1687244306",
+          "title": "HP Pavilion 15-eg3026TU Laptop Overview"
+        }
+      ]
+    },
+    {
+      "key": "asus-vivobook15-silver",
+      "productIds": [
+        "670000000000000000000014"
+      ],
+      "color": "Silver",
+      "colorCode": "#C0C0C0",
+      "candidates": [
+        {
+          "url": "https://bf1af2.akinoncloudcdn.com/products/2026/02/26/643194/b0b8a93c-7e4f-423b-9c70-aad3bd96a8c3_size1200_cropCenter.jpg",
+          "source": "https://gcc.luluhypermarket.com/en-qa/asus-vivobook-15-laptop-intel-core-7-150u-processor-16-gb-ram/p/2637194/",
+          "title": "Asus Vivobook 15 in Cool Silver"
+        }
+      ]
+    },
+    {
+      "key": "lenovo-ideapad-slim3-silver",
+      "productIds": [
+        "67000000000000000000001a"
+      ],
+      "color": "Silver",
+      "colorCode": "#C0C0C0",
+      "candidates": [
+        {
+          "url": "https://reimg-teknosa-cloud-prod.mncdn.com/mnresize/600/600/productimage/786340080/786340080_1_MC/989ac56bc65740ce877cb961e8be5836.jpg",
+          "source": "https://www.teknosa.com/lenovo-ideapad-slim-3-83em00kytr-i5-13420h-156-16-gb-ram-512-gb-ssd-fhd-freedos-dizustu-bilgisayar-p-786340080",
+          "title": "Lenovo IdeaPad Slim 3 Laptop"
+        }
+      ]
+    },
+    {
+      "key": "acer-aspire5-silver",
+      "productIds": [
+        "670000000000000000000020"
+      ],
+      "color": "Silver",
+      "colorCode": "#C0C0C0",
+      "candidates": [
+        {
+          "url": "https://i.citrus.world/imgcache/size_800/uploads/shop/3/d/3d1531be593d3d2500134cb528487f19.jpg",
+          "source": "https://www.ctrs.com.ua/ru/noutbuki-i-ultrabuki/acer-aspire-5-a515-54g-57d1-nxhn5eu00g-silver-657685.html",
+          "title": "Acer Aspire 5 A515-54G-57D1 Silver Laptop"
+        }
+      ]
+    },
+    {
+      "key": "msi-thin15-gray",
+      "productIds": [
+        "670000000000000000000026"
+      ],
+      "color": "Gray",
+      "colorCode": "#808080",
+      "candidates": [
+        {
+          "url": "https://storage-asset.msi.com/global/picture/product/product_1711524114d44074b603aa10905955ed430a69d0a6.webp",
+          "source": "https://www.msi.com/Laptop/Thin-15-B13VX/Gallery",
+          "title": "MSI Thin 15 B13V Cosmos Gray"
+        }
+      ]
+    },
+    {
+      "key": "imac24-silver",
+      "productIds": [
+        "670000000000000000000003"
+      ],
+      "color": "Silver",
+      "colorCode": "#C0C0C0",
+      "candidates": [
+        {
+          "url": "https://www.firstshop.co.za/cdn/shop/files/mwuc3so-a-all-in-ones-59590555337071.jpg?v=1736299897",
+          "source": "https://www.firstshop.co.za/products/apple-imac-24-23-5-inch-retina-4-5k-all-in-one-pc-apple-m4-256gb-ssd-16gb-ram-macos-silver-315416",
+          "title": "Apple iMac 24-inch All-in-One Desktop"
+        }
+      ]
+    },
+    {
+      "key": "dell-optiplex-black",
+      "productIds": [
+        "670000000000000000000009",
+        "670000000000000000000027"
+      ],
+      "color": "Black",
+      "colorCode": "#000000",
+      "candidates": [
+        {
+          "url": "https://altex.com/cdn/shop/files/dell-v1gd6-optiplex-7010-desktop-tower-computer-intel-core-i7-13700-16gb-memory-512gb-ssd-black-721262.jpg?v=1733276113",
+          "source": "https://altex.com/products/dell-v1gd6-optiplex-7010-desktop-tower-computer-intel-core-i7-13700-16gb-512gb-ssd-black",
+          "title": "Dell OptiPlex 7010 Desktop Tower"
+        }
+      ]
+    },
+    {
+      "key": "hp-prodesk-black",
+      "productIds": [
+        "67000000000000000000000f",
+        "67000000000000000000002c"
+      ],
+      "color": "Black",
+      "colorCode": "#000000",
+      "candidates": [
+        {
+          "url": "https://maytinhcdc.vn/media/product/7665_prodesk_g10.jpg",
+          "source": "https://maytinhcdc.vn/may-tinh-de-ban-hp-prodesk-400-g10.html",
+          "title": "HP ProDesk 400 G10 Desktop Tower"
+        }
+      ]
+    },
+    {
+      "key": "lenovo-thinkcentre-black",
+      "productIds": [
+        "670000000000000000000015"
+      ],
+      "color": "Black",
+      "colorCode": "#000000",
+      "candidates": [
+        {
+          "url": "https://p3-ofp.static.pub/fes/cms/2022/08/02/aj7p2jh6ig7yyp3cbxd907bp37ti78709836.png",
+          "source": "https://www.lenovo.com/gb/en/c/desktops/thinkcentre/m-series-towers/",
+          "title": "Lenovo ThinkCentre M Series Tower"
+        }
+      ]
+    },
+    {
+      "key": "asus-expertcenter-black",
+      "productIds": [
+        "67000000000000000000001b"
+      ],
+      "color": "Black",
+      "colorCode": "#000000",
+      "candidates": [
+        {
+          "url": "https://iqcentar.hr/image/cache/catalog/vendor/d501mer-wb53c1x-asus-expertcenter-d5-tower-i5-14500-16gb-512gbssd-inteluhd-kb-mouse-win11pro-800x800.jpg",
+          "source": "https://iqcentar.hr/58119-asus-expertcenter-d5-tower-i5-14500-16gb-512gbssd-inteluhd-kb-mouse-win11pro",
+          "title": "Asus ExpertCenter D5 Tower Desktop"
+        }
+      ]
+    },
+    {
+      "key": "acer-aspire-desktop-black",
+      "productIds": [
+        "670000000000000000000021"
+      ],
+      "color": "Black",
+      "colorCode": "#000000",
+      "candidates": [
+        {
+          "url": "https://i5.walmartimages.com/seo/Acer-Aspire-TC-TC-1780-UA92-Home-Business-Desktop-Intel-i5-13400-10-Core-16GB-RAM-512GB-PCIe-SSD-Intel-UHD-730-Wifi-Bluetooth-Win-11-Home_9d0394f9-07d1-466b-bb81-56ea0f775473.0020ddca926f6a281065df18b5f51c51.jpeg",
+          "source": "https://www.walmart.com/ip/Acer-Aspire-TC-TC-1780-UA92-Home-Business-Desktop-Intel-i5-13400-10-Core-16GB-RAM-512GB-PCIe-SSD-Intel-UHD-730-Wifi-Bluetooth-Win-11-Home/5365842120",
+          "title": "Acer Aspire TC Desktop Tower"
+        }
+      ]
+    },
+    {
+      "key": "apple-watch-se-black",
+      "productIds": [
+        "670000000000000000000004"
+      ],
+      "color": "Black",
+      "colorCode": "#171717",
+      "candidates": [
+        {
+          "url": "https://i5.walmartimages.com/asr/f4fb8000-8a00-4bdd-ae0f-352d1e41c7e6.da9b04fd4c7b7ae3a238d452c693f3fc.jpeg",
+          "source": "https://www.walmart.com.mx/ip/apple-watch-se-2nd-gen-gps-44mm-negro-midnight-m-l/00019594964418",
+          "title": "Apple Watch SE 2nd Gen GPS 44 mm Midnight Black"
+        }
+      ]
+    },
+    {
+      "key": "apple-watch-se-silver",
+      "productIds": [
+        "670000000000000000000004"
+      ],
+      "color": "Silver",
+      "colorCode": "#C0C0C0",
+      "candidates": [
+        {
+          "url": "https://kream-phinf.pstatic.net/MjAyNTA3MzBfMTYy/MDAxNzUzODYzMjcyNzk1.eHEqZBW4nn41GlF507yVfU9382zViaTvPhww4fXns14g.eKmv7a_NnPN0aeicrjny1q4twlUnW5blf2tWqxKusSMg.PNG/a_f0b1ec7bb44b4307b7c1c19c51f99b41.png",
+          "source": "https://kream.co.kr/products/101903",
+          "title": "Apple Watch SE 44mm GPS Silver with White Sport Band"
+        }
+      ]
+    },
+    {
+      "key": "samsung-watch6-black",
+      "productIds": [
+        "67000000000000000000000a"
+      ],
+      "color": "Black",
+      "colorCode": "#171717",
+      "candidates": [
+        {
+          "url": "https://www.samsung-online.com.ua/uploads/shop/products/additional/61acd670fe12d0552058dafa1bfb8196.jpg",
+          "source": "https://www.samsung-online.com.ua/smart-chasy-samsung-galaxy-watch-6-44mm-sm-r940nzkasek-black",
+          "title": "Samsung Galaxy Watch6 44mm in Black"
+        }
+      ]
+    },
+    {
+      "key": "samsung-watch6-silver",
+      "productIds": [
+        "67000000000000000000000a"
+      ],
+      "color": "Silver",
+      "colorCode": "#C0C0C0",
+      "candidates": [
+        {
+          "url": "https://data.clickforshop.it/imgprodotto/samsung-galaxy-watch-6-smartwatch-analisi-del-sonno-44mm-silver_469294_zoom.jpg",
+          "source": "https://www.clickforshop.it/samsung-galaxy-watch-6-smartwatch-analisi-del-sonno-44mm-silver-P106973.htm",
+          "title": "Samsung Galaxy Watch6 44mm Silver"
+        }
+      ]
+    },
+    {
+      "key": "samsung-watch6-classic-black",
+      "productIds": [
+        "670000000000000000000028"
+      ],
+      "color": "Black",
+      "colorCode": "#171717",
+      "candidates": [
+        {
+          "url": "https://bigbuy.ba/upload/catalog/product/5859/samsung-galaxy-watch-6-classic-black-1-za-web_668ff6061d8fd.jpg",
+          "source": "https://bigbuy.ba/samsung-galaxy-watch6-classic-47mm-bt-black-proizvod-5859/",
+          "title": "Samsung Galaxy Watch6 Classic 47mm BT Black"
+        }
+      ]
+    },
+    {
+      "key": "samsung-watch6-classic-silver",
+      "productIds": [
+        "670000000000000000000028"
+      ],
+      "color": "Silver",
+      "colorCode": "#C0C0C0",
+      "candidates": [
+        {
+          "url": "https://img.danawa.com/prod_img/500000/166/563/img/23563166_1.jpg?_v=20241008173152",
+          "source": "https://prod.danawa.com/info/?pcode=23563166",
+          "title": "Samsung Galaxy Watch6 Classic 47mm"
+        }
+      ]
+    },
+    {
+      "key": "garmin-venu-sq2-black",
+      "productIds": [
+        "670000000000000000000010"
+      ],
+      "color": "Black",
+      "colorCode": "#171717",
+      "candidates": [
+        {
+          "url": "https://res.garmin.com/en/products/S10-02701-70/v/cf-lg.jpg",
+          "source": "https://support.garmin.com/en-CA/?faq=eTYtfI5Q1J3er7jLLT74C9&productID=801643&tab=topics",
+          "title": "Garmin Venu Sq 2 Smartwatch"
+        }
+      ]
+    },
+    {
+      "key": "huawei-watch-fit3-black",
+      "productIds": [
+        "670000000000000000000016"
+      ],
+      "color": "Black",
+      "colorCode": "#171717",
+      "candidates": [
+        {
+          "url": "https://image.coolblue.de/max/700xauto/products/2068151",
+          "source": "https://www.coolblue.de/en/product/950558/huawei-watch-fit-3-black.html",
+          "title": "Huawei Watch Fit 3 Black"
+        }
+      ]
+    },
+    {
+      "key": "redmi-watch4-black",
+      "productIds": [
+        "67000000000000000000001c"
+      ],
+      "color": "Black",
+      "colorCode": "#171717",
+      "candidates": [
+        {
+          "url": "https://bemovil.es/38965-large_default/xiaomi-redmi-watch-4-black.jpg",
+          "source": "https://bemovil.es/xiaomi-redmi-watch-4-black",
+          "title": "Xiaomi Redmi Watch 4 Black"
+        }
+      ]
+    },
+    {
+      "key": "amazfit-bip5-black",
+      "productIds": [
+        "670000000000000000000022"
+      ],
+      "color": "Black",
+      "colorCode": "#171717",
+      "candidates": [
+        {
+          "url": "https://i5.walmartimages.com/seo/Amazfit-Bip-5-Smart-Watch-with-Ultra-Large-Screen-Bluetooth-Calling-Soft-Black_79e0d00a-4fe7-437c-96b3-3f87f952e927.c917d38ecfc018deceb33878accb5368.png?odnBg=FFFFFF&odnHeight=768&odnWidth=768",
+          "source": "https://www.walmart.com/ip/5014221912",
+          "title": "Amazfit Bip 5 Smartwatch Overview"
+        }
+      ]
+    },
+    {
+      "key": "samsung-tv32",
+      "productIds": [
+        "670000000000000000000005"
+      ],
+      "color": "Black",
+      "colorCode": "#000000",
+      "candidates": [
+        {
+          "url": "https://static.ticimax.cloud/13616/uploads/urunresimleri/buyuk/samsung-32-t5300-hd-smart-tv-samsung-32-593e.png",
+          "source": "https://www.gureller.com/samsung-32-t5300-hd-smart-tv-ankaraya-ozel",
+          "title": "Samsung 32\" T5300 HD Smart TV"
+        }
+      ]
+    },
+    {
+      "key": "lg-tv43",
+      "productIds": [
+        "67000000000000000000000b"
+      ],
+      "color": "Black",
+      "colorCode": "#000000",
+      "candidates": [
+        {
+          "url": "https://www.lg.com/content/dam/channel/wcms/at/images/tv/43lm6370pla_aeu_eedg_at_c/gallery/large01.jpg?w=800",
+          "source": "https://www.lg.com/at/tv-soundbars/smart-tvs/43lm6370pla/",
+          "title": "LG 43LM6370PLA Full HD 43-inch front"
+        }
+      ]
+    },
+    {
+      "key": "sony-tv43",
+      "productIds": [
+        "670000000000000000000011"
+      ],
+      "color": "Black",
+      "colorCode": "#000000",
+      "candidates": [
+        {
+          "url": "https://cdn.othoba.com/images/thumbs/1184049_sony-bravia-x75k-43-inch-4k-uhd-google-tv-with-official-warranty.png",
+          "source": "https://othoba.com/sony-bravia-43-4k-uhd-google-tv-kd-43x75k-with-official-warranty",
+          "title": "Sony Bravia X75K 43\" 4K UHD Google TV"
+        }
+      ]
+    },
+    {
+      "key": "tcl-tv50",
+      "productIds": [
+        "670000000000000000000017"
+      ],
+      "color": "Black",
+      "colorCode": "#000000",
+      "candidates": [
+        {
+          "url": "https://tcliraq.com/cdn/shop/files/50P635_1024x.jpg?v=1752057160",
+          "source": "https://tcliraq.com/products/tcl-p635-4k-uhd-google-tv-with-dolby-audio-50-inch",
+          "title": "TCL P635 50\" 4K HDR Google TV"
+        }
+      ]
+    },
+    {
+      "key": "hisense-tv55",
+      "productIds": [
+        "67000000000000000000001d"
+      ],
+      "color": "Black",
+      "colorCode": "#000000",
+      "candidates": [
+        {
+          "url": "https://src.discounto.de/pics/Angebote/2023/08/25/fd2cc7030c28ceef4ca1de778231d0ac/Hisense-55-4K-UHD-Smart-TV-Fernseher-2023-55A6K_original.jpg",
+          "source": "https://www.discounto.de/Angebot/Hisense-55-4K-UHD-Smart-TV-Fernseher-2023-55A6K-8497962/",
+          "title": "Hisense 55\" 4K UHD Smart TV (2023) 55A6K"
+        }
+      ]
+    },
+    {
+      "key": "panasonic-tv55",
+      "productIds": [
+        "670000000000000000000023"
+      ],
+      "color": "Black",
+      "colorCode": "#000000",
+      "candidates": [
+        {
+          "url": "https://panasonic.scene7.com/is/image/Panasonic/ast-2044689?fmt=png-alpha&hei=460&wid=613",
+          "source": "https://www.panasonic.com/pa/consumo/tv/televisores/tc-55mx700h.html",
+          "title": "Panasonic TC-55MX700H/L 55-inch 4K HDR LED TV"
+        }
+      ]
+    },
+    {
+      "key": "samsung-tv65",
+      "productIds": [
+        "670000000000000000000029"
+      ],
+      "color": "Black",
+      "colorCode": "#000000",
+      "candidates": [
+        {
+          "url": "https://images.samsung.com/is/image/samsung/p6pim/latin/un65cu7000pxpa/gallery/latin-uhd-4k-tv-un65cu7000pxpa-front-black-536876551?$1164_776_PNG$",
+          "source": "https://www.samsung.com/latin/tvs/uhd-4k-tv/cu7000-65-inch-un65cu7000pxpa/",
+          "title": "Samsung CU7000 65-inch front Black"
+        }
+      ]
+    },
+    {
+      "key": "lg-tv75",
+      "productIds": [
+        "67000000000000000000002d"
+      ],
+      "color": "Black",
+      "colorCode": "#000000",
+      "candidates": [
+        {
+          "url": "https://www.lg.com/content/dam/channel/wcms/nz/images/tvs/75ur80006lj_anr_ehap_nz_c/75UR80006LJ_ANR_EHAP_NZ_C-450x450.jpg",
+          "source": "https://www.lg.com/nz/tv-soundbars/ultra-big-tv/75ur80006lj/",
+          "title": "LG UR80 75-inch 4K UHD AI ThinQ TV"
+        }
+      ]
+    },
+    {
+      "key": "razer-blackwidow-v3",
+      "productIds": [
+        "67000000000000000000000c"
+      ],
+      "color": "Black",
+      "colorCode": "#000000",
+      "candidates": [
+        {
+          "url": "https://assets3.razerzone.com/DzBA7ukVLwy4bw5WQmkPv4dN-rc=/1500x1000/https%3A%2F%2Fmedias-p1.phoenix.razer.com%2Fsys-master-phoenix-images-container%2Fhc2%2Fh3d%2F9538795896862%2Fblackwidow-v3-black-4-500x500.png",
+          "source": "https://www.razer.com/ap-en/gaming-keyboards/Razer-BlackWidow-V3/RZ03-03540100-R3M1",
+          "title": "Razer BlackWidow V3 Black"
+        }
+      ]
+    },
+    {
+      "key": "corsair-k55-rgb",
+      "productIds": [
+        "670000000000000000000012"
+      ],
+      "color": "Black",
+      "colorCode": "#000000",
+      "candidates": [
+        {
+          "url": "https://static-data.manualslib.tech/product-images/c9d/20952/corsair-k55-rgb-keyboard.jpg",
+          "source": "https://www.manualslib.tech/id/guide/20952/corsair-k55-rgb-gaming-keyboard-manual.html",
+          "title": "Corsair K55 RGB Gaming Keyboard"
+        }
+      ]
+    },
+    {
+      "key": "anker-vertical-mouse",
+      "productIds": [
+        "670000000000000000000018"
+      ],
+      "color": "Black",
+      "colorCode": "#000000",
+      "candidates": [
+        {
+          "url": "https://i.ebayimg.com/images/g/R9MAAOSw7b9lRT7R/s-l1600.png",
+          "source": "https://www.ebay.com/itm/126168914442",
+          "title": "Anker A7852M Wireless Vertical Ergonomic Mouse"
+        }
+      ]
+    },
+    {
+      "key": "baseus-f02-mouse",
+      "productIds": [
+        "67000000000000000000001e"
+      ],
+      "color": "Black",
+      "colorCode": "#000000",
+      "candidates": [
+        {
+          "url": "https://pl.baseus.com/cdn/shop/files/pol_pl_Mysz-bezprzewodowa-Baseus-F02-ergonomiczna-Bluetooth-czarna-203253_1_1300x.jpg?v=1785406102",
+          "source": "https://pl.baseus.com/products/mysz-bezprzewodowa-baseus-f02-ergonomiczna-bluetooth-czarna",
+          "title": "Baseus F02 Ergonomic Wireless Mouse Black"
+        }
+      ]
+    },
+    {
+      "key": "belkin-wired-mouse",
+      "productIds": [
+        "670000000000000000000024"
+      ],
+      "color": "Black",
+      "colorCode": "#000000",
+      "candidates": [
+        {
+          "url": "https://www.belkin.com/on/demandware.static/-/Sites-master-product-catalog-blk/default/dwe4909c1a/images/hi-res/6/7599686f205c29f0_F5M010q_3116.jpg",
+          "source": "https://www.belkin.com/p/wired-usb-ergonomic-mouse/F5M010qBLK.html",
+          "title": "Belkin Wired USB Ergonomic Mouse"
+        }
+      ]
+    },
+    {
+      "key": "sony-wh1000xm5-black",
+      "productIds": [
+        "67000000000000000000002e"
+      ],
+      "color": "Black",
+      "colorCode": "#000000",
+      "candidates": [
+        {
+          "url": "https://cdn.uniquephoto.com/resources/uniquephoto/images/products/processed/SYCD3506.detail.a.png",
+          "source": "https://www.uniquephoto.com/product/sony-wh-1000xm5-noise-canceling-wireless-over-ear-headphones-black",
+          "title": "Sony WH-1000XM5 Noise-Canceling Wireless Headphones"
+        }
+      ]
+    },
+    {
+      "key": "bose-quietcomfort-black",
+      "productIds": [
+        "67000000000000000000002f"
+      ],
+      "color": "Black",
+      "colorCode": "#000000",
+      "candidates": [
+        {
+          "url": "https://www.emarketkw.com/web/image/product.template/15496/image_1920?unique=c0ce8ff",
+          "source": "https://www.emarketkw.com/shop/17817848961-bose-quietcomfort-noise-cancelling-headphones-black-15496",
+          "title": "Bose QuietComfort Noise Cancelling Headphones"
+        }
+      ]
+    },
+    {
+      "key": "jbl-tune720bt-black",
+      "productIds": [
+        "670000000000000000000030"
+      ],
+      "color": "Black",
+      "colorCode": "#000000",
+      "candidates": [
+        {
+          "url": "https://www.jbl.com.co/dw/image/v2/BFND_PRD/on/demandware.static/-/Sites-masterCatalog_Harman/default/dw6ad8ebaf/01.JBL_Tune_720BT_ProductImage_Hero_Black.png?sh=535&sw=535",
+          "source": "https://www.jbl.com.co/TUNE720BT.html?srsltid=AfmBOoo99MUaTdV2sfto-ovitu3ifjEkQVEHYPvpUUAG7vMjRjOvK4yW",
+          "title": "JBL Tune 720BT Wireless Over-Ear Headphones"
+        }
+      ]
+    },
+    {
+      "key": "sennheiser-accentum-black",
+      "productIds": [
+        "670000000000000000000031"
+      ],
+      "color": "Black",
+      "colorCode": "#000000",
+      "candidates": [
+        {
+          "url": "https://multimedia.bbycastatic.ca/multimedia/products/1500x1500/173/17312/17312462.jpg",
+          "source": "https://www.bestbuy.ca/en-ca/product/sennheiser-accentum-over-ear-noise-cancelling-wireless-headphones-black/17312462",
+          "title": "Sennheiser ACCENTUM Over-Ear Wireless Headphones"
+        }
+      ]
+    }
+  ]
+}

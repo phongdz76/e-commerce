@@ -49,8 +49,8 @@ const Footer = () => {
               <span className="text-teal-400">Tech</span>
             </Link>
             <p>Free support hotline</p>
-            <a href="tel:19002004" className="hover:text-teal-400">Call for purchase: 1900 2004</a>
-            <a href="mailto:sgtech@gmail.com" className="hover:text-teal-400">Email: sgtech@gmail.com</a>
+            <p className="hover:text-teal-400">Call for purchase: 1900 2004</p>
+            <p className="hover:text-teal-400">Email: sgtech@gmail.com</p>
           </FooterList>
 
           <FooterList>

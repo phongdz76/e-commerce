@@ -4,6 +4,7 @@ import Avatar from "@/app/components/Avatar";
 import { Rating } from "@mui/material";
 import moment from "moment";
 import type { CatalogProduct } from "@/utils/productFilters";
+import ReviewForm from "./ReviewForm";
 
 interface ListRatingProps {
   product: CatalogProduct;
@@ -13,6 +14,7 @@ export default function ListRating({ product }: ListRatingProps) {
   return (
     <div>
       <h2 className="text-2xl font-bold">Customer reviews</h2>
+      <ReviewForm key={product.id} />
       <div className="text-base mt-4">
         {product.reviews && product.reviews.length > 0 ? (
           product.reviews.map((review) => (
