@@ -5,6 +5,7 @@ import NavBar from "./components/nav/NavBar";
 import Footer from "./components/footer/Footer";
 import CartProvider from "./providers/CartProvider";
 import { Toaster } from "react-hot-toast";
+import SupportWidget from "./components/support/SupportWidget";
 
 const poppins = Poppins({ subsets: ["latin"], weight: ["400", "700"] });
 
@@ -38,6 +39,7 @@ export default function RootLayout({
             <Footer />
           </div>
         </CartProvider>
+        <SupportWidget zaloUrl={process.env.NEXT_PUBLIC_ZALO_URL} />
       </body>
     </html>
   );

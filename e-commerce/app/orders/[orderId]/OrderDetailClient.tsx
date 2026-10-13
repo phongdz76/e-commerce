@@ -87,6 +87,7 @@ const PAYMENT_LABELS: Record<string, string> = {
   VNPAY: "VNPay",
   MOMO: "MoMo",
   STRIPE: "Credit Card (Stripe)",
+  ZALOPAY: "ZaloPay",
 };
 
 function Badge({ label, color, bg }: { label: string; color: string; bg: string }) {

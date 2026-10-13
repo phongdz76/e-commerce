@@ -11,6 +11,8 @@ export const API_PATHS = {
     CREATE_INTENT: "/api/create-payment-intent",
     SYNC_STRIPE_ORDER: "/api/order/stripe-status",
     MOMO_CREATE_URL: "/api/momo/create-payment-url",
+    ZALOPAY_CREATE_URL: "/api/zalopay/create-payment-url",
+    ZALOPAY_STATUS: "/api/zalopay/status",
   },
   ORDER: {
     GET_ALL: "/api/order",

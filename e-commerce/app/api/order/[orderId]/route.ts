@@ -2,6 +2,7 @@ import prisma from "@/libs/prismadb";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/actions/getCurrentUser";
 import { syncStripeOrder } from "@/libs/syncStripeOrder";
+import { syncZaloPayOrder } from "@/libs/syncZaloPayOrder";
 
 export async function GET(
   request: Request,
@@ -29,8 +30,25 @@ export async function GET(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    if (order.paymentMethod === "STRIPE" && !["complete", "paid", "done"].includes(order.status)) {
-      try { order = await syncStripeOrder(order); } catch { /* Keep the stored status if Stripe is temporarily unavailable. */ }
+    if (
+      order.paymentMethod === "STRIPE" &&
+      !["complete", "paid", "done"].includes(order.status)
+    ) {
+      try {
+        order = await syncStripeOrder(order);
+      } catch {
+        /* Keep the stored status if Stripe is temporarily unavailable. */
+      }
+    }
+    if (
+      order.paymentMethod === "ZALOPAY" &&
+      !["complete", "paid", "done"].includes(order.status)
+    ) {
+      try {
+        order = await syncZaloPayOrder(order);
+      } catch {
+        /* Keep the stored state during provider outages. */
+      }
     }
 
     return NextResponse.json({
