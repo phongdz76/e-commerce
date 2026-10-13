@@ -55,9 +55,10 @@ export async function GET() {
       }));
 
     return NextResponse.json(safeOrders);
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Something went wrong";
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch {
+    return NextResponse.json(
+      { error: "Unable to load your orders. Please try again." },
+      { status: 500 },
+    );
   }
 }

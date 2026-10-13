@@ -29,6 +29,7 @@ function getStripePromise() {
 
 interface CheckoutClientProps {
   currentUser: safeUser | null;
+  availablePaymentMethods?: Record<string, boolean>;
 }
 
 function getCheckoutRequestId(cart: string) {
@@ -45,7 +46,10 @@ function getCheckoutRequestId(cart: string) {
   return id;
 }
 
-export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
+export default function CheckoutClient({
+  currentUser,
+  availablePaymentMethods,
+}: CheckoutClientProps) {
   const {
     cartProducts,
     paymentIntent,
@@ -91,9 +95,9 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
   const returnedPaymentMethod =
     searchParams?.get("zalopay") === "return"
       ? "ZALOPAY"
-      : searchParams?.get("vnpay") === "success"
+      : ["return", "success"].includes(searchParams?.get("vnpay") || "")
         ? "VNPAY"
-        : searchParams?.get("momo") === "success"
+        : ["return", "success"].includes(searchParams?.get("momo") || "")
           ? "MOMO"
           : null;
   const returnedOrderId = searchParams?.get("order");
@@ -161,12 +165,16 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ orderId: returnedOrderId }),
             })
-          : await fetch(`/api/order/${encodeURIComponent(returnedOrderId)}`);
+          : await fetch(API_PATHS.PAYMENT.PAYMENT_STATUS, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ orderId: returnedOrderId }),
+            });
       if (!response.ok) {
         throw new Error("Unable to load the returned order");
       }
       const data = await response.json();
-      const order = returnedPaymentMethod === "ZALOPAY" ? data.order : data;
+      const order = data.order;
       if (order.paymentMethod !== returnedPaymentMethod) {
         throw new Error("Payment method mismatch");
       }
@@ -212,6 +220,9 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
     } else if (searchParams?.get("vnpay") === "invalid_signature") {
       hasHandledRedirect.current = true;
       toast.error("Payment via VNPay failed: Invalid Signature.");
+    } else if (searchParams?.get("vnpay") === "error") {
+      hasHandledRedirect.current = true;
+      toast.error("Unable to verify VNPay payment. Please check Your Orders.");
     }
 
     // Handle MoMo redirect
@@ -221,6 +232,9 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
     } else if (searchParams?.get("momo") === "invalid_signature") {
       hasHandledRedirect.current = true;
       toast.error("Payment via MoMo failed: Invalid Signature.");
+    } else if (searchParams?.get("momo") === "error") {
+      hasHandledRedirect.current = true;
+      toast.error("Unable to verify MoMo payment. Please check Your Orders.");
     }
   }, [searchParams, handleClearCart, handleSetPaymentIntent]);
 
@@ -409,6 +423,8 @@ export default function CheckoutClient({ currentUser }: CheckoutClientProps) {
             cardPayment={renderCardPayment()}
             handleSetPaymentSuccess={handlePaymentSuccess}
             currentUser={currentUser}
+            stripeOrderId={recentOrderId}
+            availablePaymentMethods={availablePaymentMethods}
           />
         )}
       {isPaymentReturn && !paymentSuccess && (

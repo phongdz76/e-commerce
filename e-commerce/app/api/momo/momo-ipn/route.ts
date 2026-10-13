@@ -1,79 +1,44 @@
-import crypto from "crypto";
 import { NextResponse } from "next/server";
-import prisma from "@/libs/prismadb";
+import { getOrderByPaymentReference } from "@/libs/paymentReference";
+import {
+  getVerifiedMomoPayload,
+  getMomoPaymentStatus,
+  isMomoOrderMatch,
+} from "@/libs/momo";
+import { updatePaymentStatus } from "@/libs/paymentStatus";
 
-export async function POST(req: Request) {
-  const body = await req.json();
+export const runtime = "nodejs";
 
-  const accessKey = process.env.MOMO_ACCESS_KEY || "F8BBA842ECF85";
-  const secretKey =
-    process.env.MOMO_SECRET_KEY || "K951B6PE1waDMi640xX08PD3vg6EkVlz";
-
-  const {
-    partnerCode,
-    orderId,
-    requestId,
-    amount,
-    orderInfo,
-    orderType,
-    transId,
-    resultCode,
-    message,
-    payType,
-    responseTime,
-    extraData,
-    signature,
-  } = body;
-
-  // Verify signature
-  const rawSignature = [
-    `accessKey=${accessKey}`,
-    `amount=${amount}`,
-    `extraData=${extraData}`,
-    `message=${message}`,
-    `orderId=${orderId}`,
-    `orderInfo=${orderInfo}`,
-    `orderType=${orderType}`,
-    `partnerCode=${partnerCode}`,
-    `payType=${payType}`,
-    `requestId=${requestId}`,
-    `responseTime=${responseTime}`,
-    `resultCode=${resultCode}`,
-    `transId=${transId}`,
-  ].join("&");
-
-  const expectedSignature = crypto
-    .createHmac("sha256", secretKey)
-    .update(rawSignature)
-    .digest("hex");
-
-  if (signature !== expectedSignature) {
-    console.log("MoMo IPN: Invalid signature");
-    return new NextResponse(null, { status: 400 });
-  }
-
-  if (resultCode === 0 || resultCode === "0") {
-    // Payment success
+export async function POST(request: Request) {
+  try {
+    let body;
     try {
-      await prisma.order.update({
-        where: { paymentIntentId: orderId },
-        data: { status: "paid" },
-      });
-    } catch (error) {
-      console.log("MoMo IPN: Failed to update order", error);
+      body = await request.json();
+    } catch {
+      return new NextResponse(null, { status: 400 });
     }
-  } else {
-    // Payment failed
-    try {
-      await prisma.order.update({
-        where: { paymentIntentId: orderId },
-        data: { status: "failed" },
-      });
-    } catch (error) {
-      console.log("MoMo IPN: Failed to update order", error);
+    const params = getVerifiedMomoPayload(body);
+    if (!params) {
+      return new NextResponse(null, { status: 400 });
     }
-  }
 
-  // MoMo expects 204 No Content for IPN acknowledgement
-  return new NextResponse(null, { status: 204 });
+    const order = await getOrderByPaymentReference(params.orderId);
+    if (!order) {
+      return new NextResponse(null, { status: 503 });
+    }
+    if (
+      !isMomoOrderMatch({ ...order, paymentIntentId: params.orderId }, params)
+    ) {
+      return new NextResponse(null, { status: 400 });
+    }
+
+    await updatePaymentStatus(order, getMomoPaymentStatus(params.resultCode), {
+      transactionId: params.transId,
+      reference: params.orderId,
+      resultCode: params.resultCode,
+    });
+    return new NextResponse(null, { status: 204 });
+  } catch {
+    return new NextResponse(null, { status: 503 });
+  }
 }

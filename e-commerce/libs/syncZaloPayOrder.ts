@@ -37,6 +37,9 @@ export async function syncZaloPayOrder<T extends ZaloPayOrder>(
       where: {
         id: order.id,
         paymentMethod: "ZALOPAY",
+        paymentIntentId: order.paymentIntentId,
+        amount: order.amount,
+        currency: order.currency,
         status: { notIn: PAID_STATUSES },
       },
       data: { status: "paid" },
@@ -52,6 +55,9 @@ export async function syncZaloPayOrder<T extends ZaloPayOrder>(
       where: {
         id: order.id,
         paymentMethod: "ZALOPAY",
+        paymentIntentId: order.paymentIntentId,
+        amount: order.amount,
+        currency: order.currency,
         status: { notIn: PAID_STATUSES },
       },
       data: { status: "failed" },
@@ -61,7 +67,13 @@ export async function syncZaloPayOrder<T extends ZaloPayOrder>(
     throw new Error("Unable to verify ZaloPay payment. Please try again.");
   }
   const updated = await prisma.order.findUnique({ where: { id: order.id } });
-  if (!updated) {
+  if (
+    !updated ||
+    updated.paymentIntentId !== order.paymentIntentId ||
+    updated.paymentMethod !== order.paymentMethod ||
+    updated.amount !== order.amount ||
+    updated.currency !== order.currency
+  ) {
     throw new Error("Order no longer exists");
   }
   return { ...order, ...updated };

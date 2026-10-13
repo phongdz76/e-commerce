@@ -51,6 +51,27 @@ export async function GET(
       }
     }
 
+    const attempt =
+      ["VNPAY", "MOMO"].includes(order.paymentMethod) && order.paymentIntentId
+        ? await prisma.paymentAttempt.findUnique({
+            where: {
+              id: order.activePaymentAttemptId || order.paymentIntentId,
+            },
+          })
+        : null;
+    const matchesAttempt =
+      attempt &&
+      attempt.orderId === order.id &&
+      attempt.paymentMethod === order.paymentMethod &&
+      attempt.amount === order.amount &&
+      attempt.currency === order.currency;
+    const resumePaymentUrl =
+      matchesAttempt &&
+      ["pending", "processing"].includes(order.status) &&
+      attempt.state === "READY" &&
+      (!attempt.expiresAt || attempt.expiresAt.getTime() > Date.now())
+        ? attempt.paymentUrl
+        : null;
     return NextResponse.json({
       id: order.id,
       amount: order.amount,
@@ -59,6 +80,12 @@ export async function GET(
       deliveryStatus: order.deliveryStatus,
       paymentMethod: order.paymentMethod,
       paymentIntentId: order.paymentIntentId,
+      activePaymentAttemptId: order.activePaymentAttemptId,
+      resumePaymentUrl,
+      paymentAttemptState: matchesAttempt ? attempt.state : null,
+      previousPaymentAttemptId: matchesAttempt
+        ? attempt.previousAttemptId
+        : null,
       products: order.products,
       address: order.address,
       recipientName: order.recipientName,
@@ -71,9 +98,10 @@ export async function GET(
         image: order.user.image,
       },
     });
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Something went wrong";
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch {
+    return NextResponse.json(
+      { error: "Unable to load this order. Please try again." },
+      { status: 500 },
+    );
   }
 }

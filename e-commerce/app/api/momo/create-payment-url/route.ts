@@ -1,152 +1,86 @@
-import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/actions/getCurrentUser";
-import prisma from "@/libs/prismadb";
+import { createMomoPayment } from "@/libs/createMomoPayment";
 import { getOrderDelivery } from "@/libs/orderDelivery";
 import { getOrderItems } from "@/libs/orderItems";
+import {
+  CheckoutRequestError,
+  prepareCheckoutRequest,
+} from "@/libs/checkoutRequest";
+import { getMomoConfig } from "@/libs/momo";
 
-export async function POST(req: Request) {
-  const currentUser = await getCurrentUser();
-  if (!currentUser) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const body = await req.json();
-  const delivery = getOrderDelivery(body);
-  if (!delivery) return NextResponse.json({ error: "Please provide a valid recipient name, phone number and delivery address." }, { status: 400 });
-  const cart = getOrderItems(body?.items);
-  if (!cart) return NextResponse.json({ error: "Please review the products and quantities in your cart" }, { status: 400 });
-  const { items, amount } = cart;
-  if (amount < 1000 || amount > 50000000) {
-    return NextResponse.json({ error: "MoMo payments must be between 1,000 and 50,000,000 VND." }, { status: 400 });
-  }
-  if (items.length > 50) {
-    return NextResponse.json({ error: "MoMo supports up to 50 different products per payment." }, { status: 400 });
-  }
-
-  const partnerCode = process.env.MOMO_PARTNER_CODE || "MOMO";
-  const accessKey = process.env.MOMO_ACCESS_KEY || "F8BBA842ECF85";
-  const secretKey =
-    process.env.MOMO_SECRET_KEY || "K951B6PE1waDMi640xX08PD3vg6EkVlz";
-  const apiEndpoint =
-    process.env.MOMO_API_ENDPOINT ||
-    "https://test-payment.momo.vn/v2/gateway/api/create";
-  const redirectUrl =
-    process.env.MOMO_REDIRECT_URL ||
-    `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/momo/momo-return`;
-  const ipnUrl =
-    process.env.MOMO_IPN_URL ||
-    `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/momo/momo-ipn`;
-
-  const orderId = partnerCode + new Date().getTime();
-  const requestId = orderId;
-  const orderInfo = "SGTech order #" + orderId;
-  const requestType = body.requestType || "captureWallet";
-  const extraData = "";
-  const lang = "en";
-  const autoCapture = true;
-
-  // Tạo pending order trong DB
-  const order = await prisma.order.create({
-    data: {
-      userId: currentUser.id,
-      amount: amount,
-      currency: "vnd",
-      paymentMethod: "MOMO",
-      status: "pending",
-      deliveryStatus: "pending",
-      products: items,
-      paymentIntentId: orderId,
-      ...delivery,
-    },
-  });
-
-  // Tạo signature theo spec MoMo:
-  // accessKey=$accessKey&amount=$amount&extraData=$extraData&ipnUrl=$ipnUrl
-  // &orderId=$orderId&orderInfo=$orderInfo&partnerCode=$partnerCode
-  // &redirectUrl=$redirectUrl&requestId=$requestId&requestType=$requestType
-  const rawSignature = [
-    `accessKey=${accessKey}`,
-    `amount=${amount}`,
-    `extraData=${extraData}`,
-    `ipnUrl=${ipnUrl}`,
-    `orderId=${orderId}`,
-    `orderInfo=${orderInfo}`,
-    `partnerCode=${partnerCode}`,
-    `redirectUrl=${redirectUrl}`,
-    `requestId=${requestId}`,
-    `requestType=${requestType}`,
-  ].join("&");
-
-  const signature = crypto
-    .createHmac("sha256", secretKey)
-    .update(rawSignature)
-    .digest("hex");
-
-  // Gọi MoMo API
-  const requestBody = {
-    partnerCode,
-    partnerName: "SGTech E-Commerce",
-    storeId: "SGTechStore",
-    requestId,
-    amount,
-    orderId,
-    orderInfo,
-    redirectUrl,
-    ipnUrl,
-    lang,
-    requestType,
-    autoCapture,
-    extraData,
-    signature,
-    items: items.map((item) => ({
-      id: item.id,
-      name: item.name,
-      category: item.category,
-      manufacturer: item.brand,
-      imageUrl: item.selectedImg.image,
-      price: item.price,
-      currency: "VND",
-      quantity: item.quantity,
-      totalPrice: item.price * item.quantity,
-    })),
-  };
-
+export async function POST(request: Request) {
   try {
-    const momoResponse = await fetch(apiEndpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
-      signal: AbortSignal.timeout(30000), // MoMo yêu cầu timeout tối thiểu 30s
-    });
-
-    const momoData = await momoResponse.json();
-
-    if (momoData.resultCode === 0 && momoData.payUrl) {
-      let deeplink: string | null = null;
-      if (typeof momoData.deeplink === "string") {
-        try {
-          if (new URL(momoData.deeplink).protocol === "momo:") deeplink = momoData.deeplink;
-        } catch { /* The browser payment URL remains available without an app link. */ }
-      }
-      return NextResponse.json({ url: momoData.payUrl, deeplink, orderId: order.id, amount });
-    } else {
-      console.log("MoMo API Error:", momoData);
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
+    const delivery = getOrderDelivery(body);
+    const cart = getOrderItems(body?.items);
+    if (!delivery || !cart) {
       return NextResponse.json(
-        {
-          error: momoData.message || "Failed to create MoMo payment",
-          resultCode: momoData.resultCode,
-        },
+        { error: "Please review your cart and delivery details." },
         { status: 400 },
       );
     }
-  } catch (error) {
-    console.log("MoMo API Connection Error:", error);
+    if (
+      !Number.isSafeInteger(cart.amount) ||
+      cart.amount < 1000 ||
+      cart.amount > 50000000
+    ) {
+      return NextResponse.json(
+        { error: "MoMo payments must be between 1,000 and 50,000,000 VND." },
+        { status: 400 },
+      );
+    }
+    if (cart.items.length > 50) {
+      return NextResponse.json(
+        { error: "MoMo supports up to 50 different products per payment." },
+        { status: 400 },
+      );
+    }
+    let config;
+    try {
+      config = getMomoConfig();
+    } catch {
+      return NextResponse.json(
+        {
+          error:
+            "MoMo is currently unavailable. Please choose another payment method.",
+          code: "MOMO_NOT_CONFIGURED",
+        },
+        { status: 503 },
+      );
+    }
+    const { partnerCode } = config;
+    const { order, attempt } = await prepareCheckoutRequest(
+      body.checkout_request_id,
+      currentUser.id,
+      "MOMO",
+      cart,
+      delivery,
+      partnerCode,
+    );
+    return await createMomoPayment(request, order, attempt);
+  } catch (error: unknown) {
+    if (error instanceof CheckoutRequestError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status },
+      );
+    }
     return NextResponse.json(
-      { error: "Failed to connect to MoMo" },
-      { status: 500 },
+      {
+        error:
+          "Unable to prepare MoMo payment. Please retry the same checkout.",
+      },
+      { status: 503 },
     );
   }
 }

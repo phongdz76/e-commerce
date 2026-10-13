@@ -3,7 +3,9 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
+  type ReactNode,
 } from "react";
 import { CartProductProps } from "../product/[productId]/ProductDetails";
 import toast from "react-hot-toast";
@@ -24,50 +26,66 @@ type CartContextType = {
 export const CartContext = createContext<CartContextType | null>(null);
 
 interface Props {
-  [propName: string]: any;
+  children: ReactNode;
 }
 
 export const CartContextProvider = (props: Props) => {
-  const [cartTotalQtyAmount, setCartTotalQtyAmount] = useState(0);
-  const [cartTotalQty, setCartTotalQty] = useState(0);
   const [cartProducts, setCartProducts] = useState<CartProductProps[] | null>(
     null,
   );
   const [paymentIntent, setPaymentIntent] = useState<string | null>(null);
 
   useEffect(() => {
-    const cartItems: any = localStorage.getItem("CartItems");
-    const cProducts: CartProductProps[] | null = JSON.parse(cartItems);
-    const savedPaymentIntent: any = localStorage.getItem("savedPaymentIntent");
-    const paymentIntent: string | null = JSON.parse(savedPaymentIntent);
-
-    setCartProducts(cProducts);
-    setPaymentIntent(paymentIntent);
-  }, []);
-
-  useEffect(() => {
-    const getTotals = () => {
-      if (!cartProducts) {
-        setCartTotalQty(0);
-        setCartTotalQtyAmount(0);
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) {
         return;
       }
-      const { total, qty } = cartProducts?.reduce(
-        (acc, item) => {
-          const itemTotal = item.price * item.quantity;
-          acc.total += itemTotal;
-          acc.qty += item.quantity;
-          return acc;
-        },
-        {
-          total: 0,
-          qty: 0,
-        },
-      );
-      setCartTotalQty(qty);
-      setCartTotalQtyAmount(total);
+      try {
+        const savedCart = JSON.parse(
+          localStorage.getItem("CartItems") || "null",
+        );
+        const savedIntent = JSON.parse(
+          localStorage.getItem("savedPaymentIntent") || "null",
+        );
+        setCartProducts(
+          Array.isArray(savedCart)
+            ? savedCart.filter(
+                (item) =>
+                  item &&
+                  typeof item.id === "string" &&
+                  Number.isFinite(item.price) &&
+                  Number.isSafeInteger(item.quantity) &&
+                  item.quantity > 0 &&
+                  typeof item.selectedImg?.image === "string",
+              )
+            : null,
+        );
+        setPaymentIntent(typeof savedIntent === "string" ? savedIntent : null);
+      } catch {
+        // Invalid or disabled browser storage must not prevent checkout rendering.
+        setCartProducts(null);
+        setPaymentIntent(null);
+      }
+    });
+    return () => {
+      active = false;
     };
-    getTotals();
+  }, []);
+
+  const { total: cartTotalQtyAmount, qty: cartTotalQty } = useMemo(() => {
+    return (cartProducts || []).reduce(
+      (acc, item) => {
+        const itemTotal = item.price * item.quantity;
+        acc.total += itemTotal;
+        acc.qty += item.quantity;
+        return acc;
+      },
+      {
+        total: 0,
+        qty: 0,
+      },
+    );
   }, [cartProducts]);
 
   const handleAddProductToCart = useCallback((product: CartProductProps) => {
@@ -151,23 +169,19 @@ export const CartContextProvider = (props: Props) => {
   );
 
   const handleClearCart = useCallback(() => {
+    localStorage.removeItem("orderCheckoutRequest");
     setCartProducts(null);
     setPaymentIntent(null);
     localStorage.removeItem("CartItems");
     localStorage.removeItem("savedPaymentIntent");
     localStorage.removeItem("checkoutRequest");
     localStorage.removeItem("zaloPayCheckout");
-    setCartTotalQty(0);
-    setCartTotalQtyAmount(0);
   }, []);
 
-  const handleSetPaymentIntent = useCallback(
-    (val: string | null) => {
-      setPaymentIntent(val);
-      localStorage.setItem("savedPaymentIntent", JSON.stringify(val));
-    },
-    [],
-  );
+  const handleSetPaymentIntent = useCallback((val: string | null) => {
+    setPaymentIntent(val);
+    localStorage.setItem("savedPaymentIntent", JSON.stringify(val));
+  }, []);
 
   const value = {
     cartTotalQty,
