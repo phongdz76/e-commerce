@@ -40,6 +40,8 @@ model Order {
     createDate      DateTime           @default(now())
     paymentIntentId String?            @unique
     paymentMethod   String             @default("VNPAY")
+    paymentUrl      String?
+    paymentExpiresAt DateTime?
     products        CartProductProps[]
     address         Address?
     recipientName   String?

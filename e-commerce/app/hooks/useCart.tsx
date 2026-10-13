@@ -156,6 +156,7 @@ export const CartContextProvider = (props: Props) => {
     localStorage.removeItem("CartItems");
     localStorage.removeItem("savedPaymentIntent");
     localStorage.removeItem("checkoutRequest");
+    localStorage.removeItem("zaloPayCheckout");
     setCartTotalQty(0);
     setCartTotalQtyAmount(0);
   }, []);

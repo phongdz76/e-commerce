@@ -38,7 +38,7 @@ const topics: Record<string, { title: string; intro: string; sections: { title: 
     sections: [
       { title: "How do I find a product?", text: "Search for a product or brand in the header. On the shop page, choose a category, select one or more brands, and sort by price or product name. Remove a filter chip or select Clear all filters to start again." },
       { title: "How do I place an order?", text: "Open a product, choose its color and quantity, then add it to your cart. Review your cart, sign in and enter your delivery details at checkout." },
-      { title: "Which payment options are shown at checkout?", text: "Checkout includes Cash on Delivery (COD), VNPay, MoMo and card payment through Stripe. Review the selected method before placing your order." },
+      { title: "Which payment options are shown at checkout?", text: "Checkout includes Cash on Delivery (COD), VNPay, MoMo, ZaloPay and card payment through Stripe. Review the selected method before placing your order." },
       { title: "Where can I check my order?", text: "Open the account menu and select Your Orders. Choose an order to see its products, payment information and available delivery status." },
       { title: "I forgot my password. What should I do?", text: "Select Forgot password on the login page. Enter your email address and follow the reset instructions sent to your inbox." },
     ],

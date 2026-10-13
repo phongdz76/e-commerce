@@ -62,6 +62,7 @@ const PAYMENT_LABELS: Record<string, string> = {
   VNPAY: "VNPay",
   MOMO: "MoMo",
   STRIPE: "Stripe",
+  ZALOPAY: "ZaloPay",
 };
 
 export default function OrdersClient({ currentUser }: OrdersClientProps) {
