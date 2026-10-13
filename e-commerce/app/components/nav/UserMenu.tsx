@@ -10,9 +10,13 @@ import Avatar from "../Avatar";
 
 interface UserMenuProps {
   currentUser: safeUser | null;
+  isAdmin?: boolean;
 }
 
-export default function UserMenu({ currentUser }: UserMenuProps) {
+export default function UserMenu({
+  currentUser,
+  isAdmin = false,
+}: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
 
@@ -23,11 +27,19 @@ export default function UserMenu({ currentUser }: UserMenuProps) {
   return (
     <>
       {isOpen ? <BackDrop onClick={toggleOpen} /> : null}
-      <div className="relative z-30" onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setIsOpen(false);
-      }} onKeyDown={(event) => {
-        if (event.key === "Escape") { setIsOpen(false); trigger.current?.focus(); }
-      }}>
+      <div
+        className="relative z-30"
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget))
+            setIsOpen(false);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            setIsOpen(false);
+            trigger.current?.focus();
+          }
+        }}
+      >
         <button
           ref={trigger}
           type="button"
@@ -73,10 +85,29 @@ export default function UserMenu({ currentUser }: UserMenuProps) {
           >
             {currentUser ? (
               <div>
-                <Link href="/orders" onClick={toggleOpen} className="block px-4 py-3 hover:bg-slate-50">
-                  Your Orders
-                </Link>
-                <Link href="/profile" onClick={toggleOpen} className="block px-4 py-3 hover:bg-slate-50">
+                {currentUser.role === "ADMIN" && !isAdmin && (
+                  <Link
+                    href="/admin"
+                    onClick={toggleOpen}
+                    className="block px-4 py-3 hover:bg-slate-50"
+                  >
+                    Admin Panel
+                  </Link>
+                )}
+                {!isAdmin ? (
+                  <Link
+                    href="/orders"
+                    onClick={toggleOpen}
+                    className="block px-4 py-3 hover:bg-slate-50"
+                  >
+                    Your Orders
+                  </Link>
+                ) : null}
+                <Link
+                  href="/profile"
+                  onClick={toggleOpen}
+                  className="block px-4 py-3 hover:bg-slate-50"
+                >
                   Profile
                 </Link>
                 <hr />
@@ -88,16 +119,24 @@ export default function UserMenu({ currentUser }: UserMenuProps) {
                     signOut();
                   }}
                 >
-                  Logout
+                  {isAdmin ? "Sign out" : "Logout"}
                 </button>
               </div>
             ) : (
               <div>
-                <Link href="/login" onClick={toggleOpen} className="block px-4 py-3 hover:bg-slate-50">
+                <Link
+                  href="/login"
+                  onClick={toggleOpen}
+                  className="block px-4 py-3 hover:bg-slate-50"
+                >
                   Login
                 </Link>
 
-                <Link href="/register" onClick={toggleOpen} className="block px-4 py-3 hover:bg-slate-50">
+                <Link
+                  href="/register"
+                  onClick={toggleOpen}
+                  className="block px-4 py-3 hover:bg-slate-50"
+                >
                   Register
                 </Link>
               </div>
