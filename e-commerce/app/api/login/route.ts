@@ -1,53 +1,43 @@
 import { NextResponse } from "next/server";
-import prisma from "@/libs/prismadb";
-import { compare } from "bcrypt";
+import { authenticateUser } from "@/libs/authenticateUser";
+import { AuthRateLimitError, getAuthClientIp } from "@/libs/authRateLimit";
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { emailOrUsername, password } = body;
-
-    if (!emailOrUsername || !password) {
-      return NextResponse.json(
-        { error: "Please enter email/username and password" },
-        { status: 400 }
-      );
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
 
-    const user = await prisma.user.findFirst({
-      where: {
-        OR: [{ email: emailOrUsername }, { name: emailOrUsername }],
-      },
-    });
-
-    if (!user || !user.hashedPassword) {
+    const authenticated = await authenticateUser(
+      body?.emailOrUsername,
+      body?.password,
+      getAuthClientIp(request.headers),
+    );
+    if (!authenticated) {
       return NextResponse.json(
-        { error: "No account found with this email or username" },
-        { status: 401 }
+        { error: "Invalid email/username or password" },
+        { status: 401 },
       );
     }
-
-    const isCorrectPassword = await compare(password, user.hashedPassword);
-
-    if (!isCorrectPassword) {
-      return NextResponse.json(
-        { error: "Incorrect password" },
-        { status: 401 }
-      );
-    }
-
-    // Trả về thông tin user (không bao gồm password)
-    const { hashedPassword, ...userWithoutPassword } = user;
 
     return NextResponse.json({
       success: true,
-      user: userWithoutPassword,
+      user: authenticated.user,
     });
-  } catch (error) {
-    console.error("Login error:", error);
+  } catch (error: unknown) {
+    if (error instanceof AuthRateLimitError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 429, headers: { "Retry-After": String(error.retryAfter) } },
+      );
+    }
+
     return NextResponse.json(
-      { error: "Something went wrong during login" },
-      { status: 500 }
+      { error: "Sign-in is temporarily unavailable. Please try again." },
+      { status: 503 },
     );
   }
 }

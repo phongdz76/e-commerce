@@ -2,15 +2,43 @@ import { NextResponse } from "next/server";
 import prisma from "@/libs/prismadb";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
+import { normalizeAuthEmail } from "@/libs/authValidation";
+import { hashPasswordResetToken } from "@/libs/passwordReset";
+import {
+  AuthRateLimitError,
+  checkAuthRateLimit,
+  getAuthClientIp,
+} from "@/libs/authRateLimit";
+
+const RESET_RESPONSE =
+  "If an account exists with this email, a password reset link will be sent.";
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { email } = body;
+    await checkAuthRateLimit(
+      "forgot-ip",
+      getAuthClientIp(request.headers),
+      20,
+      15 * 60 * 1000,
+    );
+
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
+
+    const email = normalizeAuthEmail(body?.email);
 
     if (!email) {
-      return NextResponse.json({ error: "Email is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid email format" },
+        { status: 400 },
+      );
     }
+
+    await checkAuthRateLimit("forgot-email", email, 3, 60 * 60 * 1000);
 
     // Tìm user theo email
     const user = await prisma.user.findUnique({
@@ -18,27 +46,26 @@ export async function POST(request: Request) {
     });
 
     if (!user) {
-      return NextResponse.json(
-        { error: "No account found with this email" },
-        { status: 404 }
-      );
+      return NextResponse.json({ message: RESET_RESPONSE }, { status: 200 });
     }
 
     // Tạo reset token
     const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetTokenHash = hashPasswordResetToken(resetToken);
     const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 giờ
 
     // Lưu token vào database
     await prisma.user.update({
       where: { email },
       data: {
-        resetPasswordToken: resetToken,
+        resetPasswordToken: resetTokenHash,
         resetPasswordExpires: resetTokenExpiry,
       },
     });
 
     // Tạo link reset password
-    const resetUrl = `${process.env.NEXTAUTH_URL}/reset-password?token=${resetToken}`;
+    const resetUrl = new URL("/reset-password", process.env.NEXTAUTH_URL);
+    resetUrl.searchParams.set("token", resetToken);
 
     // Cấu hình nodemailer (sử dụng Gmail)
     const transporter = nodemailer.createTransport({
@@ -74,17 +101,33 @@ export async function POST(request: Request) {
     };
 
     // Gửi email
-    await transporter.sendMail(mailOptions);
+    try {
+      await transporter.sendMail(mailOptions);
+    } catch {
+      // Clear only this request's token, never a newer concurrent reset link.
+      try {
+        await prisma.user.updateMany({
+          where: { id: user.id, resetPasswordToken: resetTokenHash },
+          data: { resetPasswordToken: null, resetPasswordExpires: null },
+        });
+      } catch {
+        console.error("Password reset token cleanup could not be completed");
+      }
+      console.error("Password reset email could not be delivered");
+    }
+
+    return NextResponse.json({ message: RESET_RESPONSE }, { status: 200 });
+  } catch (error: unknown) {
+    if (error instanceof AuthRateLimitError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 429, headers: { "Retry-After": String(error.retryAfter) } },
+      );
+    }
 
     return NextResponse.json(
-      { message: "Password reset email sent successfully" },
-      { status: 200 }
-    );
-  } catch (error: any) {
-    console.error("Forgot password error:", error);
-    return NextResponse.json(
       { error: "Failed to process request" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

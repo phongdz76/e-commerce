@@ -8,7 +8,7 @@ import Button from "../components/Button";
 import Link from "next/link";
 import { AiOutlineGoogle } from "react-icons/ai";
 import { FaFacebook } from "react-icons/fa";
-import { signIn } from "next-auth/react";
+import { signIn, getSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { safeUser } from "@/types";
@@ -38,26 +38,46 @@ export default function LoginForm({ currentUser }: LoginFormProps) {
 
   // Load saved credentials nếu có
   useEffect(() => {
-    const savedEmail = localStorage.getItem("rememberedEmail");
-    localStorage.removeItem("rememberedPassword");
-    if (savedEmail) {
-      setValue("emailOrUsername", savedEmail);
-      setRememberMe(true);
-    }
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) {
+        return;
+      }
+      try {
+        const savedEmail = localStorage.getItem("rememberedEmail");
+        localStorage.removeItem("rememberedPassword");
+        if (savedEmail) {
+          setValue("emailOrUsername", savedEmail);
+          setRememberMe(true);
+        }
+      } catch {
+        // Sign-in remains available if browser storage is disabled.
+      }
+    });
+    return () => {
+      active = false;
+    };
   }, [setValue]);
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams?.get("callbackUrl") || "/";
+  const requestedCallback = searchParams?.get("callbackUrl");
+  const callbackUrl =
+    requestedCallback &&
+    requestedCallback.startsWith("/") &&
+    !requestedCallback.startsWith("//") &&
+    !requestedCallback.includes("\\")
+      ? requestedCallback
+      : "/";
 
   useEffect(() => {
     if (currentUser) {
-      const timer = setTimeout(() => {
-        router.push(callbackUrl);
-        router.refresh();
-      }, 3000);
-
-      return () => clearTimeout(timer);
+      const targetUrl =
+        currentUser.role === "ADMIN" && callbackUrl === "/"
+          ? "/admin"
+          : callbackUrl;
+      router.push(targetUrl);
+      router.refresh();
     }
   }, [currentUser, router, callbackUrl]);
 
@@ -75,37 +95,53 @@ export default function LoginForm({ currentUser }: LoginFormProps) {
     signIn("credentials", {
       ...data,
       redirect: false,
-    }).then((callback) => {
-      setIsLoading(false);
-      if (callback?.ok) {
-        toast.success("Logged in successfully!");
-        setShowSuccessMessage(true);
+    })
+      .then(async (callback) => {
+        setIsLoading(false);
+        if (callback?.ok) {
+          toast.success("Logged in successfully!");
+          setShowSuccessMessage(true);
 
-        setTimeout(() => {
-          router.push(callbackUrl);
-          router.refresh();
-        }, 3000);
-      }
-      if (callback?.error) {
-        toast.error(callback.error);
-      }
-    }).catch(() => {
-      setIsLoading(false);
-      toast.error("Unable to sign in. Please try again.");
-    });
+          try {
+            const session = await getSession();
+            const userRole = (session?.user as { role?: string } | undefined)
+              ?.role;
+            const targetUrl =
+              userRole === "ADMIN" && callbackUrl === "/"
+                ? "/admin"
+                : callbackUrl;
+            router.push(targetUrl);
+            router.refresh();
+          } catch {
+            router.push(callbackUrl);
+            router.refresh();
+          }
+        }
+        if (callback?.error) {
+          toast.error(callback.error);
+        }
+      })
+      .catch(() => {
+        setIsLoading(false);
+        toast.error("Unable to sign in. Please try again.");
+      });
   };
 
   if (currentUser || showSuccessMessage) {
     return (
       <div className="w-full text-center py-6 flex flex-col gap-4">
-        <p className="text-lg">You are already logged in</p>
-        <p className="text-sm text-gray-500">Taking you back to your page...</p>
+        <p className="text-lg">Redirecting...</p>
+        <p className="text-sm text-gray-500">Taking you to your destination...</p>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} noValidate className="w-full items-center flex flex-col gap-6">
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      noValidate
+      className="w-full items-center flex flex-col gap-6"
+    >
       <Heading title="Login" />
 
       <Input
@@ -146,7 +182,9 @@ export default function LoginForm({ currentUser }: LoginFormProps) {
               },
             }}
           />
-          <span className="text-sm text-gray-600 select-none">Remember my email</span>
+          <span className="text-sm text-gray-600 select-none">
+            Remember my email
+          </span>
         </div>
 
         <Link
@@ -168,7 +206,9 @@ export default function LoginForm({ currentUser }: LoginFormProps) {
         label="Continue with Google"
         disabled={isLoading}
         onClick={() => {
-          signIn("google", { callbackUrl });
+          signIn("google", {
+            callbackUrl: requestedCallback ? callbackUrl : "/login",
+          });
         }}
         outline
         icon={AiOutlineGoogle}
@@ -178,7 +218,9 @@ export default function LoginForm({ currentUser }: LoginFormProps) {
         label="Continue with Facebook"
         disabled={isLoading}
         onClick={() => {
-          signIn("facebook", { callbackUrl });
+          signIn("facebook", {
+            callbackUrl: requestedCallback ? callbackUrl : "/login",
+          });
         }}
         outline
         icon={FaFacebook}
