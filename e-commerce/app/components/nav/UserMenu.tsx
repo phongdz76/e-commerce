@@ -85,16 +85,24 @@ export default function UserMenu({
           >
             {currentUser ? (
               <div>
-                {currentUser.role === "ADMIN" && !isAdmin && (
+                {currentUser.role === "ADMIN" && (
                   <Link
                     href="/admin"
                     onClick={toggleOpen}
                     className="block px-4 py-3 hover:bg-slate-50"
                   >
-                    Admin Panel
+                    Admin page
                   </Link>
                 )}
-                {!isAdmin ? (
+                {isAdmin ? (
+                  <Link
+                    href="/"
+                    onClick={toggleOpen}
+                    className="block px-4 py-3 hover:bg-slate-50"
+                  >
+                    User page
+                  </Link>
+                ) : (
                   <Link
                     href="/orders"
                     onClick={toggleOpen}
@@ -102,7 +110,7 @@ export default function UserMenu({
                   >
                     Your Orders
                   </Link>
-                ) : null}
+                )}
                 <Link
                   href="/profile"
                   onClick={toggleOpen}

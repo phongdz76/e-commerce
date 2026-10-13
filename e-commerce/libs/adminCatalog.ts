@@ -267,7 +267,7 @@ export async function saveAdminProduct(request: Request, productId?: string) {
       return NextResponse.json(
         {
           error:
-            "Kiểm tra tên, slug, mô tả và SKU. Giá phải là VND nguyên dương; ảnh HTTPS từ Cloudinary, Firebase, Amazon hoặc Unsplash.",
+            "Check the name, URL slug, description and SKUs. Prices must be positive whole VND amounts. Use an allowed product image URL.",
         },
         { status: 400 },
       );
@@ -284,7 +284,7 @@ export async function saveAdminProduct(request: Request, productId?: string) {
       return NextResponse.json(
         {
           error:
-            "Chọn danh mục và thương hiệu hợp lệ, đang hiển thị trước khi mở bán.",
+            "Select a valid, visible category and brand before activating this product.",
         },
         { status: 400 },
       );
@@ -317,7 +317,7 @@ export async function saveAdminProduct(request: Request, productId?: string) {
         return NextResponse.json(
           {
             error:
-              "Sản phẩm đã thay đổi hoặc SKU không thuộc sản phẩm. Tải lại trước khi lưu; ngừng bán SKU bằng trạng thái ẩn.",
+              "This product has changed or a variant does not belong to it. Reload before saving. Disable existing variants instead of removing them.",
           },
           { status: 409 },
         );
@@ -375,7 +375,7 @@ export async function saveAdminProduct(request: Request, productId?: string) {
     }
     if (variants.some((variant) => variant.id)) {
       return NextResponse.json(
-        { error: "SKU mới không được mang ID có sẵn." },
+        { error: "New variants must not use an existing variant ID." },
         { status: 400 },
       );
     }
@@ -413,8 +413,9 @@ export async function saveAdminProduct(request: Request, productId?: string) {
     return NextResponse.json(
       {
         error: conflict
-          ? "Slug/SKU đã tồn tại hoặc bản ghi đã thay đổi. Tải lại trước khi lưu."
-          : "Không lưu được sản phẩm. Tải lại danh sách trước khi thử tiếp.",
+          ? "The URL slug or SKU is already in use, or the product has changed. Reload before saving."
+          : "Unable to save the product. Reload the list before trying again.",
+        ...(code === "P2002" ? { code: "DUPLICATE_CATALOG_KEY" } : {}),
       },
       { status: conflict ? 409 : 503 },
     );

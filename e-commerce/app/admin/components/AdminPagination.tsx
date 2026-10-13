@@ -13,148 +13,72 @@ interface AdminPaginationProps {
 }
 
 export default function AdminPagination({
-  currentPage,
-  totalPages,
-  hasMore = false,
-  isLoading = false,
-  onPageChange,
-  totalItems,
-  pageSize = 10,
+  currentPage, totalPages, hasMore = false, isLoading = false,
+  onPageChange, totalItems, pageSize = 10,
 }: AdminPaginationProps) {
-  // Determine effective total pages
-  const resolvedTotalPages =
-    totalPages !== undefined && totalPages > 0
-      ? totalPages
-      : totalItems !== undefined
-        ? Math.max(1, Math.ceil(totalItems / pageSize))
-        : hasMore
-          ? Math.max(currentPage + 1, 2)
-          : Math.max(currentPage, 1);
-
-  const canGoPrevious = currentPage > 1 && !isLoading;
-  const canGoNext = currentPage < resolvedTotalPages && !isLoading;
-
-  // Build page numbers list with ellipsis if many pages
-  const generatePageItems = (): (number | "dots-left" | "dots-right")[] => {
+  const resolvedTotalPages = totalPages && totalPages > 0 ? totalPages
+    : totalItems !== undefined ? Math.max(1, Math.ceil(totalItems / pageSize))
+      : hasMore ? currentPage + 1 : Math.max(currentPage, 1);
+  const getPages = (): (number | string)[] => {
     if (resolvedTotalPages <= 7) {
-      return Array.from({ length: resolvedTotalPages }, (_, i) => i + 1);
+      return Array.from({ length: resolvedTotalPages }, (_, index) => index + 1);
     }
-
     if (currentPage <= 4) {
-      return [1, 2, 3, 4, 5, "dots-right", resolvedTotalPages];
+      return [1, 2, 3, 4, 5, "more", resolvedTotalPages];
     }
-
     if (currentPage >= resolvedTotalPages - 3) {
-      return [
-        1,
-        "dots-left",
-        resolvedTotalPages - 4,
-        resolvedTotalPages - 3,
-        resolvedTotalPages - 2,
-        resolvedTotalPages - 1,
-        resolvedTotalPages,
-      ];
+      return [1, "more", resolvedTotalPages - 4, resolvedTotalPages - 3, resolvedTotalPages - 2, resolvedTotalPages - 1, resolvedTotalPages];
     }
-
-    return [
-      1,
-      "dots-left",
-      currentPage - 1,
-      currentPage,
-      currentPage + 1,
-      "dots-right",
-      resolvedTotalPages,
-    ];
+    return [1, "before", currentPage - 1, currentPage, currentPage + 1, "after", resolvedTotalPages];
   };
-
-  const pageItems = generatePageItems();
+  const start = totalItems && (currentPage - 1) * pageSize < totalItems ? (currentPage - 1) * pageSize + 1 : 0;
+  const end = start && totalItems ? Math.min(currentPage * pageSize, totalItems) : 0;
+  const buttonClassName = "flex h-11 min-w-11 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-700 hover:border-teal-500 hover:text-teal-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-300";
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-slate-200">
-      {/* Left side: cleanly shows current page and total pages */}
-      <div className="text-xs text-slate-500 font-medium">
-        Page <strong className="text-slate-800 font-semibold">{currentPage}</strong> of{" "}
-        <strong className="text-slate-800 font-semibold">{resolvedTotalPages}</strong>
-      </div>
-
-      {/* Pagination controls */}
-      <nav aria-label="Pagination navigation" className="flex items-center gap-1.5">
-        {/* Previous page button */}
-        {canGoPrevious ? (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
+      <p className="text-xs text-slate-500">
+        {totalItems !== undefined
+          ? start + "–" + end + " of " + totalItems.toLocaleString("en-US") + " results"
+          : "Page " + currentPage + " of " + resolvedTotalPages}
+      </p>
+      <nav aria-label="Pagination navigation" className="flex max-w-full items-center gap-1.5">
+        <button
+          type="button"
+          disabled={isLoading || currentPage <= 1}
+          onClick={() => onPageChange(currentPage - 1)}
+          aria-label="Previous page"
+          className={buttonClassName}
+        >
+          <FiChevronLeft size={18} />
+        </button>
+        <span className="px-2 text-sm font-medium sm:hidden">
+          {currentPage} / {resolvedTotalPages}
+        </span>
+        {getPages().map((item, index) => typeof item === "string" ? (
+          <span key={item + index} className="hidden px-1 text-slate-400 sm:inline">…</span>
+        ) : (
           <button
+            key={item}
             type="button"
             disabled={isLoading}
-            onClick={() => onPageChange(currentPage - 1)}
-            aria-label="Previous page"
-            title="Previous page"
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition hover:border-teal-500 hover:text-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500/20 shadow-xs cursor-pointer"
+            onClick={() => onPageChange(item)}
+            aria-label={"Page " + item}
+            aria-current={item === currentPage ? "page" : undefined}
+            className={"hidden h-11 min-w-11 items-center justify-center rounded-md border px-2 text-sm sm:flex " + (item === currentPage ? "border-slate-700 bg-slate-700 font-semibold text-white" : "border-slate-300 bg-white hover:border-teal-500 hover:text-teal-700")}
           >
-            <FiChevronLeft size={18} />
+            {item}
           </button>
-        ) : (
-          <span
-            aria-label="Previous page"
-            aria-disabled="true"
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-300 cursor-not-allowed"
-          >
-            <FiChevronLeft size={18} />
-          </span>
-        )}
-
-        {/* Page number buttons */}
-        {pageItems.map((item, idx) => {
-          if (typeof item === "string") {
-            return (
-              <span
-                key={`${item}-${idx}`}
-                className="flex h-9 min-w-8 items-center justify-center text-xs font-semibold text-slate-400 select-none"
-              >
-                ...
-              </span>
-            );
-          }
-
-          const isActive = item === currentPage;
-          return (
-            <button
-              key={item}
-              type="button"
-              disabled={isLoading}
-              onClick={() => onPageChange(item)}
-              aria-label={`Page ${item}`}
-              aria-current={isActive ? "page" : undefined}
-              className={`flex h-9 min-w-9 items-center justify-center rounded-md border px-2.5 text-xs transition shadow-xs ${
-                isActive
-                  ? "border-slate-700 bg-slate-700 font-bold text-white cursor-default"
-                  : "border-slate-300 bg-white text-slate-700 hover:border-teal-500 hover:text-teal-700 cursor-pointer"
-              }`}
-            >
-              {item}
-            </button>
-          );
-        })}
-
-        {/* Next page button */}
-        {canGoNext ? (
-          <button
-            type="button"
-            disabled={isLoading}
-            onClick={() => onPageChange(currentPage + 1)}
-            aria-label="Next page"
-            title="Next page"
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition hover:border-teal-500 hover:text-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500/20 shadow-xs cursor-pointer"
-          >
-            <FiChevronRight size={18} />
-          </button>
-        ) : (
-          <span
-            aria-label="Next page"
-            aria-disabled="true"
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-300 cursor-not-allowed"
-          >
-            <FiChevronRight size={18} />
-          </span>
-        )}
+        ))}
+        <button
+          type="button"
+          disabled={isLoading || currentPage >= resolvedTotalPages}
+          onClick={() => onPageChange(currentPage + 1)}
+          aria-label="Next page"
+          className={buttonClassName}
+        >
+          <FiChevronRight size={18} />
+        </button>
       </nav>
     </div>
   );

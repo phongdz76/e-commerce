@@ -15,12 +15,14 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams;
     const state = params.get("state") || "REVIEW";
     const page = Number(params.get("page") || "1");
-    if (!Object.hasOwn(PAYMENT_STATE_LABELS, state) || !Number.isSafeInteger(page) || page < 1 || page > 1000) {
+    const orderId = params.get("orderId");
+    if (!Object.hasOwn(PAYMENT_STATE_LABELS, state) || !Number.isSafeInteger(page) || page < 1 || page > 1000 || (orderId !== null && !/^[a-f\d]{24}$/i.test(orderId))) {
       return NextResponse.json({ error: "Invalid payment filters" }, { status: 400 });
     }
     const whereClause = {
       ...(state === "NEEDS_REVIEW" ? { state: { in: ["REVIEW", "UNKNOWN"] } } : state !== "ALL" ? { state } : {}),
       paymentMethod: { not: "COD" },
+      ...(orderId ? { orderId: orderId.toLowerCase() } : {}),
     };
     const [attempts, total] = await Promise.all([
       prisma.paymentAttempt.findMany({
@@ -39,6 +41,7 @@ export async function GET(request: Request) {
       where: { id: { in: attempts.map((attempt) => attempt.orderId) } },
       select: {
         id: true, status: true, deliveryStatus: true, paymentMethod: true, amount: true, currency: true,
+        activePaymentAttemptId: true, paidPaymentAttemptId: true,
         user: { select: { name: true, email: true } },
       },
     }) : [];
@@ -54,6 +57,8 @@ export async function GET(request: Request) {
           createDate: attempt.createDate.toISOString(),
           lastCheckedAt: attempt.lastCheckedAt?.toISOString() || null,
           canCheck: Boolean(order && order.paymentMethod === attempt.paymentMethod && order.amount === attempt.amount && order.currency === attempt.currency && !["RESERVED", "ABANDONED", "CREATED"].includes(attempt.state)),
+          isCurrent: order?.activePaymentAttemptId === attempt.id,
+          isAppliedToOrder: order?.paidPaymentAttemptId === attempt.id,
           order: order ? {
             id: order.id, status: order.status, deliveryStatus: order.deliveryStatus,
             customerName: order.user?.name || order.user?.email || "Customer unavailable",

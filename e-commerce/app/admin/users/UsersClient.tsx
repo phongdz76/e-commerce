@@ -3,9 +3,14 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { FiSearch, FiRefreshCw, FiLock, FiUnlock, FiShield } from "react-icons/fi";
+import { FiSearch, FiLock, FiUnlock, FiShield } from "react-icons/fi";
 import { API_PATHS } from "@/utils/apiPaths";
 import AdminPagination from "@/app/admin/components/AdminPagination";
+import AdminDialog from "@/app/admin/components/AdminDialog";
+import { getAdminErrorMessage } from "@/utils/adminError";
+import { formatAdminOrderDate } from "@/utils/adminOrders";
+import AdminPageHeader from "@/app/admin/components/AdminPageHeader";
+import AdminRefreshButton from "@/app/admin/components/AdminRefreshButton";
 
 interface AccountRow {
   id: string;
@@ -29,6 +34,8 @@ export default function UsersClient() {
   const [error, setError] = useState("");
   const [refresh, setRefresh] = useState(0);
   const [updatingUser, setUpdatingUser] = useState<string | null>(null);
+  const [selectedUser, setSelectedUser] = useState<AccountRow | null>(null);
+  const [statusError, setStatusError] = useState("");
   const updating = useRef(false);
 
   useEffect(() => {
@@ -78,6 +85,7 @@ export default function UsersClient() {
       return;
     }
     updating.current = true;
+    setStatusError("");
     setUpdatingUser(user.id);
     const status = user.status === "BLOCKED" ? "ACTIVE" : "BLOCKED";
     try {
@@ -88,15 +96,11 @@ export default function UsersClient() {
           : "Account unlocked successfully.",
       );
       handleRefresh();
+      setSelectedUser(null);
     } catch (error: unknown) {
-      const message = axios.isAxiosError(error)
-        ? error.response?.data?.error
-        : undefined;
-      toast.error(
-        typeof message === "string"
-          ? message
-          : "Failed to update account status.",
-      );
+      const message = getAdminErrorMessage(error, "Unable to update this account. Please refresh and try again.");
+      setStatusError(message);
+      toast.error(message);
     } finally {
       updating.current = false;
       setUpdatingUser(null);
@@ -106,26 +110,9 @@ export default function UsersClient() {
   return (
     <div className="space-y-6">
       {/* Title & Actions */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 ">
-            User Accounts & Security
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Manage customer directories, inspect role authorizations, and lock or restore accounts.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          disabled={isLoading}
-          onClick={handleRefresh}
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-md border border-slate-300 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-100 transition shadow-xs disabled:opacity-70"
-        >
-          <FiRefreshCw className={`text-sm ${isLoading ? "animate-spin" : ""}`} />
-          <span>{isLoading ? "Refreshing..." : "Refresh Users"}</span>
-        </button>
-      </div>
+      <AdminPageHeader title="User accounts" description="Find customer accounts and manage access. Administrator accounts are protected.">
+        <AdminRefreshButton isLoading={isLoading} onRefresh={handleRefresh} />
+      </AdminPageHeader>
 
       {/* Search Input Bar */}
       <div className="rounded-md border border-slate-200 bg-white p-4 shadow-xs">
@@ -134,6 +121,7 @@ export default function UsersClient() {
             <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm" />
             <input
               id="account-search"
+              aria-label="Search accounts by name or email"
               type="search"
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
@@ -175,6 +163,7 @@ export default function UsersClient() {
         ) : error ? (
           <div className="p-10 text-center text-sm text-rose-700 font-medium">
             {error}
+            <button type="button" onClick={handleRefresh} className="mt-3 block w-full font-semibold text-teal-700 underline">Try again</button>
           </div>
         ) : users.length === 0 ? (
           <div className="p-14 text-center text-sm text-slate-500 font-medium">
@@ -182,14 +171,14 @@ export default function UsersClient() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm">
+            <table className="w-full min-w-[700px] text-left border-collapse text-sm">
               <thead className="bg-slate-200 border-b border-slate-300 text-xs font-bold text-slate-700 uppercase ">
                 <tr>
                   <th className="py-3 px-4">Customer Details</th>
-                  <th className="py-3 px-4">Role & Privilege</th>
+                  <th className="py-3 px-4">Role</th>
                   <th className="py-3 px-4">Account Status</th>
                   <th className="py-3 px-4">Registered Date</th>
-                  <th className="py-3 px-4 text-right">Access Controls</th>
+                  <th className="py-3 px-4 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -202,17 +191,18 @@ export default function UsersClient() {
                       <p className="text-xs text-slate-500">
                         {user.email || "No email"}
                       </p>
+                      <p className="mt-1 text-xs text-slate-500">{user.emailVerified ? "Email verified" : "Email not verified"}</p>
                     </td>
 
                     <td className="py-3.5 px-4">
                       {user.role === "ADMIN" ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-sm font-bold bg-purple-50 text-purple-700 border border-purple-200">
                           <FiShield className="text-xs" />
-                          ADMIN
+                          Admin
                         </span>
                       ) : (
                         <span className="inline-block px-2 py-0.5 rounded text-sm font-semibold bg-slate-100 text-slate-700">
-                          CUSTOMER
+                          Customer
                         </span>
                       )}
                     </td>
@@ -221,7 +211,7 @@ export default function UsersClient() {
                       {user.status === "BLOCKED" ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-sm font-semibold bg-rose-50 text-rose-800 border border-rose-200">
                           <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
-                          Locked
+                          Blocked
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-sm font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
@@ -232,7 +222,7 @@ export default function UsersClient() {
                     </td>
 
                     <td className="py-3.5 px-4 text-slate-500 text-xs">
-                      {new Date(user.createdAt).toLocaleDateString("en-US")}
+                      {formatAdminOrderDate(user.createdAt)}
                     </td>
 
                     <td className="py-3.5 px-4 text-right">
@@ -245,7 +235,8 @@ export default function UsersClient() {
                           type="button"
                           disabled={Boolean(updatingUser)}
                           onClick={() => {
-                            void handleStatusChange(user);
+                            setStatusError("");
+                            setSelectedUser(user);
                           }}
                           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold transition shadow-xs border ${
                             user.status === "BLOCKED"
@@ -256,12 +247,12 @@ export default function UsersClient() {
                           {user.status === "BLOCKED" ? (
                             <>
                               <FiUnlock className="text-sm" />
-                              <span>{updatingUser === user.id ? "Updating..." : "Unlock"}</span>
+                              <span>{updatingUser === user.id ? "Updating..." : "Unblock"}</span>
                             </>
                           ) : (
                             <>
                               <FiLock className="text-sm" />
-                              <span>{updatingUser === user.id ? "Updating..." : "Lock Account"}</span>
+                              <span>{updatingUser === user.id ? "Updating..." : "Block account"}</span>
                             </>
                           )}
                         </button>
@@ -274,7 +265,7 @@ export default function UsersClient() {
           </div>
         )}
 
-        <div className="px-5 pb-4">
+        {!isLoading && !error ? <div className="px-5 pb-4">
           <AdminPagination
             currentPage={page}
             totalPages={totalPages}
@@ -284,8 +275,28 @@ export default function UsersClient() {
             isLoading={isLoading}
             onPageChange={(newPage) => setPage(newPage)}
           />
-        </div>
+        </div> : null}
       </div>
+      {selectedUser ? (
+        <AdminDialog
+          title={selectedUser.status === "BLOCKED" ? "Unblock account?" : "Block account?"}
+          isBusy={Boolean(updatingUser)}
+          onClose={() => setSelectedUser(null)}
+        >
+          <p className="break-words text-sm font-semibold">{selectedUser.name || "Customer"}</p>
+          <p className="mt-1 break-all text-sm text-slate-500">{selectedUser.email || "No email recorded"}</p>
+          <p className="mt-4 text-sm leading-6">
+            {selectedUser.status === "BLOCKED" ? "This customer will be able to sign in again. Previously revoked sessions will remain invalid." : "This customer will lose access and their active sessions will be revoked."}
+          </p>
+          {statusError ? <p role="alert" className="mt-4 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{statusError}</p> : null}
+          <div className="mt-6 flex flex-wrap justify-end gap-3">
+            <button type="button" disabled={Boolean(updatingUser)} onClick={() => setSelectedUser(null)} className="rounded-md border border-slate-300 px-4 py-2 text-sm">Cancel</button>
+            <button type="button" disabled={Boolean(updatingUser)} onClick={() => { void handleStatusChange(selectedUser); }} className="rounded-md bg-slate-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+              {updatingUser ? "Updating..." : selectedUser.status === "BLOCKED" ? "Unblock account" : "Block account"}
+            </button>
+          </div>
+        </AdminDialog>
+      ) : null}
     </div>
   );
 }

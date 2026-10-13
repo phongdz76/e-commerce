@@ -11,6 +11,8 @@ import type { AdminOverview } from "@/types";
 import AdminPageHeader from "@/app/admin/components/AdminPageHeader";
 import AdminRefreshButton from "@/app/admin/components/AdminRefreshButton";
 import AdminFeedback from "@/app/admin/components/AdminFeedback";
+import DashboardCharts from "@/app/admin/DashboardCharts";
+import TopSellingProducts from "@/app/admin/TopSellingProducts";
 
 export default function AdminDashboardClient() {
   const [overview, setOverview] = useState<AdminOverview | null>(null);
@@ -57,7 +59,7 @@ export default function AdminDashboardClient() {
           <FiPlus /> Add product
         </Link>
       </AdminPageHeader>
-      {isLoading ? (
+      {isLoading && !overview ? (
         <AdminFeedback title="Loading dashboard..." />
       ) : error ? (
         <AdminFeedback title={error} isError onRetry={handleRefresh} />
@@ -105,6 +107,11 @@ export default function AdminDashboardClient() {
               })}
             </div>
           </section>
+          <DashboardCharts
+            months={overview.monthlyRevenue || []}
+            payments={overview.paymentDistribution || []}
+          />
+          <TopSellingProducts refreshKey={refresh} />
           <section className="grid gap-4 lg:grid-cols-2">
             <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-xs">
               <h2 className="font-semibold text-slate-800">Catalog overview</h2>
@@ -121,8 +128,9 @@ export default function AdminDashboardClient() {
               <h2 className="font-semibold text-slate-800">About these numbers</h2>
               <p className="mt-2 text-sm leading-6 text-slate-500">
                 Confirmed online payments include paid VNPay, MoMo, ZaloPay and card orders in VND.
-                This total does not represent provider payouts or profit. Monthly and yearly sales reports will be added separately.
+                This total does not represent provider payouts or profit. Product rankings by month, quarter and year are available under Sales reports.
               </p>
+              <Link href="/admin/reports" className="mt-3 inline-flex min-h-10 items-center text-sm font-semibold text-teal-700 hover:underline">View sales reports</Link>
             </div>
           </section>
         </>

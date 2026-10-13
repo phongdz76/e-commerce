@@ -15,6 +15,20 @@ export const ADMIN_ORDER_METHODS: Record<string, string> = {
   STRIPE: "Card (Stripe)",
 };
 
+export const ADMIN_DELIVERY_FILTERS = [
+  { value: "ALL", label: "All delivery statuses" },
+  { value: "NOT_RECORDED", label: "Not recorded" },
+  { value: "pending", label: "Not shipped" },
+  { value: "preparing", label: "Preparing" },
+  { value: "ready_to_ship", label: "Ready to ship" },
+  { value: "shipped", label: "Shipped" },
+  { value: "in_transit", label: "In transit" },
+  { value: "delivered", label: "Delivered" },
+  { value: "delivery_failed", label: "Delivery failed" },
+  { value: "returned", label: "Returned" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
 export function getAdminOrderStatus(status: string) {
   if (["paid", "complete", "done"].includes(status)) {
     return { label: "Paid", className: "border-teal-200 bg-teal-50 text-teal-800" };
@@ -48,7 +62,7 @@ export function getAdminDeliveryLabel(status: string | null) {
     returned: "Returned",
     cancelled: "Cancelled",
   };
-  return status ? labels[status.toLowerCase()] || "Status unconfirmed" : "Not recorded";
+  return status && Object.hasOwn(labels, status.toLowerCase()) ? labels[status.toLowerCase()] : status ? "Status unconfirmed" : "Not recorded";
 }
 
 export function formatAdminOrderDate(value: string) {

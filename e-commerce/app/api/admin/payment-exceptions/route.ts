@@ -14,19 +14,21 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams;
     const status = params.get("status") || "OPEN";
     const page = Number(params.get("page") || "1");
+    const reason = params.get("reason") || "ALL";
     if (
       !["OPEN", "REVIEWED", "REFUND_REQUIRED"].includes(status) ||
+      !["ALL", "DUPLICATE_PAYMENT", "LATE_SUCCESS"].includes(reason) ||
       !Number.isSafeInteger(page) ||
       page < 1 ||
       page > 1000
     ) {
       return NextResponse.json({ error: "Invalid filters" }, { status: 400 });
     }
-    const whereClause = { status };
+    const whereClause = { status, ...(reason !== "ALL" ? { reason } : {}) };
     const [rows, total] = await Promise.all([
       prisma.paymentException.findMany({
         where: whereClause,
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         skip: (page - 1) * 10,
         take: 10,
       }),
@@ -42,19 +44,16 @@ export async function GET(request: Request) {
       exceptions: rows.map((row) => ({
         id: row.id,
         orderId: row.orderId,
-        attemptId: row.attemptId,
-        paidAttemptId: row.paidAttemptId,
         reason: row.reason,
         amount: row.amount,
         currency: row.currency,
         providerTransactionId: row.providerTransactionId,
         status: row.status,
         note: row.note,
-        reviewedBy: row.reviewedBy,
         reviewedAt: row.reviewedAt?.toISOString() || null,
         createdAt: row.createdAt.toISOString(),
       })),
-    });
+    }, { headers: { "Cache-Control": "private, no-store" } });
   } catch {
     return NextResponse.json(
       { error: "Unable to load payment exceptions" },

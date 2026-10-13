@@ -15,7 +15,8 @@ export default function AdminHeader({ currentUser }: { currentUser: safeUser | n
   const current = ADMIN_NAVIGATION.flatMap((group) => group.items).find((item) => isAdminPageActive(pathname, item.href));
   const isProductChild = pathname.startsWith("/admin/products/");
   const isOrderChild = pathname.startsWith("/admin/orders/");
-  const childTitle = pathname === "/admin/products/new" ? "Add product" : isProductChild ? "Edit product" : isOrderChild ? "Order details" : null;
+  const isShipmentChild = pathname.startsWith("/admin/shipments/");
+  const childTitle = pathname === "/admin/products/new" ? "Add product" : isProductChild ? "Edit product" : isOrderChild ? "Order details" : isShipmentChild ? "Shipment details" : null;
 
   return (
     <>
@@ -60,7 +61,7 @@ export default function AdminHeader({ currentUser }: { currentUser: safeUser | n
                       href={item.href}
                       aria-current={active ? "page" : undefined}
                       onClick={() => setIsMenuOpen(false)}
-                      className={"flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm " + (active ? "bg-slate-700 font-semibold text-teal-300" : "hover:bg-slate-100")}
+                      className={"flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm " + (active ? "bg-[#334155] font-semibold text-[#2dd4bf]" : "hover:bg-slate-100")}
                     >
                       <Icon size={18} />{item.label}
                     </Link>

@@ -85,6 +85,7 @@ function fixture(method) {
   }
   const prisma = {
     paymentAttempt: {
+      count: async ({ where = {} }) => [...attempts.values()].filter((row) => matches(row, where)).length,
       create: async ({ data }) => {
         if (attempts.has(data.id))
           throw Object.assign(new Error("Duplicate"), { code: "P2002" });
@@ -194,6 +195,7 @@ function fixture(method) {
     },
   };
   prisma.paymentException = {
+    count: async ({ where = {} }) => [...exceptions.values()].filter((row) => matches(row, where)).length,
     upsert: async ({ where, create }) => {
       if (state.exceptionError) throw new Error("private-exception-db-error");
       if (!exceptions.has(where.id))
@@ -272,6 +274,7 @@ function fixture(method) {
     mocks,
   ).PATCH;
   const jobs = load("app/api/jobs/reconcile-payments/route.ts", mocks).GET;
+  mocks["@/utils/adminPayment"] = load("utils/adminPayment.ts", mocks);
   const queue = load("app/api/admin/payments/route.ts", mocks).GET;
   const manual = load(
     "app/api/admin/payments/[orderId]/reconcile/route.ts",
@@ -970,6 +973,10 @@ test("payment queue and manual reconciliation enforce ADMIN permissions", async 
   const queued = await (await f.queue(req)).json();
   assert.equal(queued.attempts.length, 1);
   assert.equal("privateSecret" in queued.attempts[0], false);
+  for (const field of ["lastError", "resultCode", "checkCount", "nextCheckAt"]) {
+    assert.equal(field in queued.attempts[0], false);
+  }
+  assert.equal(queued.configuration, undefined);
   assert.equal(
     (await f.queue(new Request("http://localhost/queue?state=invalid"))).status,
     400,

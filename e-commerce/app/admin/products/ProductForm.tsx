@@ -1,25 +1,27 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import toast from "react-hot-toast";
 import Image from "next/image";
 import {
-  FiBox,
   FiPlus,
   FiTrash2,
-  FiCheck,
-  FiX,
   FiLayers,
   FiTag,
   FiArrowLeft,
   FiSave,
+  FiChevronDown,
 } from "react-icons/fi";
 import ImageUpload from "@/app/components/inputs/ImageUpload";
 import { API_PATHS } from "@/utils/apiPaths";
 import { isCatalogImageUrl } from "@/utils/catalogImage";
+import { getAdminErrorMessage } from "@/utils/adminError";
+import { getCatalogSlug } from "@/utils/catalogSlug";
+import { formatPrice } from "@/utils/formatPrice";
+import OrderProductImage from "@/app/admin/orders/OrderProductImage";
 import type {
   AdminCatalogProduct,
   AdminCatalogVariant,
@@ -43,16 +45,6 @@ function newVariant(): VariantForm {
     isActive: true,
     inStock: true,
   };
-}
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
 }
 
 function getAttributes(value: string) {
@@ -87,6 +79,7 @@ export default function ProductForm({
   const router = useRouter();
   const [name, setName] = useState(product?.name || "");
   const [slug, setSlug] = useState(product?.slug || "");
+  const [hasCustomSlug, setHasCustomSlug] = useState(Boolean(product));
   const [description, setDescription] = useState(product?.description || "");
   const [status, setStatus] = useState<AdminCatalogProduct["status"]>(
     product?.status || "DRAFT",
@@ -104,6 +97,7 @@ export default function ProductForm({
     product?.variants.length
       ? product.variants.map(({ attributes, ...v }) => ({
           ...v,
+          image: { ...v.image, colorCode: v.image.colorCode.trim() },
           specifications: Object.entries(attributes)
             .map(([k, val]) => `${k}: ${val}`)
             .join("\n"),
@@ -112,11 +106,43 @@ export default function ProductForm({
   );
   const [isSaving, setIsSaving] = useState(false);
   const saving = useRef(false);
+  const form = useRef<HTMLFormElement>(null);
+  const [formError, setFormError] = useState("");
+  const [hasConflict, setHasConflict] = useState(false);
+  const [variantErrors, setVariantErrors] = useState<Record<number, string>>({});
+  const snapshot = JSON.stringify({ name, slug, description, status, categoryId, brandId, variants });
+  const [original] = useState(snapshot);
+  const isDirty = snapshot !== original;
+
+  useEffect(() => {
+    if (!isDirty) {
+      return;
+    }
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty]);
+
+  const handleCancel = () => {
+    if (isDirty && !window.confirm("Discard your unsaved product changes?")) {
+      return;
+    }
+    router.push("/admin/products");
+  };
+
+  const handleGenerateSku = (index: number) => {
+    const variant = variants[index];
+    const base = (slug || "PRODUCT").toUpperCase().slice(0, 30);
+    const color = (variant.image.color || "STANDARD").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12);
+    handleVariantChange(index, { sku: base + "-" + color + "-" + (index + 1) });
+  };
 
   const handleNameChange = (val: string) => {
     setName(val);
-    if (!product) {
-      setSlug(slugify(val));
+    if (!product && !hasCustomSlug) {
+      setSlug(getCatalogSlug(val));
     }
   };
 
@@ -126,7 +152,7 @@ export default function ProductForm({
       toast.error("Brand name must be at least 2 characters.");
       return;
     }
-    const brandSlug = slugify(trimmed);
+    const brandSlug = getCatalogSlug(trimmed, 100);
     setIsSavingBrand(true);
     try {
       const response = await axios.post(API_PATHS.ADMIN.BRANDS, {
@@ -134,26 +160,14 @@ export default function ProductForm({
         slug: brandSlug,
         isVisible: true,
       });
-      const newBrand: SafeCatalogGroup = {
-        id: response.data.id,
-        name: trimmed,
-        slug: brandSlug,
-        isVisible: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        productCount: 0,
-      };
+      const newBrand: SafeCatalogGroup = response.data;
       setBrandsList((prev) => [...prev, newBrand]);
       setBrandId(newBrand.id);
       setNewBrandName("");
       setIsCreatingBrand(false);
       toast.success(`Brand "${trimmed}" created and selected!`);
     } catch (err: unknown) {
-      toast.error(
-        axios.isAxiosError(err) && err.response?.data?.error
-          ? err.response.data.error
-          : "Failed to create new brand.",
-      );
+      toast.error(getAdminErrorMessage(err, "Unable to create this brand. Check its name and URL slug, then try again."));
     } finally {
       setIsSavingBrand(false);
     }
@@ -192,17 +206,58 @@ export default function ProductForm({
     );
   };
 
+  const handleRevealField = (field: HTMLElement | null) => {
+    if (!field) {
+      return;
+    }
+    let parent = field.parentElement;
+    while (parent && parent !== form.current) {
+      if (parent instanceof HTMLDetailsElement) {
+        parent.open = true;
+      }
+      parent = parent.parentElement;
+    }
+    field.scrollIntoView({ block: "center" });
+    field.focus({ preventScroll: true });
+  };
+
+  const handleInvalid = (event: FormEvent<HTMLFormElement>) => {
+    let parent = (event.target as HTMLElement).parentElement;
+    while (parent && parent !== form.current) {
+      if (parent instanceof HTMLDetailsElement) {
+        parent.open = true;
+      }
+      parent = parent.parentElement;
+    }
+    setFormError("Review the required fields and highlighted inputs before saving.");
+  };
+
+  const handleReviewFields = () => {
+    handleRevealField(form.current?.querySelector<HTMLElement>("input:invalid, select:invalid, textarea:invalid") || null);
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (saving.current) {
       return;
     }
+    setFormError("");
+    setHasConflict(false);
+    setVariantErrors({});
     if (!categoryId) {
       toast.error("Please select a category.");
       return;
     }
     if (!brandId) {
       toast.error("Please select or add a brand.");
+      return;
+    }
+    if (status === "ACTIVE" && (
+      !categories.find((category) => category.id === categoryId)?.isVisible ||
+      !brandsList.find((brand) => brand.id === brandId)?.isVisible ||
+      !variants.some((variant) => variant.isActive)
+    )) {
+      setFormError("An active product needs a visible category, a visible brand and at least one enabled variant.");
       return;
     }
 
@@ -228,16 +283,20 @@ export default function ProductForm({
         status,
         categoryId,
         brandId,
-        variants: preparedVariants.map(({ specifications, ...variant }) => ({
-          ...variant,
-          attributes: getAttributes(specifications),
-        })),
+        variants: preparedVariants.map(({ specifications, ...variant }, index) => {
+          try {
+            return { ...variant, attributes: getAttributes(specifications) };
+          } catch (error: unknown) {
+            setVariantErrors({ [index]: "Use one Name: value per line, with unique specification names." });
+            const specifications = document.getElementById("variant-spec-" + index);
+            handleRevealField(specifications);
+            throw error;
+          }
+        }),
         ...(product ? { updatedAt: product.updatedAt } : {}),
       };
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Invalid variant specifications.",
-      );
+      setFormError(error instanceof Error ? error.message : "Check the variant specifications.");
       return;
     }
 
@@ -250,14 +309,13 @@ export default function ProductForm({
         await axios.post(API_PATHS.ADMIN.PRODUCTS, data);
       }
       toast.success("Product saved successfully.");
-      router.push("/admin/products");
+      router.push("/admin/products?updated=" + Date.now());
       router.refresh();
     } catch (error: unknown) {
-      toast.error(
-        axios.isAxiosError(error)
-          ? error.response?.data?.error || "Failed to save product."
-          : "Failed to save product.",
-      );
+      const message = getAdminErrorMessage(error, "Unable to save this product. Check the name, URL slug, description and variants. Prices must be positive whole VND amounts and each SKU must be unique.");
+      setFormError(message);
+      setHasConflict(axios.isAxiosError(error) && error.response?.status === 409 && error.response?.data?.code !== "DUPLICATE_CATALOG_KEY");
+      toast.error(message);
     } finally {
       saving.current = false;
       setIsSaving(false);
@@ -265,20 +323,25 @@ export default function ProductForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8 max-w-6xl mx-auto">
+    <form
+      ref={form}
+      onSubmit={handleSubmit}
+      onInvalidCapture={handleInvalid}
+      className="space-y-6 max-w-6xl mx-auto"
+    >
       {/* Header bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-5">
+      <div className="sticky top-16 z-10 flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-slate-50 py-4">
         <div>
           <button
             type="button"
-            onClick={() => router.push("/admin/products")}
+            onClick={handleCancel}
             className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-teal-600 mb-1"
           >
             <FiArrowLeft />
             <span>Back to Products</span>
           </button>
           <h1 className="text-2xl font-bold text-slate-800 ">
-            {product ? "Edit Catalog Item" : "Create New Product"}
+            {product ? "Edit product" : "Add product"}
           </h1>
         </div>
 
@@ -286,10 +349,10 @@ export default function ProductForm({
           <button
             type="button"
             disabled={isSaving}
-            onClick={() => router.push("/admin/products")}
+            onClick={handleCancel}
             className="px-4 py-2 rounded-md border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 transition shadow-xs"
           >
-            Discard
+            Cancel
           </button>
           <button
             type="submit"
@@ -297,19 +360,46 @@ export default function ProductForm({
             className="inline-flex items-center gap-2 px-5 py-2 rounded-md bg-slate-700 hover:bg-slate-800 text-sm font-bold text-white shadow-xs transition disabled:opacity-70"
           >
             <FiSave className="text-sm" />
-            <span>{isSaving ? "Saving..." : "Save Product"}</span>
+            <span>{isSaving ? "Saving..." : "Save changes"}</span>
           </button>
         </div>
       </div>
 
+      {formError ? (
+        <div role="alert" className="space-y-2 rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+          <p className="font-semibold">Check the product details</p>
+          <p>{formError}</p>
+          {hasConflict ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm("Reload the latest product? Unsaved input will be discarded.")) {
+                  window.location.reload();
+                }
+              }}
+              className="mr-4 font-semibold underline"
+            >
+              Reload product
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={handleReviewFields}
+            className="font-semibold underline"
+          >
+            Review required fields
+          </button>
+        </div>
+      ) : null}
+      <fieldset disabled={isSaving} className="min-w-0 space-y-6">
       {/* Main 2-Column Layout */}
-      <div className="grid gap-8 lg:grid-cols-3 items-start">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 items-start">
         {/* Left Column (2 cols): General & Variants */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="min-w-0 lg:col-span-2 space-y-6">
           {/* General Information Card */}
           <div className="rounded-md border border-slate-200 bg-white p-6 shadow-xs space-y-5">
             <h2 className="text-sm font-bold text-slate-700 uppercase pb-3 border-b border-slate-100">
-              General Product Information
+              Basic information
             </h2>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -330,13 +420,17 @@ export default function ProductForm({
                 <span>URL Slug *</span>
                 <input
                   value={slug}
-                  onChange={(e) => setSlug(e.target.value)}
+                  onChange={(e) => {
+                    setSlug(e.target.value);
+                    setHasCustomSlug(true);
+                  }}
                   required
                   maxLength={150}
                   pattern="[a-z0-9]+(-[a-z0-9]+)*"
                   placeholder="e.g. macbook-pro-14-m3-max"
                   className={inputClassName}
                 />
+                <span className="block text-xs font-normal leading-5 text-slate-500">Generated from the name. A custom URL slug is kept when the name changes.</span>
               </label>
             </div>
 
@@ -357,10 +451,10 @@ export default function ProductForm({
 
           {/* Variants Section */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-sm font-bold text-slate-800">
-                  Product Variants & SKUs ({variants.length}/20)
+                  Variants & SKUs ({variants.length}/20)
                 </h2>
                 <p className="text-sm text-slate-500">
                   Manage each sellable option with its distinct color, image, and price.
@@ -374,25 +468,40 @@ export default function ProductForm({
                 className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white hover:bg-slate-50 px-3 py-1.5 text-sm font-semibold text-slate-700 transition shadow-xs"
               >
                 <FiPlus className="text-teal-600" />
-                <span>Add Variant</span>
+                <span>Add variant</span>
               </button>
             </div>
 
             {variants.map((variant, index) => (
-              <div
+              <details
                 key={variant.id || `variant-${index}`}
-                className="rounded-md border border-slate-200 bg-white p-5 shadow-xs space-y-4"
+                open={index === 0 || !variant.id || Boolean(variantErrors[index]) || undefined}
+                className="group/variant min-w-0 rounded-md border border-slate-200 bg-white shadow-xs"
               >
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="h-6 w-6 rounded-md bg-slate-100 text-slate-700 font-bold text-sm flex items-center justify-center border border-slate-200">
-                      {index + 1}
-                    </span>
-                    <strong className="text-sm font-bold text-slate-900">
-                      {variant.name || `Variant #${index + 1}`}
-                    </strong>
+                <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 p-4 marker:content-none [&::-webkit-details-marker]:hidden sm:p-5">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <OrderProductImage
+                      key={variant.image.image}
+                      image={isCatalogImageUrl(variant.image.image) ? variant.image.image : null}
+                      name={variant.name || "Variant " + (index + 1)}
+                    />
+                    <div className="min-w-0">
+                      <strong className="block break-words text-sm font-semibold text-slate-900">{variant.name || "Variant " + (index + 1)}</strong>
+                      <p className="mt-1 break-all text-xs text-slate-500">{variant.sku || "SKU not entered"}</p>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                        <span className={"rounded-full px-2 py-0.5 " + (variant.isActive ? "bg-teal-50 text-teal-800" : "bg-slate-100 text-slate-600")}>{variant.isActive ? "Enabled" : "Disabled"}</span>
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">{variant.inStock ? "In stock" : "Out of stock"}</span>
+                      </div>
+                    </div>
                   </div>
-
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className="text-sm font-semibold text-slate-800">{variant.price > 0 ? formatPrice(variant.price) : "Price required"}</span>
+                    <FiChevronDown className="text-slate-400 transition-transform group-open/variant:rotate-180" aria-hidden="true" />
+                  </div>
+                </summary>
+                <div className="space-y-4 border-t border-slate-100 p-4 sm:p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-xs font-medium text-slate-500">Variant {index + 1} · Edit SKU, price, image and availability</p>
                   {variants.length > 1 && !variant.id && (
                     <button
                       type="button"
@@ -421,10 +530,17 @@ export default function ProductForm({
                       placeholder="e.g. MBP14-M3-BLK"
                       className={inputClassName}
                     />
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateSku(index)}
+                      className="text-xs font-semibold text-teal-700 hover:underline"
+                    >
+                      Generate SKU
+                    </button>
                   </label>
 
                   <label className="space-y-1 text-sm font-semibold text-slate-700 block">
-                    <span>Variant Name *</span>
+                    <span>Variant name *</span>
                     <input
                       value={variant.name}
                       onChange={(e) =>
@@ -500,6 +616,7 @@ export default function ProductForm({
                     <span>Image Preview *</span>
                     <div className="flex items-center gap-2">
                       <input
+                        aria-label={"Image URL for variant " + (index + 1)}
                         value={variant.image.image}
                         onChange={(e) =>
                           handleImageChange(index, { image: e.target.value })
@@ -515,7 +632,7 @@ export default function ProductForm({
                             src={variant.image.image}
                             alt={variant.image.color}
                             fill
-                            className="object-cover"
+                            className="object-contain"
                           />
                         </div>
                       ) : null}
@@ -534,9 +651,12 @@ export default function ProductForm({
 
                 {/* Specs and stock */}
                 <div className="grid gap-3 sm:grid-cols-3 items-start">
-                  <label className="space-y-1 text-sm font-semibold text-slate-700 sm:col-span-2 block">
-                    <span>Specifications (Optional: RAM: 18GB per line)</span>
+                  <details className="sm:col-span-2 rounded-md border border-slate-200 p-3" open={Boolean(variantErrors[index]) || undefined}>
+                    <summary className="cursor-pointer text-sm font-semibold">Specifications (optional)</summary>
+                    <label className="mt-3 block space-y-1 text-sm text-slate-700">
+                    <span>One specification per line, for example RAM: 18GB.</span>
                     <textarea
+                      id={"variant-spec-" + index}
                       value={variant.specifications}
                       onChange={(e) =>
                         handleVariantChange(index, {
@@ -547,7 +667,9 @@ export default function ProductForm({
                       placeholder={"RAM: 18GB\nStorage: 512GB SSD"}
                       className={inputClassName}
                     />
+                    {variantErrors[index] ? <p className="text-xs text-rose-700">{variantErrors[index]}</p> : null}
                   </label>
+                  </details>
 
                   <div className="space-y-2 pt-4">
                     <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-700">
@@ -559,7 +681,7 @@ export default function ProductForm({
                         }
                         className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
                       />
-                      <span>In Stock</span>
+                      <span>In stock</span>
                     </label>
 
                     <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-700">
@@ -571,35 +693,37 @@ export default function ProductForm({
                         }
                         className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
                       />
-                      <span>Sellable (Active)</span>
+                      <span>Enable variant</span>
                     </label>
                   </div>
                 </div>
-              </div>
+                </div>
+              </details>
             ))}
           </div>
         </div>
 
         {/* Right Column (1 col): Organization & Brand Inline Add */}
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           {/* Status Card */}
           <div className="rounded-md border border-slate-200 bg-white p-5 shadow-xs space-y-3">
             <h2 className="text-sm font-bold text-slate-700 uppercase ">
-              Catalog Visibility
+              Product status
             </h2>
             <select
+              aria-label="Product status"
               value={status}
               onChange={(e) =>
                 setStatus(e.target.value as AdminCatalogProduct["status"])
               }
               className={inputClassName}
             >
-              <option value="DRAFT">Draft (Not displayed publicly)</option>
-              <option value="ACTIVE">Active (Live in storefront)</option>
-              <option value="ARCHIVED">Archived (Discontinued)</option>
+              <option value="DRAFT">Draft</option>
+              <option value="ACTIVE">Active</option>
+              <option value="ARCHIVED">Archived</option>
             </select>
             <p className="text-xs text-slate-500">
-              Active items require at least one active variant with an in-stock tag.
+              Active requires a visible category, visible brand and at least one enabled variant. In stock is a separate availability flag, not a stock quantity.
             </p>
           </div>
 
@@ -607,9 +731,10 @@ export default function ProductForm({
           <div className="rounded-md border border-slate-200 bg-white p-5 shadow-xs space-y-3">
             <div className="flex items-center gap-2 text-sm font-bold text-slate-700 uppercase ">
               <FiLayers />
-              <span>Category (Taxonomy) *</span>
+              <span>Category *</span>
             </div>
             <select
+              aria-label="Category"
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
               required
@@ -624,7 +749,7 @@ export default function ProductForm({
               ))}
             </select>
             <p className="text-xs text-slate-500">
-              Choose from the verified category taxonomy.
+              Choose the group this product belongs to.
             </p>
           </div>
 
@@ -633,7 +758,7 @@ export default function ProductForm({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm font-bold text-slate-700 uppercase ">
                 <FiTag />
-                <span>Brand / Manufacturer *</span>
+                <span>Brand *</span>
               </div>
               {!isCreatingBrand && (
                 <button
@@ -652,7 +777,9 @@ export default function ProductForm({
                   Add Brand Instantly
                 </span>
                 <input
+                  aria-label="New brand name"
                   value={newBrandName}
+                  maxLength={80}
                   onChange={(e) => setNewBrandName(e.target.value)}
                   placeholder="e.g. Sony, Anker..."
                   className="w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-teal-500"
@@ -668,6 +795,7 @@ export default function ProductForm({
                   </button>
                   <button
                     type="button"
+                    disabled={isSavingBrand}
                     onClick={() => {
                       setIsCreatingBrand(false);
                       setNewBrandName("");
@@ -680,6 +808,7 @@ export default function ProductForm({
               </div>
             ) : (
               <select
+                aria-label="Brand"
                 value={brandId}
                 onChange={(e) => {
                   if (e.target.value === "ADD_NEW") {
@@ -707,6 +836,7 @@ export default function ProductForm({
           </div>
         </div>
       </div>
+      </fieldset>
     </form>
   );
 }

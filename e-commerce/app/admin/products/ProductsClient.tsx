@@ -4,25 +4,27 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import axios from "axios";
 import Link from "next/link";
-import Image from "next/image";
 import {
   FiSearch,
   FiPlus,
   FiEdit2,
   FiFilter,
   FiRotateCcw,
-  FiBox,
 } from "react-icons/fi";
 import { API_PATHS } from "@/utils/apiPaths";
 import { formatPrice } from "@/utils/formatPrice";
 import type { AdminCatalogProduct } from "@/types";
 import AdminPagination from "@/app/admin/components/AdminPagination";
+import AdminPageHeader from "@/app/admin/components/AdminPageHeader";
+import AdminRefreshButton from "@/app/admin/components/AdminRefreshButton";
+import AdminFeedback from "@/app/admin/components/AdminFeedback";
+import OrderProductImage from "@/app/admin/orders/OrderProductImage";
 
 const STATUS_LABELS: Record<string, string> = {
   ALL: "All Statuses",
-  ACTIVE: "Active (Live)",
-  DRAFT: "Draft (Hidden)",
-  ARCHIVED: "Archived (Discontinued)",
+  ACTIVE: "Active",
+  DRAFT: "Draft",
+  ARCHIVED: "Archived",
 };
 
 export default function ProductsClient() {
@@ -81,26 +83,26 @@ export default function ProductsClient() {
     setPage(1);
   };
 
+  const handleClearFilters = () => {
+    setSearch("");
+    setQuery("");
+    setStatus("ALL");
+    setPage(1);
+  };
+
   return (
     <div className="space-y-6">
       {/* Title & Add Button */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 ">
-            Product Management
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Maintain catalog products, manage variant pricing, and track inventory.
-          </p>
-        </div>
+      <AdminPageHeader title="Products" description="Manage catalog products, variants and prices. Availability is separate from stock quantity.">
+        <AdminRefreshButton isLoading={isLoading} onRefresh={() => setRefresh((value) => value + 1)} />
         <Link
           href="/admin/products/new"
           className="inline-flex items-center gap-2 rounded-md bg-slate-700 hover:bg-slate-800 px-4 py-2.5 text-sm font-bold text-white transition shadow-sm"
         >
           <FiPlus className="text-base" />
-          <span>Add New Product</span>
+          <span>Add product</span>
         </Link>
-      </div>
+      </AdminPageHeader>
 
       {/* Filter and Search Bar */}
       <div className="rounded-md border border-slate-200 bg-white p-4 shadow-xs">
@@ -109,6 +111,7 @@ export default function ProductsClient() {
             <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm" />
             <input
               id="admin-product-search"
+              aria-label="Search products by name"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               maxLength={100}
@@ -121,6 +124,7 @@ export default function ProductsClient() {
             <FiFilter className="text-slate-500 text-sm" />
             <select
               id="admin-product-status"
+              aria-label="Filter products by status"
               value={status}
               onChange={(event) => handleStatusChange(event.target.value)}
               className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-teal-500 bg-white"
@@ -143,12 +147,7 @@ export default function ProductsClient() {
           {(query || status !== "ALL") && (
             <button
               type="button"
-              onClick={() => {
-                setSearch("");
-                setQuery("");
-                setStatus("ALL");
-                setPage(1);
-              }}
+              onClick={handleClearFilters}
               className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white hover:bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600 transition shadow-xs"
             >
               <FiRotateCcw className="text-sm" />
@@ -161,23 +160,23 @@ export default function ProductsClient() {
       {/* Table Card */}
       <div className="rounded-md border border-slate-200 bg-white shadow-xs overflow-hidden">
         {isLoading ? (
-          <div className="p-14 text-center text-sm text-slate-500 font-medium">
-            Loading products catalog...
-          </div>
+          <AdminFeedback title="Loading products..." />
         ) : error ? (
-          <div className="p-10 text-center text-sm text-rose-700 font-medium">
-            {error}
-          </div>
+          <AdminFeedback title={error} isError onRetry={() => setRefresh((value) => value + 1)} />
         ) : products.length === 0 ? (
-          <div className="p-14 text-center text-sm text-slate-500 font-medium">
-            No products found matching your search criteria.
+          <div className="space-y-3 p-6 text-center text-sm text-slate-500">
+            <p role="status" className="font-semibold">{query || status !== "ALL" ? "No matching products" : "No products yet"}</p>
+            <p>{query || status !== "ALL" ? "Try another name or clear your filters." : "Add your first product to start managing the catalog."}</p>
+            {query || status !== "ALL" ? (
+              <button type="button" onClick={handleClearFilters} className="min-h-11 px-3 font-semibold text-teal-700 underline">Clear filters</button>
+            ) : <Link href="/admin/products/new" className="inline-flex min-h-11 items-center px-3 font-semibold text-teal-700 underline">Add product</Link>}
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm">
+            <table className="w-full min-w-[800px] text-left border-collapse text-sm">
               <thead className="bg-slate-200 border-b border-slate-300 text-xs font-bold text-slate-700 uppercase ">
                 <tr>
-                  <th className="py-3 px-4">Product Details</th>
+                  <th scope="col" className="min-w-72 py-3 px-4">Product</th>
                   <th className="py-3 px-4">Category</th>
                   <th className="py-3 px-4">Brand</th>
                   <th className="py-3 px-4">Price (VND)</th>
@@ -203,26 +202,10 @@ export default function ProductsClient() {
                     >
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-3">
-                          <div className="relative h-12 w-12 shrink-0 rounded-md border border-slate-200 bg-slate-50 overflow-hidden">
-                            {firstImage ? (
-                              <Image
-                                src={firstImage}
-                                alt={item.name}
-                                fill
-                                className="object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">
-                                <FiBox />
-                              </div>
-                            )}
-                          </div>
-                          <div>
-                            <p className="font-bold text-sm text-slate-900 line-clamp-1">
+                          <OrderProductImage key={firstImage} image={firstImage || null} name={item.name} />
+                          <div className="min-w-0 max-w-64">
+                            <p className="font-semibold text-sm text-slate-900 break-words">
                               {item.name}
-                            </p>
-                            <p className="text-xs text-slate-400 mt-0.5">
-                              {item.slug}
                             </p>
                           </div>
                         </div>
@@ -239,7 +222,7 @@ export default function ProductsClient() {
                       </td>
 
                       <td className="py-3.5 px-4 font-bold text-slate-900">
-                        {minPrice === maxPrice
+                        {!item.variants.length ? "No price" : minPrice === maxPrice
                           ? formatPrice(minPrice)
                           : `${formatPrice(minPrice)} - ${formatPrice(maxPrice)}`}
                       </td>
@@ -288,7 +271,7 @@ export default function ProductsClient() {
         )}
 
         {/* Pagination Footer using AdminPagination matching storefront user design */}
-        <div className="px-5 pb-4">
+        {!isLoading && !error ? <div className="px-5 pb-4">
           <AdminPagination
             currentPage={page}
             totalPages={totalPages}
@@ -298,7 +281,7 @@ export default function ProductsClient() {
             isLoading={isLoading}
             onPageChange={(newPage) => setPage(newPage)}
           />
-        </div>
+        </div> : null}
       </div>
     </div>
   );

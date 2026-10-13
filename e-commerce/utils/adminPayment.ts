@@ -14,5 +14,5 @@ export const PAYMENT_STATE_LABELS: Record<string, string> = {
 };
 
 export function getPaymentStateLabel(state: string) {
-  return PAYMENT_STATE_LABELS[state] || "Status unconfirmed";
+  return Object.hasOwn(PAYMENT_STATE_LABELS, state) ? PAYMENT_STATE_LABELS[state] : "Status unconfirmed";
 }

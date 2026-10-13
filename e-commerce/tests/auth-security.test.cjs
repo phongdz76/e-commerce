@@ -96,6 +96,7 @@ function fixture() {
   };
   const prisma = {
     auditLog: {
+      count: async () => auditLogs.length,
       create: async ({ data }) => {
         if (state.auditError) throw new Error("private-audit-database-error");
         const log = {
@@ -120,6 +121,10 @@ function fixture() {
         ),
     },
     user: {
+      count: async ({ where = {} }) => {
+        failIfNeeded();
+        return [...users.values()].filter((row) => matches(row, where)).length;
+      },
       findMany: async ({ where = {}, select, skip = 0, take = 100 }) => {
         failIfNeeded();
         const results = [...users.values()]
@@ -262,6 +267,9 @@ function fixture() {
   const rate = loadSource("libs/authRateLimit.ts", mocks);
   mocks["@/libs/authRateLimit"] = rate;
   mocks["@/libs/adminAudit"] = loadSource("libs/adminAudit.ts", mocks);
+  mocks["@/utils/adminOrders"] = loadSource("utils/adminOrders.ts", mocks);
+  mocks["@/utils/adminPayment"] = loadSource("utils/adminPayment.ts", mocks);
+  mocks["@/libs/adminActivity"] = loadSource("libs/adminActivity.ts", mocks);
   const sessions = loadSource("libs/authSession.ts", mocks);
   mocks["@/libs/authSession"] = sessions;
   const verification = loadSource("libs/emailVerification.ts", mocks);
@@ -1301,12 +1309,18 @@ test("admin account listing paginates on the server instead of returning the ful
   const second = await (
     await f.routes.users(new Request("http://localhost/users?page=2"))
   ).json();
-  assert.equal(first.users.length, 25);
+  assert.equal(first.users.length, 10);
   assert.equal(first.hasMore, true);
-  assert.equal(second.users.length, 6);
-  assert.equal(second.hasMore, false);
+  assert.equal(second.users.length, 10);
+  assert.equal(second.hasMore, true);
+  const third = await (await f.routes.users(new Request("http://localhost/users?page=3"))).json();
+  const fourth = await (await f.routes.users(new Request("http://localhost/users?page=4"))).json();
+  assert.equal(third.users.length, 10);
+  assert.equal(fourth.users.length, 1);
+  assert.equal(fourth.hasMore, false);
+  assert.equal(fourth.total, 31);
   assert.equal(
-    new Set([...first.users, ...second.users].map((user) => user.id)).size,
+    new Set([...first.users, ...second.users, ...third.users, ...fourth.users].map((user) => user.id)).size,
     31,
   );
 });

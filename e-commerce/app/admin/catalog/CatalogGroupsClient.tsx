@@ -5,10 +5,13 @@ import type { FormEvent } from "react";
 import Link from "next/link";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { FiEdit2, FiPlus, FiSearch, FiRefreshCw, FiCheck, FiX } from "react-icons/fi";
+import { FiEdit2, FiSearch, FiRefreshCw, FiCheck, FiX } from "react-icons/fi";
 import { API_PATHS } from "@/utils/apiPaths";
 import type { SafeCatalogGroup } from "@/types";
 import AdminPagination from "@/app/admin/components/AdminPagination";
+import { getAdminErrorMessage } from "@/utils/adminError";
+import { getCatalogSlug } from "@/utils/catalogSlug";
+import AdminPageHeader from "@/app/admin/components/AdminPageHeader";
 
 interface CatalogGroupsClientProps {
   kind: "categories" | "brands";
@@ -33,8 +36,10 @@ export default function CatalogGroupsClient({
   const [selected, setSelected] = useState<SafeCatalogGroup | null>(null);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
+  const [hasCustomSlug, setHasCustomSlug] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const saving = useRef(false);
 
   const title = kind === "categories" ? "Categories" : "Brands";
@@ -81,16 +86,20 @@ export default function CatalogGroupsClient({
   };
 
   const handleReset = () => {
+    setSaveError("");
     setSelected(null);
     setName("");
     setSlug("");
+    setHasCustomSlug(false);
     setIsVisible(true);
   };
 
   const handleEdit = (group: SafeCatalogGroup) => {
+    setSaveError("");
     setSelected(group);
     setName(group.name);
     setSlug(group.slug);
+    setHasCustomSlug(true);
     setIsVisible(group.isVisible);
     document.getElementById("catalog-group-name")?.focus();
   };
@@ -101,6 +110,7 @@ export default function CatalogGroupsClient({
       return;
     }
     saving.current = true;
+    setSaveError("");
     setIsSaving(true);
     try {
       const data = { name, slug, isVisible };
@@ -117,11 +127,9 @@ export default function CatalogGroupsClient({
       handleReset();
       setRefresh((previous) => previous + 1);
     } catch (error: unknown) {
-      toast.error(
-        axios.isAxiosError(error)
-          ? error.response?.data?.error || "Failed to save record."
-          : "Failed to save record.",
-      );
+      const message = getAdminErrorMessage(error, "Unable to save. Use a name of 2–80 characters and a unique URL slug with lowercase letters, numbers and hyphens.");
+      setSaveError(message);
+      toast.error(message);
     } finally {
       saving.current = false;
       setIsSaving(false);
@@ -131,16 +139,7 @@ export default function CatalogGroupsClient({
   return (
     <div className="space-y-6">
       {/* Title & Section Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 ">
-            {title} Management
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Maintain catalog taxonomy, visibility states, and linked product SKU counts.
-          </p>
-        </div>
-
+      <AdminPageHeader title={title} description="Manage catalog groups, visibility and their linked products.">
         {/* Quick switcher between Categories and Brands */}
         <div className="flex items-center gap-2 bg-slate-200 p-1 rounded-md">
           <Link
@@ -164,13 +163,13 @@ export default function CatalogGroupsClient({
             Brands
           </Link>
         </div>
-      </div>
+      </AdminPageHeader>
 
-      <div className="grid items-start gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
         {/* Form Column */}
         <form
           onSubmit={handleSave}
-          className="space-y-4 rounded-md border border-slate-200 bg-white p-5 shadow-xs lg:sticky lg:top-20"
+          className="min-w-0 space-y-4 rounded-md border border-slate-200 bg-white p-5 shadow-xs lg:sticky lg:top-20"
         >
           <div className="border-b border-slate-100 pb-2">
             <h2 className="font-bold text-sm text-slate-800">
@@ -179,7 +178,7 @@ export default function CatalogGroupsClient({
             <p className="text-xs text-slate-400">
               {selected
                 ? `Updating slug and visibility for ${selected.name}`
-                : `Create a new ${singularTitle.toLowerCase()} entry for the storefront`}
+                : "Create a catalog group. Visibility controls eligibility for active products."}
             </p>
           </div>
 
@@ -193,7 +192,13 @@ export default function CatalogGroupsClient({
             <input
               id="catalog-group-name"
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => {
+                const value = event.target.value;
+                setName(value);
+                if (!selected && !hasCustomSlug) {
+                  setSlug(getCatalogSlug(value, 100));
+                }
+              }}
               required
               minLength={2}
               maxLength={80}
@@ -213,7 +218,10 @@ export default function CatalogGroupsClient({
             <input
               id="catalog-group-slug"
               value={slug}
-              onChange={(event) => setSlug(event.target.value)}
+              onChange={(event) => {
+                setSlug(event.target.value);
+                setHasCustomSlug(true);
+              }}
               required
               maxLength={100}
               pattern="[a-z0-9]+(-[a-z0-9]+)*"
@@ -226,7 +234,7 @@ export default function CatalogGroupsClient({
               id="catalog-group-slug-help"
               className="text-xs text-slate-400"
             >
-              Lowercase alphanumeric characters and dashes only.
+              Generated from the name. Use lowercase letters, numbers and hyphens. Custom slugs are kept.
             </p>
           </div>
 
@@ -238,17 +246,18 @@ export default function CatalogGroupsClient({
               disabled={isSaving}
               className="h-4 w-4 rounded accent-teal-600"
             />
-            <span>Visible to public storefront catalog</span>
+            <span>Visible catalog group</span>
           </label>
 
-          <div className="flex items-center gap-2.5 pt-2">
+          {saveError ? <p role="alert" className="text-sm leading-6 text-rose-700">{saveError}</p> : null}
+          <div className="flex flex-wrap items-center gap-2.5 pt-2">
             <button
               type="submit"
               disabled={isSaving}
               className="inline-flex items-center gap-1.5 rounded-md bg-slate-700 hover:bg-slate-800 px-4 py-2 text-sm font-bold text-white transition shadow-xs disabled:opacity-70"
             >
               <FiCheck className="text-sm" />
-              <span>{isSaving ? "Saving..." : selected ? "Update Record" : `Create ${singularTitle}`}</span>
+              <span>{isSaving ? "Saving..." : selected ? "Save changes" : `Create ${singularTitle.toLowerCase()}`}</span>
             </button>
 
             {selected && (
@@ -266,7 +275,7 @@ export default function CatalogGroupsClient({
         </form>
 
         {/* Table Column */}
-        <div className="space-y-4 lg:col-span-2">
+        <div className="min-w-0 space-y-4 lg:col-span-2">
           {/* Search bar */}
           <div className="rounded-md border border-slate-200 bg-white p-3.5 shadow-xs">
             <form onSubmit={handleSearch} className="flex flex-wrap items-center gap-2.5">
@@ -274,6 +283,7 @@ export default function CatalogGroupsClient({
                 <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm" />
                 <input
                   id="catalog-group-search"
+                  aria-label={"Search " + title.toLowerCase()}
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   maxLength={80}
@@ -314,17 +324,21 @@ export default function CatalogGroupsClient({
               <div className="p-14 text-center text-sm text-slate-500 font-medium">
                 Loading {title.toLowerCase()} list...
               </div>
+            ) : error ? (
+              <div className="p-6 text-center text-sm">
+                <button type="button" onClick={() => setRefresh((previous) => previous + 1)} className="font-semibold text-teal-700 underline">Try again</button>
+              </div>
             ) : groups.length === 0 ? (
               <div className="p-14 text-center text-sm text-slate-500 font-medium">
                 No {title.toLowerCase()} records found.
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-sm">
+                <table className="w-full min-w-[500px] text-left border-collapse text-sm">
                   <thead className="bg-slate-200 border-b border-slate-300 text-xs font-bold text-slate-700 uppercase ">
                     <tr>
                       <th className="py-3 px-4">Name & Slug</th>
-                      <th className="py-3 px-4 text-center">SKUs Linked</th>
+                      <th className="py-3 px-4 text-center">Linked products</th>
                       <th className="py-3 px-4">Visibility</th>
                       <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
@@ -358,7 +372,7 @@ export default function CatalogGroupsClient({
                                 group.isVisible ? "bg-emerald-600" : "bg-slate-400"
                               }`}
                             />
-                            {group.isVisible ? "Public" : "Hidden"}
+                            {group.isVisible ? "Visible" : "Hidden"}
                           </span>
                         </td>
 

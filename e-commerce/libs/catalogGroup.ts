@@ -105,7 +105,7 @@ export async function listCatalogGroups(
     });
   } catch {
     return NextResponse.json(
-      { error: "Không tải được danh sách." },
+      { error: "Unable to load the list. Please try again." },
       { status: 503 },
     );
   }
@@ -139,7 +139,7 @@ export async function saveCatalogGroup(
       return NextResponse.json(
         {
           error:
-            "Tên từ 2–80 ký tự; slug dùng chữ thường, số và dấu gạch ngang.",
+            "Use a name of 2–80 characters and a URL slug with lowercase letters, numbers and hyphens.",
         },
         { status: 400 },
       );
@@ -151,7 +151,7 @@ export async function saveCatalogGroup(
         !Number.isFinite(Date.parse(body.updatedAt))
       ) {
         return NextResponse.json(
-          { error: "Tải lại bản ghi trước khi sửa." },
+          { error: "Reload the record before editing." },
           { status: 400 },
         );
       }
@@ -161,13 +161,13 @@ export async function saveCatalogGroup(
           : await prisma.brand.findUnique({ where: { id: groupId } });
       if (!row) {
         return NextResponse.json(
-          { error: "Không tìm thấy bản ghi." },
+          { error: "Record not found." },
           { status: 404 },
         );
       }
       if (row.updatedAt.toISOString() !== body.updatedAt) {
         return NextResponse.json(
-          { error: "Bản ghi đã được sửa. Tải lại trước khi lưu." },
+          { error: "This record has changed. Reload before saving." },
           { status: 409 },
         );
       }
@@ -198,7 +198,7 @@ export async function saveCatalogGroup(
       if (result.count !== 1) {
         await finishAdminAudit(audit.id, "FAILED");
         return NextResponse.json(
-          { error: "Bản ghi đã thay đổi. Tải lại trước khi lưu." },
+          { error: "This record has changed. Reload before saving." },
           { status: 409 },
         );
       }
@@ -211,7 +211,7 @@ export async function saveCatalogGroup(
         : await prisma.brand.findUnique({ where: { slug: data.slug } });
     if (existing) {
       return NextResponse.json(
-        { error: "Slug đã tồn tại. Chọn slug khác." },
+        { error: "This URL slug is already in use. Choose another.", code: "DUPLICATE_CATALOG_KEY" },
         { status: 409 },
       );
     }
@@ -228,7 +228,11 @@ export async function saveCatalogGroup(
         ? await prisma.category.create({ data })
         : await prisma.brand.create({ data });
     await finishAdminAudit(audit.id, "SUCCEEDED", { id: row.id, after: data });
-    return NextResponse.json({ success: true, id: row.id }, { status: 201 });
+    return NextResponse.json({
+      success: true, id: row.id, name: row.name, slug: row.slug,
+      isVisible: row.isVisible, productCount: 0,
+      createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
+    }, { status: 201 });
   } catch (error) {
     const duplicate =
       error &&
@@ -241,8 +245,9 @@ export async function saveCatalogGroup(
     return NextResponse.json(
       {
         error: duplicate
-          ? "Slug đã tồn tại. Chọn slug khác."
-          : "Không lưu được bản ghi. Tải lại danh sách trước khi thử tiếp.",
+          ? "This URL slug is already in use. Choose another."
+          : "Unable to save the record. Reload the list before trying again.",
+        ...(duplicate ? { code: "DUPLICATE_CATALOG_KEY" } : {}),
       },
       { status: duplicate ? 409 : 503 },
     );

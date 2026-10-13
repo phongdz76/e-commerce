@@ -16,8 +16,12 @@ export default function AdminDialog({
   const titleId = useId();
   useEffect(() => {
     const element = dialog.current;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
     element?.showModal();
-    return () => element?.close();
+    return () => {
+      element?.close();
+      previouslyFocused?.focus({ preventScroll: true });
+    };
   }, []);
   return (
     <dialog
@@ -29,7 +33,7 @@ export default function AdminDialog({
           onClose();
         }
       }}
-      className="m-auto max-h-[85dvh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 text-slate-700 shadow-xl backdrop:bg-slate-900/50"
+      className="m-auto max-h-[85dvh] w-[calc(100%_-_2rem)] max-w-xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 text-slate-700 shadow-xl backdrop:bg-slate-900/50"
     >
       <div className="mb-5 flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
         <h2 id={titleId} className="text-lg font-semibold">{title}</h2>

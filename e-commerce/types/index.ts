@@ -1,8 +1,8 @@
 import { User, PaymentAttempt, PaymentException } from "@prisma/client";
 
-export type SafePaymentException = Omit<
+export type SafePaymentException = Pick<
   PaymentException,
-  "createdAt" | "reviewedAt"
+  "id" | "orderId" | "reason" | "amount" | "currency" | "providerTransactionId" | "status" | "note"
 > & {
   createdAt: string;
   reviewedAt: string | null;
@@ -81,11 +81,26 @@ export interface AdminOrderSummary {
   createDate: string;
   customer: { name: string | null; email: string | null };
   recipientName: string | null;
+  recipientPhone: string | null;
+  deliveryAddress: string | null;
+  shippingCarrier: string | null;
+  trackingNumber: string | null;
+  shippingUpdatedAt: string | null;
   itemCount: number;
 }
 
+export interface AdminSalesProduct {
+  id: string;
+  name: string;
+  category: string;
+  brand: string;
+  image: string | null;
+  unitsSold: number;
+  revenue: number;
+  orderCount: number;
+}
+
 export interface AdminOrderDetail extends AdminOrderSummary {
-  recipientPhone: string | null;
   address: {
     line1: string;
     line2: string | null;
@@ -113,6 +128,33 @@ export interface AdminOrderList {
   total: number;
   totalPages: number;
   hasMore: boolean;
+}
+
+export interface AdminShipmentEvent {
+  id: string;
+  createdAt: string;
+  actor: string;
+  deliveryStatus: string | null;
+  carrier: string;
+  trackingNumber: string;
+  note: string;
+  result: string;
+}
+
+export interface AdminShipmentDetail {
+  order: AdminOrderDetail;
+  carrier: string;
+  trackingNumber: string;
+  note: string;
+  version: number;
+  updatedAt: string | null;
+  allowedStatuses: string[];
+  canEdit: boolean;
+  lockReason: string | null;
+  history: AdminShipmentEvent[];
+  historyPage: number;
+  historyTotal: number;
+  historyTotalPages: number;
 }
 
 export interface AdminCatalogVariant {
@@ -171,5 +213,7 @@ export type SafePaymentAttempt = Pick<
   createDate: string;
   lastCheckedAt: string | null;
   canCheck: boolean;
+  isCurrent: boolean;
+  isAppliedToOrder: boolean;
   order: { id: string; status: string; deliveryStatus: string | null; customerName: string } | null;
 };

@@ -183,8 +183,17 @@ model Order {
   address                Address?
   recipientName          String?
   recipientPhone         String?
+  shippingInfo           ShippingInfo?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+type ShippingInfo {
+  carrier        String
+  trackingNumber String
+  note           String
+  version        Int
+  updatedAt      DateTime
 }
 
 type CartProductProps {

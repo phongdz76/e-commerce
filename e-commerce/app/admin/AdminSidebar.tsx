@@ -10,7 +10,7 @@ export default function AdminSidebar({ currentUser }: {
   const pathname = usePathname() || "/admin";
   const initials = (currentUser.name || "Administrator").trim().split(/\s+/).slice(-2).map((word) => word[0]).join("").toUpperCase();
   return (
-    <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-slate-600 bg-slate-700 text-slate-200 lg:flex">
+    <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-slate-700 bg-slate-800 text-slate-200 lg:flex">
       <Link href="/admin" className="flex h-16 shrink-0 items-center gap-2 border-b border-slate-600 bg-slate-800/40 px-6">
         <span className="text-2xl font-bold text-white">SG <span className="text-teal-400">Tech</span></span>
         <span className="rounded border border-teal-400/40 bg-teal-400/10 px-1.5 py-0.5 text-xs font-semibold text-teal-300">Admin</span>
@@ -28,7 +28,7 @@ export default function AdminSidebar({ currentUser }: {
                     key={item.href}
                     href={item.href}
                     aria-current={active ? "page" : undefined}
-                    className={"flex min-h-11 items-center gap-3 rounded-md border-l-4 px-3 py-2 text-sm font-medium transition " + (active ? "border-teal-400 bg-slate-800 text-teal-300" : "border-transparent text-slate-200 hover:bg-slate-600 hover:text-white")}
+                    className={"flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm transition " + (active ? "bg-[#334155] font-semibold text-[#2dd4bf]" : "font-medium text-slate-200 hover:bg-slate-700 hover:text-white")}
                   >
                     <Icon size={17} /><span>{item.label}</span>
                   </Link>

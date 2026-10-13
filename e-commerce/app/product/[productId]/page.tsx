@@ -1,7 +1,7 @@
 import Container from "@/app/components/Container";
 import ProductDetails from "./ProductDetails";
 import ListRating from "./ListRating";
-import { products } from "@/utils/products";
+import { getStorefrontProducts } from "@/libs/storefrontProductNames";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import ProductCard from "@/app/components/products/ProductCard";
@@ -13,6 +13,7 @@ interface IPrams {
 
 export default async function ProductPage({ params }: { params: Promise<IPrams> }) {
   const { productId } = await params;
+  const products = await getStorefrontProducts();
     
   const product = products.find(
     (item) => item.id.toString() === productId

@@ -1,69 +1,49 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import axios from "axios";
 import Link from "next/link";
+import axios from "axios";
 import toast from "react-hot-toast";
-import { FiRefreshCw, FiExternalLink, FiAlertCircle } from "react-icons/fi";
 import { API_PATHS } from "@/utils/apiPaths";
-import { formatPrice } from "@/utils/formatPrice";
+import { getAdminErrorMessage } from "@/utils/adminError";
+import { PAYMENT_STATE_LABELS, getPaymentStateLabel } from "@/utils/adminPayment";
+import { ADMIN_ORDER_METHODS, formatAdminOrderAmount, formatAdminOrderDate, getAdminOrderReference } from "@/utils/adminOrders";
 import type { SafePaymentAttempt } from "@/types";
 import AdminPagination from "@/app/admin/components/AdminPagination";
+import AdminPageHeader from "@/app/admin/components/AdminPageHeader";
+import AdminRefreshButton from "@/app/admin/components/AdminRefreshButton";
+import AdminFeedback from "@/app/admin/components/AdminFeedback";
+import OrderStatusBadge from "@/app/admin/orders/OrderStatusBadge";
+import AdminDialog from "@/app/admin/components/AdminDialog";
+import PaymentHistory from "@/app/admin/payments/PaymentHistory";
 
-const STATE_LABELS: Record<string, string> = {
-  RESERVED: "Reserved for Retry",
-  ABANDONED: "Attempt Abandoned",
-  REVIEW: "Needs Manual Review",
-  UNKNOWN: "Unknown Gateway Outcome",
-  PROCESSING: "Processing with Gateway",
-  CREATING: "Initiating Transaction",
-  CREATED: "Newly Created",
-  READY: "Awaiting Customer Action",
-  FAILED: "Payment Failed",
-  SUCCEEDED: "Settled & Verified",
-};
-
-function formatDate(value: string | null) {
-  return value ? new Date(value).toLocaleString("en-US") : "—";
-}
-
-export default function PaymentQueueClient() {
+export default function PaymentQueueClient({ initialState = "NEEDS_REVIEW" }: { initialState?: string }) {
   const [attempts, setAttempts] = useState<SafePaymentAttempt[]>([]);
-  const [configuration, setConfiguration] = useState<{
-    availableMethods: Record<string, boolean>;
-    reconciliationConfigured: boolean;
-    stripeWebhookConfigured: boolean;
-  } | null>(null);
-  const [state, setState] = useState("REVIEW");
+  const [state, setState] = useState(initialState);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [refresh, setRefresh] = useState(0);
-  const [checkingOrder, setCheckingOrder] = useState<string | null>(null);
+  const [checkingAttempt, setCheckingAttempt] = useState<string | null>(null);
+  const [selected, setSelected] = useState<SafePaymentAttempt | null>(null);
   const checking = useRef(false);
-
   useEffect(() => {
     let active = true;
     const loadPayments = async () => {
       setIsLoading(true);
       setError("");
       try {
-        const response = await axios.get(API_PATHS.ADMIN.PAYMENTS, {
-          params: { state, page },
-        });
+        const response = await axios.get(API_PATHS.ADMIN.PAYMENTS, { params: { state, page } });
         if (active) {
           setAttempts(response.data.attempts);
-          setConfiguration(response.data.configuration);
-          setTotal(response.data.total ?? 0);
-          setTotalPages(response.data.totalPages ?? 1);
-          setHasMore(response.data.hasMore);
+          setTotal(response.data.total);
+          setTotalPages(response.data.totalPages);
         }
       } catch {
         if (active) {
-          setError("Failed to load payment transactions queue. Please try again.");
+          setError("Unable to load payments. Please try again.");
         }
       } finally {
         if (active) {
@@ -72,237 +52,103 @@ export default function PaymentQueueClient() {
       }
     };
     void loadPayments();
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [state, page, refresh]);
-
-  const handleRefresh = () => {
-    setRefresh((previous) => previous + 1);
-  };
-
-  const handleStateChange = (value: string) => {
-    setState(value);
-    setPage(1);
-  };
-
+  const handleRefresh = () => setRefresh((previous) => previous + 1);
   const handleReconcile = async (orderId: string, attemptId: string) => {
     if (checking.current) {
       return;
     }
     checking.current = true;
-    setCheckingOrder(orderId);
+    setCheckingAttempt(attemptId);
     try {
-      const response = await axios.post(
-        API_PATHS.ADMIN.RECONCILE_PAYMENT(orderId),
-        { attemptId },
-      );
+      const response = await axios.post(API_PATHS.ADMIN.RECONCILE_PAYMENT(orderId), { attemptId });
       if (response.data.skipped) {
-        toast("Transaction is already being verified by another background process.");
-      } else if (["REVIEW", "UNKNOWN"].includes(response.data.state)) {
-        toast.error(
-          "Gateway verification unresolved. Please check provider merchant portal.",
-        );
+        toast("A payment check is already in progress. Refresh shortly.");
+      } else if (["UNKNOWN", "REVIEW"].includes(response.data.state)) {
+        toast("Payment status is still unconfirmed. Check again later.");
       } else {
-        toast.success(
-          `Status updated: ${STATE_LABELS[response.data.state] || response.data.state}`,
-        );
+        toast("Payment status: " + getPaymentStateLabel(response.data.state));
       }
       handleRefresh();
     } catch (error: unknown) {
-      const message = axios.isAxiosError(error)
-        ? error.response?.data?.error
-        : undefined;
-      toast.error(
-        typeof message === "string"
-          ? message
-          : "Failed to query gateway status.",
-      );
+      toast.error(getAdminErrorMessage(error, "Unable to check this payment. Please try again."));
     } finally {
       checking.current = false;
-      setCheckingOrder(null);
+      setCheckingAttempt(null);
     }
   };
-
   return (
     <div className="space-y-6">
-      {/* Title & Summary */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 ">
-            Payment Reconciliation Queue
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Monitor in-flight gateway transactions, review stuck states, and manually query gateway callbacks.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          disabled={isLoading}
-          onClick={handleRefresh}
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-md border border-slate-300 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-100 transition shadow-xs disabled:opacity-70"
-        >
-          <FiRefreshCw className={`text-sm ${isLoading ? "animate-spin" : ""}`} />
-          <span>{isLoading ? "Refreshing..." : "Refresh Queue"}</span>
-        </button>
-      </div>
-
-      {/* Gateway API Configuration Status */}
-      {configuration && (
-        <div className="flex flex-wrap gap-2 text-sm">
-          {Object.entries(configuration.availableMethods).map(
-            ([method, configured]) => (
-              <span
-                key={method}
-                className={`rounded-md border px-3 py-1.5 font-medium ${
-                  configured
-                    ? "border-teal-200 bg-teal-50 text-teal-800"
-                    : "border-amber-200 bg-amber-50 text-amber-800"
-                }`}
-              >
-                {method === "ZALOPAY" ? "ZaloPay" : method}:{" "}
-                {configured ? "Configured" : "Missing Keys"}
-              </span>
-            ),
-          )}
-          <span className="rounded-md border border-slate-200 bg-white text-slate-700 px-3 py-1.5 font-medium shadow-xs">
-            Worker Polling:{" "}
-            {configuration.reconciliationConfigured
-              ? "Secret Key Active"
-              : "No Secret Set"}
-          </span>
-        </div>
-      )}
-
-      {/* Filter and State Selector */}
-      <div className="rounded-md border border-slate-200 bg-white p-4 shadow-xs flex flex-wrap items-center gap-3">
-        <label htmlFor="payment-state" className="text-sm font-semibold text-slate-700">
-          Filter by Attempt State:
-        </label>
+      <AdminPageHeader title="Payments" description="Review online payment records and check payments that need confirmation. Cash on delivery orders are listed under Orders.">
+        <AdminRefreshButton isLoading={isLoading} onRefresh={handleRefresh} />
+      </AdminPageHeader>
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-4">
+        <label htmlFor="payment-state" className="text-sm font-medium">Payment status</label>
         <select
           id="payment-state"
           value={state}
-          onChange={(event) => handleStateChange(event.target.value)}
-          className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-teal-500"
+          onChange={(event) => { setState(event.target.value); setPage(1); setSelected(null); }}
+          className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
         >
-          {Object.entries(STATE_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label} ({value})
-            </option>
-          ))}
+          {Object.entries(PAYMENT_STATE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
+        <Link href="/admin/orders" className="text-sm font-semibold text-teal-700 hover:underline">View orders</Link>
+        <Link href="/admin/refunds" className="text-sm font-semibold text-teal-700 hover:underline">View refund follow-up</Link>
       </div>
-
-      {/* Table Card */}
-      <div className="rounded-md border border-slate-200 bg-white shadow-xs overflow-hidden">
-        {isLoading ? (
-          <div className="p-14 text-center text-sm text-slate-500 font-medium">
-            Loading payment attempts queue...
-          </div>
-        ) : error ? (
-          <div className="p-10 text-center text-sm text-rose-700 font-medium">
-            {error}
-          </div>
-        ) : attempts.length === 0 ? (
-          <div className="p-14 text-center text-sm text-slate-500 font-medium">
-            No transactions found in state: <strong className="text-slate-700">{state}</strong>
-          </div>
-        ) : (
+      <p className="text-xs text-slate-500">A payment record is one payment attempt. Order status is shown separately. Times are in Vietnam (UTC+7).</p>
+      {isLoading ? <AdminFeedback title="Loading payments..." /> : error ? (
+        <AdminFeedback title={error} isError onRetry={handleRefresh} />
+      ) : !attempts.length ? (
+        <AdminFeedback title="No payments found" description="Try another payment status. Pending COD orders do not appear in this list." />
+      ) : (
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xs">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm">
-              <thead className="bg-slate-200 border-b border-slate-300 text-xs font-bold text-slate-700 uppercase ">
+            <table className="w-full min-w-[850px] text-left text-sm">
+              <thead className="bg-slate-100 text-xs text-slate-600">
                 <tr>
-                  <th className="py-3 px-4">Order & Attempt ID</th>
-                  <th className="py-3 px-4">Payment & Gateway Details</th>
-                  <th className="py-3 px-4">Audit & Check Intervals</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                  <th scope="col" className="px-5 py-3">Order / Customer</th>
+                  <th scope="col" className="px-5 py-3">Method / Amount</th>
+                  <th scope="col" className="px-5 py-3">Payment status</th>
+                  <th scope="col" className="px-5 py-3">Order status</th>
+                  <th scope="col" className="px-5 py-3">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {attempts.map((attempt) => (
-                  <tr key={attempt.id} className="hover:bg-slate-50 transition align-top">
-                    <td className="py-3.5 px-4">
-                      <Link
-                        href={`/orders/${attempt.orderId}`}
-                        target="_blank"
-                        className="font-bold text-teal-700 hover:underline inline-flex items-center gap-1"
-                      >
-                        <span>#{attempt.orderId.slice(-8).toUpperCase()}</span>
-                        <FiExternalLink className="text-xs" />
-                      </Link>
-                      <p className="mt-1 text-xs text-slate-400 break-all max-w-xs">
-                        {attempt.id}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {formatDate(attempt.createDate)}
-                      </p>
+                  <tr key={attempt.id} className="align-top hover:bg-slate-50">
+                    <td className="px-5 py-4">
+                      <Link href={"/admin/orders/" + attempt.orderId} className="font-semibold text-teal-700 hover:underline">{getAdminOrderReference(attempt.orderId)}</Link>
+                      <p className="mt-1 max-w-56 break-words text-xs text-slate-500">{attempt.order?.customerName || "Order unavailable"}</p>
+                      <p className="mt-1 text-xs text-slate-500">{formatAdminOrderDate(attempt.createDate)}</p>
                     </td>
-
-                    <td className="py-3.5 px-4">
-                      <div className="font-bold text-slate-900">
-                        <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 text-sm border border-slate-200 mr-2">
-                          {attempt.paymentMethod}
-                        </span>
-                        <span>{formatPrice(attempt.amount)}</span>
-                      </div>
-                      <p className="mt-1.5 font-semibold text-slate-700">
-                        {STATE_LABELS[attempt.state] || attempt.state}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500 ">
-                        Gateway Txn: {attempt.providerTransactionId || "—"}
-                      </p>
-                      <p className="text-xs text-slate-500 ">
-                        Result Code: {attempt.resultCode || "—"}
-                      </p>
+                    <td className="px-5 py-4">
+                      <p>{ADMIN_ORDER_METHODS[attempt.paymentMethod] || "Method unavailable"}</p>
+                      <p className="mt-1 whitespace-nowrap font-semibold">{formatAdminOrderAmount(attempt.amount, attempt.currency)}</p>
                     </td>
-
-                    <td className="py-3.5 px-4 text-slate-600 max-w-xs">
-                      <p className="font-medium text-slate-800">
-                        Verified {attempt.checkCount} times
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        Last Checked: {formatDate(attempt.lastCheckedAt)}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        Next Scheduled: {formatDate(attempt.nextCheckAt)}
-                      </p>
-                      {attempt.lastError && (
-                        <p className="mt-1.5 text-xs text-amber-700 font-medium flex items-center gap-1 bg-amber-50 p-1.5 rounded border border-amber-200">
-                          <FiAlertCircle className="shrink-0" />
-                          <span>{attempt.lastError}</span>
-                        </p>
-                      )}
-                      {!attempt.order && (
-                        <p className="mt-1.5 text-xs text-rose-700 font-semibold">
-                          Associated order record not found.
-                        </p>
-                      )}
+                    <td className="px-5 py-4">
+                      <p className="font-medium">{getPaymentStateLabel(attempt.state)}</p>
+                      {attempt.lastCheckedAt ? <p className="mt-1 text-xs text-slate-500">Checked: {formatAdminOrderDate(attempt.lastCheckedAt)}</p> : null}
+                      {attempt.providerTransactionId ? <p className="mt-2 max-w-56 break-all text-xs text-slate-500">Provider reference: {attempt.providerTransactionId}</p> : null}
                     </td>
-
-                    <td className="py-3.5 px-4 text-right">
+                    <td className="px-5 py-4">
+                      {attempt.order ? <OrderStatusBadge status={attempt.order.status} /> : <span className="text-xs text-slate-500">Unavailable</span>}
+                    </td>
+                    <td className="px-5 py-4">
                       <button
                         type="button"
-                        disabled={
-                          Boolean(checkingOrder) ||
-                          !attempt.order ||
-                          ["RESERVED", "ABANDONED"].includes(attempt.state)
-                        }
-                        onClick={() => {
-                          void handleReconcile(attempt.orderId, attempt.id);
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-slate-300 bg-white text-slate-700 hover:border-teal-500 hover:text-teal-700 text-sm font-semibold transition shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={() => setSelected(attempt)}
+                        className="mb-2 block min-h-11 whitespace-nowrap text-sm font-semibold text-teal-700 hover:underline"
                       >
-                        <FiRefreshCw
-                          className={`text-sm ${
-                            checkingOrder === attempt.orderId ? "animate-spin" : ""
-                          }`}
-                        />
-                        <span>
-                          {checkingOrder === attempt.orderId
-                            ? "Querying..."
-                            : "Query Gateway"}
-                        </span>
+                        View details
+                      </button>
+                      <button
+                        type="button"
+                        disabled={Boolean(checkingAttempt) || !attempt.canCheck}
+                        onClick={() => { void handleReconcile(attempt.orderId, attempt.id); }}
+                        className="min-h-10 whitespace-nowrap rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold hover:border-teal-500 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {checkingAttempt === attempt.id ? "Checking..." : "Check payment"}
                       </button>
                     </td>
                   </tr>
@@ -310,20 +156,28 @@ export default function PaymentQueueClient() {
               </tbody>
             </table>
           </div>
-        )}
-
-        <div className="px-5 pb-4">
-          <AdminPagination
-            currentPage={page}
-            totalPages={totalPages}
-            totalItems={total}
-            pageSize={10}
-            hasMore={hasMore}
-            isLoading={isLoading}
-            onPageChange={(newPage) => setPage(newPage)}
-          />
         </div>
-      </div>
+      )}
+      {!error && !isLoading ? <AdminPagination currentPage={page} totalPages={totalPages} totalItems={total} pageSize={10} onPageChange={setPage} /> : null}
+      {selected ? (
+        <AdminDialog title={"Payment details · " + getAdminOrderReference(selected.orderId)} onClose={() => setSelected(null)}>
+          <div className="space-y-5">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm font-semibold">{selected.order?.customerName || "Customer unavailable"}</p>
+              <p className="mt-2 text-xl font-bold">{formatAdminOrderAmount(selected.amount, selected.currency)}</p>
+              <p className="mt-1 text-sm text-slate-500">{ADMIN_ORDER_METHODS[selected.paymentMethod] || "Method unavailable"}</p>
+              <p className="mt-3 text-sm font-medium">Payment: {getPaymentStateLabel(selected.state)}</p>
+              {selected.order ? <div className="mt-2 flex flex-wrap items-center gap-2 text-xs"><span>Order status:</span><OrderStatusBadge status={selected.order.status} /></div> : null}
+              {selected.providerTransactionId ? <p className="mt-3 break-all text-xs text-slate-500">Provider reference: {selected.providerTransactionId}</p> : null}
+            </div>
+            <Link href={"/admin/orders/" + selected.orderId} className="inline-flex min-h-11 items-center text-sm font-semibold text-teal-700 hover:underline">View order</Link>
+            <section className="border-t border-slate-200 pt-4">
+              <h3 className="mb-3 text-sm font-semibold">Payment history for this order</h3>
+              <PaymentHistory key={selected.orderId} orderId={selected.orderId} highlightAttemptId={selected.id} refreshKey={refresh} />
+            </section>
+          </div>
+        </AdminDialog>
+      ) : null}
     </div>
   );
 }

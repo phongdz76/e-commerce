@@ -26,6 +26,8 @@ export const API_PATHS = {
     RETRY_PAYMENT: (id: string) => `/api/order/${id}/retry-payment`,
   },
   ADMIN: {
+    SALES: "/api/admin/sales",
+    SHIPMENT: (id: string) => `/api/admin/shipments/${id}`,
     ORDERS: "/api/admin/orders",
     ORDER: (id: string) => `/api/admin/orders/${id}`,
     PRODUCTS: "/api/admin/products",

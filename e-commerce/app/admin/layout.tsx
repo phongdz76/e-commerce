@@ -23,7 +23,7 @@ export default async function AdminLayout({
       <AdminSidebar currentUser={currentUser} />
 
       {/* Right Column: Full-width Header and Page Content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
+      <div className="flex-1 flex flex-col min-w-0">
         <AdminHeader currentUser={currentUser} />
         <main className="flex-1 p-5 sm:p-7 lg:p-8 max-w-7xl w-full mx-auto">
           {children}

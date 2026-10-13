@@ -46,6 +46,10 @@ function fixture(kind) {
     });
   }
   const delegate = {
+    count: async ({ where }) => {
+      if (state.offline) throw new Error("private database password");
+      return [...records.values()].filter((row) => matches(row, where)).length;
+    },
     findUnique: async ({ where }) => {
       if (state.offline) throw new Error("private database password");
       return structuredClone(
@@ -130,6 +134,7 @@ function fixture(kind) {
       throw Object.assign(new Error("private SKU conflict"), { code: "P2002" });
   };
   prisma.product = {
+    count: async ({ where }) => [...catalogProducts.values()].filter((row) => matches(row, where)).length,
     findUnique: async ({ where }) => {
       const row = catalogProducts.get(where.id);
       return row ? relationData(row) : null;
@@ -381,10 +386,14 @@ for (const kind of ["categories", "brands"]) {
       const second = await (
         await f.routes.GET(new Request("http://localhost/?page=2"))
       ).json();
-      assert.equal(first.groups.length, 25);
+      assert.equal(first.groups.length, 10);
       assert.equal(first.hasMore, true);
-      assert.equal(second.groups.length, 2);
-      assert.equal(second.hasMore, false);
+      assert.equal(second.groups.length, 10);
+      assert.equal(second.hasMore, true);
+      const third = await (await f.routes.GET(new Request("http://localhost/?page=3"))).json();
+      assert.equal(third.groups.length, 7);
+      assert.equal(third.hasMore, false);
+      assert.equal(third.total, 27);
       assert.equal(
         (await f.routes.GET(new Request("http://localhost/?page=0"))).status,
         400,
