@@ -1,16 +1,17 @@
-import { createHash, randomUUID } from "crypto";
+import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/actions/getCurrentUser";
 import prisma from "@/libs/prismadb";
 import { getOrderItems } from "@/libs/orderItems";
 import { getOrderDelivery } from "@/libs/orderDelivery";
 import { syncZaloPayOrder } from "@/libs/syncZaloPayOrder";
+import { prepareCheckoutRequest, CheckoutRequestError } from "@/libs/checkoutRequest";
+import { releaseVerifiedFailedStock } from "@/libs/orderStock";
 import {
   callZaloPay,
   getZaloPayConfig,
   getZaloPayUrls,
   safeZaloPayPaymentUrl,
-  zaloPayDate,
   zaloPayMac,
   ZaloPayConfigurationError,
   ZALOPAY_EXPIRY_SECONDS,
@@ -29,7 +30,8 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
-  const cart = getOrderItems(body?.items);
+  try {
+  const cart = await getOrderItems(body?.items);
   const delivery = getOrderDelivery(body);
   if (
     !cart ||
@@ -43,7 +45,6 @@ export async function POST(request: Request) {
     );
   }
 
-  try {
     const { appId, key1 } = getZaloPayConfig();
     const { appUrl, callbackUrl } = getZaloPayUrls();
     const requestId =
@@ -52,14 +53,9 @@ export async function POST(request: Request) {
         ? body.checkout_request_id
         : randomUUID();
     const appTime = Date.now();
-    const suffix = createHash("sha256")
-      .update(JSON.stringify([user.id, requestId, cart.items, delivery]))
-      .digest("hex")
-      .slice(0, 24);
-    const appTransId = `${zaloPayDate(new Date(appTime))}_${suffix}`;
-    const existing = await prisma.order.findUnique({
-      where: { paymentIntentId: appTransId },
-    });
+    const prepared = await prepareCheckoutRequest(requestId, user.id, "ZALOPAY", cart, delivery, String(appId));
+    const appTransId = prepared.order.paymentIntentId!;
+    const existing = prepared.order.paymentUrl || prepared.order.status !== "pending" ? prepared.order : null;
     const resume = async (savedOrder: NonNullable<typeof existing>) => {
       let order = savedOrder;
       if (order.userId !== user.id || order.paymentMethod !== "ZALOPAY") {
@@ -125,38 +121,9 @@ export async function POST(request: Request) {
       return resume(existing);
     }
 
-    let order;
-    try {
-      order = await prisma.order.create({
-        data: {
-          userId: user.id,
-          amount: cart.amount,
-          currency: "vnd",
-          status: "pending",
-          deliveryStatus: "pending",
-          paymentMethod: "ZALOPAY",
-          paymentIntentId: appTransId,
-          paymentExpiresAt: new Date(appTime + ZALOPAY_EXPIRY_SECONDS * 1000),
-          products: cart.items,
-          ...delivery,
-        },
-      });
-    } catch (error) {
-      if (
-        typeof error === "object" &&
-        error &&
-        "code" in error &&
-        error.code === "P2002"
-      ) {
-        const concurrent = await prisma.order.findUnique({
-          where: { paymentIntentId: appTransId },
-        });
-        if (concurrent) {
-          return resume(concurrent);
-        }
-      }
-      throw error;
-    }
+    const order = prepared.order;
+    const creating = await prisma.paymentAttempt.updateMany({ where: { id: prepared.attempt.id, state: "CREATED" }, data: { state: "CREATING" } });
+    if (!creating.count) return resume(order);
 
     const embedData = JSON.stringify({
       redirecturl: `${appUrl}/checkout?zalopay=return&order=${order.id}`,
@@ -207,6 +174,7 @@ export async function POST(request: Request) {
           where: { id: order.id, status: "pending" },
           data: { status: "failed" },
         });
+        await releaseVerifiedFailedStock(order.id, appTransId);
       }
       return NextResponse.json(
         {
@@ -225,12 +193,14 @@ export async function POST(request: Request) {
       where: { id: order.id },
       data: { paymentUrl },
     });
+    await prisma.paymentAttempt.updateMany({ where: { id: prepared.attempt.id, state: "CREATING" }, data: { state: "READY", paymentUrl, nextCheckAt: new Date(Date.now() + 60000) } });
     return NextResponse.json({
       url: paymentUrl,
       orderId: order.id,
       amount: cart.amount,
     });
   } catch (error) {
+    if (error instanceof CheckoutRequestError) return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
     if (error instanceof ZaloPayConfigurationError) {
       return NextResponse.json(
         { error: error.message, code: "ZALOPAY_NOT_CONFIGURED" },

@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import type { Order } from "@prisma/client";
 import prisma from "@/libs/prismadb";
+import { reviewPaidReleasedStock } from "@/libs/orderStock";
 import {
   getActivePaymentReference,
   getActivePaymentWhere,
@@ -158,5 +159,6 @@ export async function updatePaymentStatus(
       });
     }
   }
+  if (confirmedPaid && updated.stockReservation?.state === "RELEASED") await reviewPaidReleasedStock(updated.id);
   return updated;
 }

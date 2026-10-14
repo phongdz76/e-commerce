@@ -58,6 +58,10 @@ export async function GET(request: Request) {
           const row = (log.entityType === "CATEGORY" ? categories : brands).find((row) => row.id === id);
           const recordedName = typeof after.name === "string" ? after.name : typeof before.name === "string" ? before.name : null;
           target = { label: recordedName || row?.name || "Details unavailable", href: log.entityType === "CATEGORY" ? "/admin/categories" : "/admin/brands" };
+        } else if (log.entityType === "PRODUCT_VARIANT") {
+          const sku = typeof details.sku === "string" ? details.sku : "SKU unavailable";
+          const name = typeof details.productName === "string" ? details.productName : "Product unavailable";
+          target = { label: name + " · " + sku, href: id ? "/admin/inventory/" + id : null };
         } else {
           const orderId = log.entityType === "ORDER" ? id : isId(details.orderId) ? details.orderId : null;
           if (orderId) {

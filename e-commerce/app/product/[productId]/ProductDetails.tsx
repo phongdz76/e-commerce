@@ -18,6 +18,8 @@ interface ProductDetailsProps {
 
 export interface CartProductProps {
   id: string;
+  variantId?: string;
+  sku?: string;
   name: string;
   description: string;
   category: string;
@@ -45,28 +47,37 @@ const Horizontal = () => (
 
 export default function ProductDetails({ product }: ProductDetailsProps) {
   const { handleAddProductToCart, cartProducts } = useCart().context;
-  const isProductInCart = Boolean(cartProducts?.some((item) => item.id === product.id));
+  const firstVariant = product.variants?.find((variant) => variant.available > 0) || product.variants?.[0];
   const [cartProduct, setCartProduct] = useState<CartProductProps>({
     id: product.id,
+    variantId: firstVariant?.id,
+    sku: firstVariant?.sku,
     name: product.name,
     description: product.description,
     category: product.category ?? "",
     brand: product.brand ?? "",
     selectedImg: {
-      ...(product.images[0] ?? { color: "", colorCode: "", image: "" }),
+      ...(firstVariant?.image ?? product.images[0] ?? { color: "", colorCode: "", image: "" }),
     },
     quantity: 1,
-    price: product.price ?? 0,
+    price: firstVariant?.price ?? product.price ?? 0,
   });
+  const selectedVariant = product.variants?.find((variant) => variant.id === cartProduct.variantId);
+  const isProductInCart = Boolean(cartProducts?.some((item) => item.variantId ? item.variantId === cartProduct.variantId : item.id === product.id && item.selectedImg.color === cartProduct.selectedImg.color));
+  const available = selectedVariant?.available ?? (product.inStock ? 20 : 0);
 
   const handColorSelect = useCallback(
     (value: SelectedImgProps) => {
+      const choices = product.variants?.filter((variant) => variant.image.color === value.color && variant.image.image === value.image);
+      if (choices && choices.length !== 1) return;
+      const variant = choices?.[0];
       setCartProduct((prev) => ({
         ...prev,
         selectedImg: value,
+        ...(variant ? { variantId: variant.id, sku: variant.sku, price: variant.price, quantity: 1 } : {}),
       }));
     },
-    []
+    [product.variants]
   );
 
   const handleQtyDecreaser = useCallback(() => {
@@ -80,14 +91,14 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
   }, [cartProduct.quantity]);
 
   const handleQtyIncreaser = useCallback(() => {
-    if (cartProduct.quantity >= 20) {
+    if (cartProduct.quantity >= Math.min(20, available)) {
       return;
     }
     setCartProduct((prev) => ({
       ...prev,
       quantity: prev.quantity + 1,
     }));
-  }, [cartProduct.quantity]);
+  }, [cartProduct.quantity, available]);
 
   const productRating =
     product.reviews.reduce((acc, item) => acc + item.rating, 0) /
@@ -112,7 +123,7 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
           <div>{product.reviews.length} reviews</div>
         </div>
         <div className="mt-4 font-semibold text-2xl">
-          {formatPrice(product.price)}
+          {formatPrice(cartProduct.price)}
         </div>
         <Horizontal />
         <div className="whitespace-pre-line leading-7">{product.description}</div>
@@ -126,13 +137,23 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
           </dl>
         </section>
         <div>
-          {product.inStock ? (
-            <span className="text-green-600 font-semibold">In Stock</span>
+          {available > 0 ? (
+            <span className="text-green-600 font-semibold">{available} available</span>
           ) : (
             <span className="text-red-600 font-semibold">Out of Stock</span>
           )}
         </div>
         <Horizontal />
+        {product.variants && <label className="space-y-2 text-sm">
+          <span className="block font-semibold">Product option</span>
+          <select aria-label="Product option" value={cartProduct.variantId} onChange={(event) => {
+            const variant = product.variants!.find((row) => row.id === event.target.value)!;
+            setCartProduct((previous) => ({ ...previous, variantId: variant.id, sku: variant.sku, selectedImg: variant.image, price: variant.price, quantity: 1 }));
+          }} className="min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2">
+            {product.variants.map((variant) => <option key={variant.id} value={variant.id}>{variant.name} · {formatPrice(variant.price)} · {variant.available > 0 ? variant.available + " available" : "Unavailable"}</option>)}
+          </select>
+          <p className="text-slate-500">Stock is reserved when you submit your order. Availability can change before checkout.</p>
+        </label>}
         {isProductInCart ? (
           <>
             <p className="mb-2 text-slate-500 flex items-center gap-1 ">
@@ -146,11 +167,11 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
           </>
         ) : (
           <>
-            <SetColor
+        {!product.variants && <SetColor
               cartProduct={cartProduct}
               images={product.images}
               handColorSelect={handColorSelect}
-            ></SetColor>
+            ></SetColor>}
             <Horizontal />
             <SetQuantity
               cartProduct={cartProduct}
@@ -160,8 +181,8 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
             <Horizontal />
             <div className="max-w-[300px]">
               <Button
-                label={product.inStock ? "Add to Cart" : "Out of Stock"}
-                disabled={!product.inStock}
+                label={available > 0 ? "Add to Cart" : "Out of Stock"}
+                disabled={available < 1}
                 onClick={() => handleAddProductToCart(cartProduct)}
               />
             </div>

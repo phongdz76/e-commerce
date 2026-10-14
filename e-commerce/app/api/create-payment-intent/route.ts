@@ -1,80 +1,66 @@
-import { createHash, randomUUID } from "crypto";
 import { NextResponse } from "next/server";
-import type { CartProductProps } from "@/app/product/[productId]/ProductDetails";
 import { getCurrentUser } from "@/actions/getCurrentUser";
 import prisma from "@/libs/prismadb";
 import { getStripe } from "@/libs/stripe";
 import { syncStripeOrder } from "@/libs/syncStripeOrder";
 import { getOrderItems } from "@/libs/orderItems";
+import { prepareCheckoutRequest, CheckoutRequestError } from "@/libs/checkoutRequest";
 
-function cartFingerprint(items: CartProductProps[]) {
-  return JSON.stringify(items.map((item) => [item.id, item.quantity, item.selectedImg.color, item.price]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
-}
+const receipt = (order: { id: string; amount: number; currency: string; status: string; paymentMethod: string }) => ({ id: order.id, amount: order.amount, currency: order.currency, status: order.status, paymentMethod: order.paymentMethod });
+const fingerprint = (items: { id: string; variantId?: string | null; quantity: number; price: number }[]) => JSON.stringify(items.map((item) => [item.id, item.variantId, item.quantity, item.price]).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
 
-export async function POST(req: Request) {
-  const currentUser = await getCurrentUser();
-  if (!currentUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function POST(request: Request) {
   try {
-    const body = await req.json();
-    const cart = getOrderItems(body?.items);
-    if (!cart) return NextResponse.json({ error: "Please review the products and quantities in your cart" }, { status: 400 });
-    const { items, amount: total } = cart;
-    const fingerprint = cartFingerprint(items);
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    let body;
+    try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }
+    const cart = await getOrderItems(body?.items);
+    if (!cart) return NextResponse.json({ error: "Please review your cart." }, { status: 400 });
     const stripe = getStripe();
-    let intent;
-    if (body.payment_intent_id) {
-      const existing = await prisma.order.findFirst({ where: { paymentIntentId: body.payment_intent_id, userId: currentUser.id, paymentMethod: "STRIPE" } });
-      if (!existing) return NextResponse.json({ error: "The saved payment could not be found. Please try again.", code: "INVALID_PAYMENT_REFERENCE" }, { status: 400 });
-      intent = await stripe.paymentIntents.retrieve(existing.paymentIntentId!);
-      if (intent.status === "succeeded") {
-        const order = await syncStripeOrder(existing);
-        if (cartFingerprint(existing.products) === fingerprint) return NextResponse.json({ paymentIntent: intent, alreadyPaid: true, order });
-        intent = undefined;
-      } else if (intent.status === "canceled") {
-        await syncStripeOrder(existing);
-        return NextResponse.json({ error: "This payment was cancelled. Please try again.", code: "INVALID_PAYMENT_REFERENCE" }, { status: 400 });
-      }
-      else if (["processing", "requires_capture", "requires_action"].includes(intent.status)) {
-        await syncStripeOrder(existing);
-        return NextResponse.json({ error: "This payment is already in progress. Please check Your Orders." }, { status: 409 });
-      }
-    } else {
-      const candidates = await prisma.order.findMany({ where: { userId: currentUser.id, paymentMethod: "STRIPE", status: { in: ["draft", "pending", "processing", "failed"] }, amount: total }, orderBy: { createDate: "desc" }, take: 20 });
-      for (const order of candidates) {
-        if (cartFingerprint(order.products) !== fingerprint || !order.paymentIntentId?.startsWith("pi_")) continue;
-        const candidate = await stripe.paymentIntents.retrieve(order.paymentIntentId);
-        if (["requires_payment_method", "requires_confirmation"].includes(candidate.status)) { intent = candidate; break; }
-        await syncStripeOrder(order);
-        if (["processing", "requires_capture", "requires_action"].includes(candidate.status)) return NextResponse.json({ error: "This payment is already in progress. Please check Your Orders." }, { status: 409 });
-      }
-    }
-    if (intent) {
-      if (intent.amount !== total) intent = await stripe.paymentIntents.update(intent.id, { amount: total });
-    } else {
-      const requestId = typeof body.checkout_request_id === "string" && /^[a-zA-Z0-9-]{1,80}$/.test(body.checkout_request_id) ? body.checkout_request_id : randomUUID();
-      const key = createHash("sha256").update(`${currentUser.id}:${requestId}:${fingerprint}`).digest("hex");
-      intent = await stripe.paymentIntents.create({ amount: total, currency: "vnd", automatic_payment_methods: { enabled: true }, metadata: { userId: currentUser.id } }, { idempotencyKey: `checkout-${key}` });
-    }
-    const data = { userId: currentUser.id, amount: total, currency: "vnd", paymentIntentId: intent.id, paymentMethod: "STRIPE", status: "draft", deliveryStatus: "pending", products: items };
     let order;
-    try {
-      order = await prisma.order.upsert({ where: { paymentIntentId: intent.id }, create: data, update: { amount: total, products: items } });
-    } catch (error) {
-      if (typeof error === "object" && error && "code" in error && error.code === "P2002") {
-        order = await prisma.order.findUnique({ where: { paymentIntentId: intent.id } });
-        if (!order || order.userId !== currentUser.id) throw error;
-      } else throw error;
+    let reference;
+    if (body.payment_intent_id) {
+      order = await prisma.order.findFirst({ where: { userId: user.id, paymentIntentId: body.payment_intent_id, paymentMethod: "STRIPE" } });
+      if (!order || fingerprint(order.products) !== fingerprint(cart.items)) return NextResponse.json({ error: "The saved payment does not match this cart. Check Your Orders before starting another payment.", code: "INVALID_PAYMENT_REFERENCE" }, { status: 409 });
+      const intent = await stripe.paymentIntents.retrieve(order.paymentIntentId!);
+      if (intent.status === "succeeded") {
+        const paid = await syncStripeOrder(order);
+        return NextResponse.json({ alreadyPaid: true, order: receipt(paid), paymentIntent: { id: intent.id, status: intent.status } });
+      }
+      if (!order.stockReservation || order.stockReservation.state !== "HELD" || intent.status === "canceled") throw new CheckoutRequestError("This order no longer holds stock. Check Your Orders before buying again.", 409, "STOCK_REVIEW_REQUIRED");
+      if (["processing", "requires_capture", "requires_action"].includes(intent.status)) return NextResponse.json({ error: "Payment is already in progress. Check Your Orders." }, { status: 409 });
+      reference = intent.id;
+    } else {
+      const prepared = await prepareCheckoutRequest(body.checkout_request_id, user.id, "STRIPE", cart, null);
+      order = prepared.order;
+      reference = prepared.attempt.id;
     }
-    if (intent.status === "succeeded" && order) {
-      order = await syncStripeOrder(order);
-      return NextResponse.json({ paymentIntent: intent, alreadyPaid: true, order });
+    let intent;
+    if (order.paymentIntentId?.startsWith("pi_")) {
+      intent = await stripe.paymentIntents.retrieve(order.paymentIntentId);
+    } else {
+      intent = await stripe.paymentIntents.create({ amount: order.amount, currency: "vnd", automatic_payment_methods: { enabled: true },
+        metadata: { userId: user.id, orderId: order.id } }, { idempotencyKey: "stock-checkout-" + order.id });
+      const attached = await prisma.order.updateMany({ where: { id: order.id, userId: user.id, paymentIntentId: order.paymentIntentId,
+        stockReservation: { is: { state: "HELD" } } }, data: { paymentIntentId: intent.id } });
+      const latest = await prisma.order.findUnique({ where: { id: order.id } });
+      if (!latest || latest.paymentIntentId !== intent.id || (!attached.count && latest.stockReservation?.state !== "HELD")) throw new Error("Unable to confirm Stripe reference");
+      order = latest;
+      await prisma.paymentAttempt.updateMany({ where: { id: reference, orderId: order.id }, data: { state: "READY", nextCheckAt: new Date(Date.now() + 60000) } });
     }
-    if (intent.status === "canceled" && order) {
+    if (intent.amount !== order.amount || intent.currency.toLowerCase() !== order.currency) throw new Error("Stripe amount mismatch");
+    if (intent.status === "succeeded") {
+      const paid = await syncStripeOrder(order);
+      return NextResponse.json({ alreadyPaid: true, order: receipt(paid), paymentIntent: { id: intent.id, status: intent.status } });
+    }
+    if (intent.status === "canceled") {
       await syncStripeOrder(order);
-      return NextResponse.json({ error: "This payment was cancelled. Please try again.", code: "INVALID_PAYMENT_REFERENCE" }, { status: 400 });
+      throw new CheckoutRequestError("This payment was cancelled. Check Your Orders before buying again.", 409, "STOCK_REVIEW_REQUIRED");
     }
-    return NextResponse.json({ paymentIntent: intent, order });
-  } catch {
-    return NextResponse.json({ error: "Unable to prepare payment. Please try again." }, { status: 502 });
+    return NextResponse.json({ paymentIntent: { id: intent.id, client_secret: intent.client_secret, status: intent.status, amount: intent.amount, currency: intent.currency }, order: receipt(order) }, { headers: { "Cache-Control": "private, no-store" } });
+  } catch (error) {
+    if (error instanceof CheckoutRequestError) return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    return NextResponse.json({ error: "Unable to confirm card payment preparation. Retry the same checkout or check Your Orders." }, { status: 503 });
   }
 }

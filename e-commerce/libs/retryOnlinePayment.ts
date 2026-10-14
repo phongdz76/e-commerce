@@ -10,6 +10,7 @@ import { PAID_ORDER_STATUSES } from "@/libs/paymentStatus";
 import { reconcilePayment } from "@/libs/reconcilePayment";
 import { getMomoConfig } from "@/libs/momo";
 import { getVnpayConfig } from "@/libs/vnpay";
+import { reacquireRetryStock } from "@/libs/orderStock";
 
 function retryConflict() {
   return new CheckoutRequestError(
@@ -77,7 +78,7 @@ export async function preparePaymentRetry(order: Order, requestId: unknown) {
     if (checked.skipped || !checked.verifiedFailure) {
       throw retryConflict();
     }
-    const current = await prisma.order.findUnique({ where: { id: order.id } });
+    let current = await prisma.order.findUnique({ where: { id: order.id } });
     if (
       !current ||
       current.status !== "failed" ||
@@ -86,6 +87,7 @@ export async function preparePaymentRetry(order: Order, requestId: unknown) {
     ) {
       throw retryConflict();
     }
+    if (current.stockReservation?.state === "RELEASED") current = await reacquireRetryStock(current.id);
     try {
       if (!reserved) {
         reserved = await prisma.paymentAttempt.create({

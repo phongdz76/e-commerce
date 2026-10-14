@@ -1,167 +1,48 @@
-import { createHash } from "crypto";
-import prisma from "@/libs/prismadb";
-import { getOrderItems } from "@/libs/orderItems";
+import { createHash } from "node:crypto";
+import { getOrderItems, type OrderCart } from "@/libs/orderItems";
 import { getOrderDelivery } from "@/libs/orderDelivery";
+import { CheckoutRequestError } from "@/libs/checkoutErrors";
+import { reserveOrderStock, withStockTransaction } from "@/libs/orderStock";
 
-export class CheckoutRequestError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number,
-    public readonly code: string,
-  ) {
-    super(message);
-    this.name = "CheckoutRequestError";
-  }
-}
+export { CheckoutRequestError } from "@/libs/checkoutErrors";
 
-function isDuplicateKey(error: unknown) {
-  return Boolean(
-    error &&
-      typeof error === "object" &&
-      "code" in error &&
-      error.code === "P2002",
-  );
-}
-
-export async function prepareCheckoutRequest(
-  requestId: unknown,
-  userId: string,
-  paymentMethod: "COD" | "VNPAY" | "MOMO",
-  cart: NonNullable<ReturnType<typeof getOrderItems>>,
-  delivery: NonNullable<ReturnType<typeof getOrderDelivery>>,
-  merchantId: string | null = null,
-  options: Record<string, string> = {},
-) {
-  if (typeof requestId !== "string" || !/^[a-z0-9-]{1,80}$/i.test(requestId)) {
-    throw new CheckoutRequestError(
-      "Please refresh checkout and submit again.",
-      400,
-      "CHECKOUT_REQUEST_REQUIRED",
-    );
-  }
-  const id = createHash("sha256")
-    .update(JSON.stringify([userId, requestId]))
-    .digest("hex");
-  const items = cart.items.map((item) => [
-    item.id,
-    item.selectedImg.color,
-    item.quantity,
-    item.price,
-  ]);
-  items.sort((left, right) =>
-    JSON.stringify(left).localeCompare(JSON.stringify(right)),
-  );
-  const fingerprint = createHash("sha256")
-    .update(
-      JSON.stringify([paymentMethod, cart.amount, items, delivery, options]),
-    )
-    .digest("hex");
-  const paymentReference =
-    paymentMethod === "VNPAY" ? `VNPAY${id}` : `${paymentMethod}_${id}`;
-
-  let checkoutRequest;
-  try {
-    checkoutRequest = await prisma.checkoutRequest.create({
-      data: { id, userId, fingerprint, paymentMethod, paymentReference },
-    });
-  } catch (error) {
-    if (!isDuplicateKey(error)) {
-      throw error;
+export async function prepareCheckoutRequest(requestId: unknown, userId: string,
+  paymentMethod: "COD" | "VNPAY" | "MOMO" | "STRIPE" | "ZALOPAY", cart: OrderCart,
+  delivery: NonNullable<ReturnType<typeof getOrderDelivery>> | null, merchantId: string | null = null,
+  options: Record<string, string> = {}) {
+  if (typeof requestId !== "string" || !/^[a-z0-9-]{1,80}$/i.test(requestId)) throw new CheckoutRequestError("Please refresh checkout and submit again.", 400, "CHECKOUT_REQUEST_REQUIRED");
+  const id = createHash("sha256").update(JSON.stringify([userId, requestId])).digest("hex");
+  const orderId = id.slice(0, 24);
+  const itemKeys = cart.items.map((item) => [item.id, item.variantId, item.quantity, item.price]).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  const fingerprint = createHash("sha256").update(JSON.stringify([paymentMethod, cart.amount, itemKeys, delivery, options])).digest("hex");
+  return withStockTransaction(async (tx) => {
+    const saved = await tx.checkoutRequest.findUnique({ where: { id } });
+    if (saved && (saved.fingerprint !== fingerprint || saved.paymentMethod !== paymentMethod || saved.userId !== userId)) {
+      throw new CheckoutRequestError("This checkout already has different products, delivery details or payment method. Check the existing order first.", 409, "CHECKOUT_REQUEST_CONFLICT");
     }
-    checkoutRequest = await prisma.checkoutRequest.findUnique({
-      where: { id },
-    });
-  }
-  if (
-    !checkoutRequest ||
-    checkoutRequest.userId !== userId ||
-    checkoutRequest.fingerprint !== fingerprint ||
-    checkoutRequest.paymentMethod !== paymentMethod
-  ) {
-    throw new CheckoutRequestError(
-      "This checkout request already has different products, delivery details or payment method. Check the existing order first.",
-      409,
-      "CHECKOUT_REQUEST_CONFLICT",
-    );
-  }
-
-  let order = await prisma.order.findUnique({
-    where: { paymentIntentId: checkoutRequest.paymentReference },
-  });
-  if (!order) {
-    try {
-      order = await prisma.order.create({
-        data: {
-          userId,
-          paymentMethod,
-          amount: cart.amount,
-          currency: "vnd",
-          paymentIntentId: checkoutRequest.paymentReference,
-          status: "pending",
-          deliveryStatus: "pending",
-          products: cart.items,
-          ...delivery,
-        },
-      });
-    } catch (error) {
-      if (!isDuplicateKey(error)) {
-        throw error;
+    if (saved) {
+      const order = await tx.order.findUnique({ where: saved.orderId ? { id: saved.orderId } : { paymentIntentId: saved.paymentReference } });
+      if (!order || order.userId !== userId || order.paymentMethod !== paymentMethod || !order.stockReservation || order.stockReservation.state === "RELEASED") {
+        throw new CheckoutRequestError("This checkout cannot be resumed. Check the order before starting another purchase.", 409, "CHECKOUT_REQUEST_CONFLICT");
       }
-      order = await prisma.order.findUnique({
-        where: { paymentIntentId: checkoutRequest.paymentReference },
-      });
+      const attempt = await tx.paymentAttempt.findUnique({ where: { id: order.activePaymentAttemptId || saved.paymentReference } });
+      if (!attempt || attempt.orderId !== order.id || attempt.merchantId !== merchantId || attempt.amount !== order.amount) throw new CheckoutRequestError("The payment configuration has changed. Check the existing order.", 409, "PAYMENT_ATTEMPT_CONFLICT");
+      return { order, attempt };
     }
-  }
-  if (
-    !order ||
-    order.userId !== userId ||
-    order.paymentMethod !== paymentMethod ||
-    order.amount !== cart.amount ||
-    order.currency !== "vnd"
-  ) {
-    throw new CheckoutRequestError(
-      "Unable to resume this checkout request.",
-      409,
-      "CHECKOUT_REQUEST_CONFLICT",
-    );
-  }
-
-  const reference =
-    order.activePaymentAttemptId || checkoutRequest.paymentReference;
-  let attempt;
-  try {
-    attempt = await prisma.paymentAttempt.create({
-      data: {
-        id: reference,
-        orderId: order.id,
-        paymentMethod,
-        merchantId,
-        amount: order.amount,
-        currency: order.currency,
-      },
-    });
-  } catch (error) {
-    if (!isDuplicateKey(error)) {
-      throw error;
-    }
-    attempt = await prisma.paymentAttempt.findUnique({
-      where: { id: reference },
-    });
-  }
-  if (
-    !attempt ||
-    attempt.orderId !== order.id ||
-    attempt.paymentMethod !== paymentMethod ||
-    attempt.merchantId !== merchantId ||
-    attempt.amount !== order.amount ||
-    attempt.currency !== order.currency
-  ) {
-    throw new CheckoutRequestError(
-      "The payment configuration has changed. Check the existing order before continuing.",
-      409,
-      "PAYMENT_ATTEMPT_CONFLICT",
-    );
-  }
-
-  return { order, attempt };
+    const latest = await getOrderItems(cart.items, tx);
+    if (!latest || latest.amount !== cart.amount) throw new CheckoutRequestError("The cart has changed. Confirm its current price and options.", 409, "CHECKOUT_PRICE_CHANGED");
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Ho_Chi_Minh", year: "2-digit", month: "2-digit", day: "2-digit" }).formatToParts(now);
+    const day = ["year", "month", "day"].map((key) => parts.find((part) => part.type === key)!.value).join("");
+    const paymentReference = paymentMethod === "VNPAY" ? `VNPAY${id}` : paymentMethod === "ZALOPAY" ? `${day}_${id.slice(0, 24)}` : `${paymentMethod}_${id}`;
+    const stockReservation = await reserveOrderStock(tx, orderId, userId, latest.items, paymentMethod);
+    await tx.checkoutRequest.create({ data: { id, userId, fingerprint, paymentMethod, paymentReference, orderId } });
+    const order = await tx.order.create({ data: { id: orderId, userId, paymentMethod, amount: latest.amount, currency: "vnd",
+      paymentIntentId: paymentReference, activePaymentAttemptId: paymentReference, paymentAttemptTracked: true, status: paymentMethod === "STRIPE" ? "draft" : "pending", deliveryStatus: "pending",
+      products: latest.items, stockReservation, ...(delivery || {}),
+      ...(paymentMethod === "ZALOPAY" ? { paymentExpiresAt: new Date(now.getTime() + 900000) } : {}) } });
+    const attempt = await tx.paymentAttempt.create({ data: { id: paymentReference, orderId, paymentMethod, merchantId, amount: order.amount,
+      currency: order.currency, state: paymentMethod === "COD" ? "COD_PENDING" : "CREATED" } });
+    return { order, attempt };
+  });
 }

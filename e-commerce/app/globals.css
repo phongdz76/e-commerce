@@ -1,4 +1,19 @@
 @import "tailwindcss";
+
+@media print {
+  body:has(.sgtech-packing-slip) .sgtech-admin aside,
+  body:has(.sgtech-packing-slip) .sgtech-admin header {
+    display: none !important;
+  }
+
+  body:has(.sgtech-packing-slip) .sgtech-admin,
+  body:has(.sgtech-packing-slip) .sgtech-admin main {
+    min-height: 0;
+    background: white;
+    padding: 0;
+    max-width: none;
+  }
+}
 @layer base {
   :root {
     font-family: var(--font-poppins), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;

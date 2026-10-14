@@ -55,6 +55,7 @@ model CheckoutRequest {
   fingerprint      String
   paymentMethod    String
   paymentReference String
+  orderId          String?  @db.ObjectId
   createDate       DateTime @default(now())
 }
 
@@ -127,11 +128,19 @@ model ProductVariant {
   attributes Json?
   isActive   Boolean  @default(true)
   inStock    Boolean  @default(false)
+  inventory  VariantInventory?
   product    Product  @relation(fields: [productId], references: [id])
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   @@index([productId, isActive])
+}
+
+type VariantInventory {
+  onHand    Int
+  reserved  Int
+  version   Int
+  updatedAt DateTime
 }
 
 model PaymentAttempt {
@@ -184,6 +193,8 @@ model Order {
   recipientName          String?
   recipientPhone         String?
   shippingInfo           ShippingInfo?
+  codPaymentInfo         CodPaymentInfo?
+  stockReservation       OrderStockReservation?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -196,8 +207,38 @@ type ShippingInfo {
   updatedAt      DateTime
 }
 
+type CodPaymentInfo {
+  version    Int
+  collection CodCollection?
+  settlement CodSettlement?
+}
+
+type CodCollection {
+  requestId  String
+  collector  String
+  amount     Float
+  reference  String
+  occurredAt DateTime
+  note       String
+  recordedAt DateTime
+  recordedBy String   @db.ObjectId
+}
+
+type CodSettlement {
+  requestId  String
+  amount     Float
+  carrierFee Float
+  reference  String
+  occurredAt DateTime
+  note       String
+  recordedAt DateTime
+  recordedBy String   @db.ObjectId
+}
+
 type CartProductProps {
   id          String @db.ObjectId
+  variantId   String? @db.ObjectId
+  sku         String?
   name        String
   description String
   category    String
@@ -205,6 +246,20 @@ type CartProductProps {
   selectedImg Image
   quantity    Int
   price       Float
+}
+
+type OrderStockReservation {
+  state     String
+  version   Int
+  expiresAt DateTime?
+  updatedAt DateTime
+  lines     ReservedStockLine[]
+}
+
+type ReservedStockLine {
+  variantId String @db.ObjectId
+  sku       String
+  quantity  Int
 }
 
 type Image {

@@ -151,6 +151,8 @@ export default function CheckoutForm({
       currentUser?.id,
       cartProducts?.map((item) => [
         item.id,
+        item.variantId,
+        item.price,
         item.selectedImg.color,
         item.quantity,
       ]),

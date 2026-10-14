@@ -10,6 +10,7 @@ import { catalogCategories } from "@/utils/productFilters";
 interface IPrams {
   productId?: string;
 }
+export const dynamic = "force-dynamic";
 
 export default async function ProductPage({ params }: { params: Promise<IPrams> }) {
   const { productId } = await params;

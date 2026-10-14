@@ -94,6 +94,7 @@ export default function ProductsClient() {
     <div className="space-y-6">
       {/* Title & Add Button */}
       <AdminPageHeader title="Products" description="Manage catalog products, variants and prices. Availability is separate from stock quantity.">
+        <Link href="/admin/inventory" className="inline-flex min-h-11 items-center rounded-md border border-slate-300 px-4 text-sm font-semibold text-slate-700">Inventory</Link>
         <AdminRefreshButton isLoading={isLoading} onRefresh={() => setRefresh((value) => value + 1)} />
         <Link
           href="/admin/products/new"

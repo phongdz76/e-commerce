@@ -9,6 +9,8 @@
     "lint": "eslint",
     "test": "node --test tests/*.test.cjs",
     "test:auth": "node --test tests/auth-security.test.cjs",
+    "test:cod-mongo": "node scripts/check-cod-queue.cjs",
+    "test:stock-mongo": "node scripts/check-stock-concurrency.cjs",
     "typecheck": "tsc --noEmit --incremental false",
     "worker:payments": "node scripts/payment-worker.cjs",
     "seed:catalog": "node scripts/seed-catalog.cjs",

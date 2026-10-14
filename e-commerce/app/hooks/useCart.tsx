@@ -9,6 +9,7 @@ import {
 } from "react";
 import { CartProductProps } from "../product/[productId]/ProductDetails";
 import toast from "react-hot-toast";
+import { getCartItemKey } from "@/utils/cartItemKey";
 
 type CartContextType = {
   cartTotalQty: number;
@@ -56,8 +57,9 @@ export const CartContextProvider = (props: Props) => {
                   typeof item.id === "string" &&
                   Number.isFinite(item.price) &&
                   Number.isSafeInteger(item.quantity) &&
-                  item.quantity > 0 &&
-                  typeof item.selectedImg?.image === "string",
+                  item.quantity > 0 && item.quantity <= 20 &&
+                  (item.variantId === undefined || typeof item.variantId === "string") &&
+                  typeof item.selectedImg?.image === "string" && typeof item.selectedImg.color === "string",
               )
             : null,
         );
@@ -93,7 +95,8 @@ export const CartContextProvider = (props: Props) => {
       let updatedCart;
 
       if (prev) {
-        updatedCart = [...prev, product];
+        const existing = prev.find((item) => getCartItemKey(item) === getCartItemKey(product));
+        updatedCart = existing ? prev.map((item) => getCartItemKey(item) === getCartItemKey(product) ? { ...item, quantity: Math.min(20, item.quantity + product.quantity) } : item) : [...prev, product];
       } else {
         updatedCart = [product];
       }
@@ -113,7 +116,7 @@ export const CartContextProvider = (props: Props) => {
     (product: CartProductProps) => {
       if (cartProducts) {
         const filteredProducts = cartProducts.filter(
-          (item) => item.id !== product.id,
+          (item) => getCartItemKey(item) !== getCartItemKey(product),
         );
         setCartProducts(filteredProducts);
         toast.success("Product removed from cart!");
@@ -132,7 +135,7 @@ export const CartContextProvider = (props: Props) => {
       if (cartProducts) {
         updatedCart = [...cartProducts];
         const existingIndex = updatedCart.findIndex(
-          (item) => item.id === product.id,
+          (item) => getCartItemKey(item) === getCartItemKey(product),
         );
         if (existingIndex > -1) {
           updatedCart[existingIndex].quantity -= 1;
@@ -154,7 +157,7 @@ export const CartContextProvider = (props: Props) => {
       if (cartProducts) {
         updatedCart = [...cartProducts];
         const existingIndex = updatedCart.findIndex(
-          (item) => item.id === product.id,
+          (item) => getCartItemKey(item) === getCartItemKey(product),
         );
 
         if (existingIndex > -1) {

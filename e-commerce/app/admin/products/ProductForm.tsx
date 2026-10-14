@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import toast from "react-hot-toast";
 import Image from "next/image";
+import Link from "next/link";
 import {
   FiPlus,
   FiTrash2,
@@ -285,7 +286,9 @@ export default function ProductForm({
         brandId,
         variants: preparedVariants.map(({ specifications, ...variant }, index) => {
           try {
-            return { ...variant, attributes: getAttributes(specifications) };
+            const catalogVariant = { ...variant };
+            delete catalogVariant.inventory;
+            return { ...catalogVariant, attributes: getAttributes(specifications) };
           } catch (error: unknown) {
             setVariantErrors({ [index]: "Use one Name: value per line, with unique specification names." });
             const specifications = document.getElementById("variant-spec-" + index);
@@ -672,6 +675,11 @@ export default function ProductForm({
                   </details>
 
                   <div className="space-y-2 pt-4">
+                    <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+                      <p className="font-semibold text-slate-700">Stock quantity</p>
+                      <p className="mt-1 text-slate-600">{variant.inventory ? `${variant.inventory.onHand.toLocaleString("en-US")} on hand · ${variant.inventory.available.toLocaleString("en-US")} available` : "Not counted"}</p>
+                      {variant.id ? <Link href={"/admin/inventory/" + variant.id} className="mt-1 inline-flex min-h-11 items-center font-semibold text-teal-700">Manage stock →</Link> : <p className="mt-1 text-xs text-slate-500">Save this variant before recording its opening count.</p>}
+                    </div>
                     <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-700">
                       <input
                         type="checkbox"
@@ -681,7 +689,7 @@ export default function ProductForm({
                         }
                         className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
                       />
-                      <span>In stock</span>
+                      <span>Catalog availability</span>
                     </label>
 
                     <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-700">

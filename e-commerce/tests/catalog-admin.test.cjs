@@ -209,6 +209,7 @@ function fixture(kind) {
   mocks["@/libs/adminAudit"] = load("libs/adminAudit.ts", mocks);
   mocks["@/libs/catalogGroup"] = load("libs/catalogGroup.ts", mocks);
   mocks["@/utils/catalogImage"] = load("utils/catalogImage.ts", mocks);
+  mocks["@/utils/adminInventory"] = load("utils/adminInventory.ts", mocks);
   mocks["@/libs/adminCatalog"] = load("libs/adminCatalog.ts", mocks);
   const productRoutes = load("app/api/admin/products/route.ts", mocks);
   const editProduct = load(
@@ -550,6 +551,22 @@ test("nested catalog writes set VND, preserve variant identity, audit prices and
   assert.equal(list.products.length, 1);
   assert.equal(list.products[0].variants[0].price, 150000);
   assert.equal(typeof list.products[0].updatedAt, "string");
+});
+
+test("catalog edits preserve stock and cannot forge inventory through variant metadata", async () => {
+  const f = await productFixture();
+  assert.equal((await f.createProduct()).status, 201);
+  const product = [...f.catalogProducts.values()][0];
+  const inventory = { onHand: 12, reserved: 2, version: 1, updatedAt: new Date() };
+  product.variants[0].inventory = structuredClone(inventory);
+  assert.equal((await f.updateProduct(product, { variants: [{ ...product.variants[0], price: 150000,
+    inventory: { onHand: 999999, reserved: 0, version: 99, updatedAt: new Date() } }] })).status, 200);
+  const saved = f.catalogProducts.get(product.id);
+  assert.deepEqual(saved.variants[0].inventory, inventory);
+  const list = await (await f.productRoutes.GET(new Request("http://localhost/?status=ACTIVE"))).json();
+  assert.equal(list.products[0].variants[0].inventory.onHand, 12);
+  assert.equal(list.products[0].variants[0].inventory.available, 10);
+  assert.equal(list.products[0].variants[0].inventory.reserved, 2);
 });
 
 test("SKU omission/foreign IDs are rejected, new SKUs can be added and existing SKUs can be deactivated", async () => {

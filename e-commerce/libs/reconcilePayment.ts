@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import type { Order, PaymentAttempt } from "@prisma/client";
 import prisma from "@/libs/prismadb";
+import { releaseVerifiedFailedStock } from "@/libs/orderStock";
 import { getActivePaymentReference } from "@/libs/paymentReference";
 import { PAID_ORDER_STATUSES, updatePaymentStatus } from "@/libs/paymentStatus";
 import { queryMomoOrder, queryVnpayOrder } from "@/libs/queryOnlinePayment";
@@ -117,8 +118,9 @@ export async function reconcilePayment(
   let lastError: string | null = null;
   let queryConfirmed = false;
   let verifiedFailure = false;
+  let currentOrder: Order | null = null;
   try {
-    const currentOrder = await prisma.order.findUnique({
+    currentOrder = await prisma.order.findUnique({
       where: { id: order.id },
     });
     if (
@@ -203,6 +205,9 @@ export async function reconcilePayment(
   const savedAttempt = await prisma.paymentAttempt.findUnique({
     where: { id: attempt.id },
   });
+  if (queryConfirmed && verifiedFailure && savedAttempt?.state === "FAILED" && order.stockReservation) {
+    await releaseVerifiedFailedStock(order.id, attempt.id);
+  }
   return {
     orderId: order.id,
     state: savedAttempt?.state || state,

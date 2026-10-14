@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import axios from "axios";
 import { FiArrowLeft, FiTruck } from "react-icons/fi";
@@ -19,12 +19,17 @@ import PaymentHistory from "@/app/admin/payments/PaymentHistory";
 import AdminPageHeader from "@/app/admin/components/AdminPageHeader";
 import AdminRefreshButton from "@/app/admin/components/AdminRefreshButton";
 import AdminFeedback from "@/app/admin/components/AdminFeedback";
+import CodPaymentClient from "@/app/admin/orders/CodPaymentClient";
+import OrderStock from "@/app/orders/[orderId]/OrderStock";
 
 export default function OrderDetailClient({ orderId }: { orderId: string }) {
   const [order, setOrder] = useState<AdminOrderDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [refresh, setRefresh] = useState(0);
+  const handleCodRecorded = useCallback(() => {
+    setRefresh((previous) => previous + 1);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -175,15 +180,17 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
               <p className="p-6 text-sm text-slate-500">No product details recorded for this order.</p>
             )}
           </section>
-          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-xs">
+          {order.paymentMethod === "COD" && (
+            <CodPaymentClient key={order.id} orderId={order.id} onRecorded={handleCodRecorded} />
+          )}
+          <OrderStock key={order.id} orderId={order.id} />
+          {order.paymentMethod !== "COD" && <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-xs">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h2 className="font-semibold text-slate-800">Payment history</h2>
               <Link href="/admin/refunds" className="inline-flex min-h-10 items-center text-sm font-semibold text-teal-700 hover:underline">View refund follow-up</Link>
             </div>
-            {order.paymentMethod === "COD" ? (
-              <p className="text-sm leading-6 text-slate-500">Cash on delivery is collected separately. Check the saved order status for payment confirmation; delivery status alone does not confirm collection.</p>
-            ) : <PaymentHistory key={order.id} orderId={order.id} refreshKey={refresh} />}
-          </section>
+            <PaymentHistory key={order.id} orderId={order.id} refreshKey={refresh} />
+          </section>}
         </>
       ) : null}
     </div>

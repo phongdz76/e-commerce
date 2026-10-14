@@ -7,11 +7,13 @@ export const ADMIN_NAVIGATION = [
   ] },
   { title: "Catalog", items: [
     { label: "Products", href: "/admin/products", icon: FiBox },
+    { label: "Inventory", href: "/admin/inventory", icon: FiLayers },
     { label: "Categories", href: "/admin/categories", icon: FiLayers },
     { label: "Brands", href: "/admin/brands", icon: FiTag },
   ] },
   { title: "Orders & Payments", items: [
     { label: "Orders", href: "/admin/orders", icon: FiShoppingBag },
+    { label: "COD follow-up", href: "/admin/cod", icon: FiCreditCard },
     { label: "Shipments", href: "/admin/shipments", icon: FiTruck },
     { label: "Payments", href: "/admin/payments", icon: FiCreditCard },
     { label: "Payment issues", href: "/admin/payment-exceptions", icon: FiAlertCircle },

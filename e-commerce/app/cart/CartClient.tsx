@@ -48,7 +48,7 @@ export function CartClient({ currentUser }: CartClientProps) {
       <div>
         {cartProducts &&
           cartProducts.map((item) => {
-            return <ItemContent key={item.id} item={item}></ItemContent>;
+            return <ItemContent key={item.variantId || item.id + ":" + item.selectedImg.color} item={item}></ItemContent>;
           })}
       </div>
       <div className="border-t-[1.5px] border-slate-200 pt-6 flex flex-col md:flex-row justify-between gap-6">

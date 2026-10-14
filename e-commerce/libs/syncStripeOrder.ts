@@ -2,6 +2,7 @@ import type { Order } from "@prisma/client";
 import type Stripe from "stripe";
 import prisma from "@/libs/prismadb";
 import { getStripe } from "./stripe";
+import { releaseVerifiedFailedStock, reviewPaidReleasedStock } from "@/libs/orderStock";
 
 type StripeOrder = Pick<
   Order,
@@ -97,7 +98,11 @@ export async function syncStripeOrder<T extends StripeOrder>(order: T) {
     ) {
       throw new Error("Order changed during payment confirmation");
     }
+    if (updated.stockReservation && intent.status === "canceled") await releaseVerifiedFailedStock(updated.id, updated.activePaymentAttemptId || intent.id);
+    if (updated.stockReservation?.state === "RELEASED" && status === "complete") await reviewPaidReleasedStock(updated.id);
     return { ...order, ...updated };
   }
+  if (intent.status === "canceled" && "stockReservation" in order && order.stockReservation) await releaseVerifiedFailedStock(order.id, "activePaymentAttemptId" in order && typeof order.activePaymentAttemptId === "string" ? order.activePaymentAttemptId : intent.id);
+  if (status === "complete" && "stockReservation" in order && order.stockReservation) await reviewPaidReleasedStock(order.id);
   return order;
 }

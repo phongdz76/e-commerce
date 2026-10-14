@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/libs/prismadb";
 import { getZaloPayConfig, verifyZaloPayMac } from "@/libs/zalopay";
+import { reviewPaidReleasedStock } from "@/libs/orderStock";
 
 export const runtime = "nodejs";
 
@@ -95,6 +96,7 @@ export async function POST(request: Request) {
         return_message: "Order confirmation is not ready. Please retry.",
       });
     }
+    if (confirmed.stockReservation?.state === "RELEASED") await reviewPaidReleasedStock(confirmed.id);
     return NextResponse.json({ return_code: 1, return_message: "Success" });
   } catch {
     // Tell ZaloPay to retry when the database/configuration is temporarily unavailable.

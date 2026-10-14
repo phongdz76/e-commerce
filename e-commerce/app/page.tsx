@@ -4,6 +4,7 @@ import HomeBanner from "./components/banner/HomeBanner";
 import ProductCard from "./components/products/ProductCard";
 import Link from "next/link";
 import { catalogCategories, PRODUCTS_PER_PAGE } from "@/utils/productFilters";
+export const dynamic = "force-dynamic";
 export default async function Home() {
   const products = await getStorefrontProducts();
   return (

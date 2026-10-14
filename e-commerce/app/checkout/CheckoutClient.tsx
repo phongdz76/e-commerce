@@ -60,6 +60,7 @@ export default function CheckoutClient({
   const [clientSecret, setClientSecret] = useState<string>("");
   const [submittedSuccess, setPaymentSuccess] = useState<boolean>(false);
   const [error, setError] = useState<boolean>(false);
+  const [checkoutError, setCheckoutError] = useState("");
   const [processedCartString, setProcessedCartString] = useState<string | null>(
     null,
   );
@@ -313,7 +314,9 @@ export default function CheckoutClient({
           console.log(err);
           setLoading(false);
           setError(true);
-          toast.error("Something went wrong. Please try again.");
+          const message = err instanceof Error ? err.message : "Unable to prepare checkout. Review your cart and try again.";
+          setCheckoutError(message);
+          toast.error(message);
         })
         .finally(() => {
           isCreatingIntent.current = false;
@@ -380,7 +383,7 @@ export default function CheckoutClient({
       return (
         <div role="alert" className="space-y-3">
           <p className="text-sm text-rose-600">
-            We couldn’t prepare card payment.
+            {checkoutError || "We couldn’t prepare card payment."}
           </p>
           <Button
             type="button"

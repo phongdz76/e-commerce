@@ -21,7 +21,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
     const delivery = getOrderDelivery(body);
-    const cart = getOrderItems(body?.items);
+    const cart = await getOrderItems(body?.items);
     if (!delivery || !cart) {
       return NextResponse.json(
         { error: "Please review your cart and delivery details." },
@@ -40,7 +40,17 @@ export async function POST(request: Request) {
       where: { id: attempt.id, state: "CREATED" },
       data: { state: "COD_PENDING" },
     });
-    return NextResponse.json({ success: true, order });
+    return NextResponse.json({
+      success: true,
+      order: {
+        id: order.id,
+        amount: order.amount,
+        currency: order.currency,
+        status: order.status,
+        deliveryStatus: order.deliveryStatus,
+        paymentMethod: order.paymentMethod,
+      },
+    }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error: unknown) {
     if (error instanceof CheckoutRequestError) {
       return NextResponse.json(

@@ -13,6 +13,8 @@ import Heading from "@/app/components/Headinng";
 import { FaBoxOpen } from "react-icons/fa";
 import Button from "@/app/components/Button";
 import SelectMenu from "@/app/components/inputs/SelectMenu";
+import { API_PATHS } from "@/utils/apiPaths";
+import { CUSTOMER_DELIVERY_LABELS, getCustomerDeliveryInfo, normalizeCustomerDeliveryStatus } from "@/utils/orderShipment";
 
 interface OrderProduct {
   id: string;
@@ -44,17 +46,11 @@ interface OrdersClientProps {
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   pending: { label: "Pending", className: "bg-amber-50 text-amber-700 border-amber-200" },
   processing: { label: "Processing", className: "bg-blue-50 text-blue-700 border-blue-200" },
-  complete: { label: "Done", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  paid: { label: "Done", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  done: { label: "Done", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  complete: { label: "Paid", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  paid: { label: "Paid", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  done: { label: "Paid", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
   failed: { label: "Failed", className: "bg-rose-50 text-rose-700 border-rose-200" },
   cancelled: { label: "Cancelled", className: "bg-rose-50 text-rose-700 border-rose-200" },
-};
-
-const DELIVERY_LABELS: Record<string, { label: string; className: string }> = {
-  pending: { label: "Pending", className: "bg-amber-50 text-amber-700 border-amber-200" },
-  dispatched: { label: "Dispatched", className: "bg-blue-50 text-blue-700 border-blue-200" },
-  delivered: { label: "Delivered", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
 };
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -75,7 +71,7 @@ export default function OrdersClient({ currentUser }: OrdersClientProps) {
   const [deliveryFilter, setDeliveryFilter] = useState("all");
   const filteredOrders = orders.filter((order) => {
     const paymentStatus = ["complete", "paid", "done"].includes(order.status) ? "complete" : order.status;
-    return (paymentFilter === "all" || paymentStatus === paymentFilter) && (deliveryFilter === "all" || order.deliveryStatus === deliveryFilter);
+    return (paymentFilter === "all" || paymentStatus === paymentFilter) && (deliveryFilter === "all" || normalizeCustomerDeliveryStatus(order.deliveryStatus) === deliveryFilter);
   });
   const hasFilters = paymentFilter !== "all" || deliveryFilter !== "all";
 
@@ -87,7 +83,7 @@ export default function OrdersClient({ currentUser }: OrdersClientProps) {
 
     const fetchOrders = async () => {
       try {
-        const res = await axios.get("/api/order");
+        const res = await axios.get(API_PATHS.ORDER.GET_ALL);
         setOrders(res.data);
       } catch {
         setHasError(true);
@@ -144,7 +140,7 @@ export default function OrdersClient({ currentUser }: OrdersClientProps) {
         </div>
         <div className="w-full sm:w-56">
           <label htmlFor="order-delivery-filter" className="mb-2 block text-sm font-medium">Delivery status</label>
-          <SelectMenu id="order-delivery-filter" label="Delivery status" value={deliveryFilter} onChange={setDeliveryFilter} options={[{ value: "all", label: "All deliveries" }, ...Object.entries(DELIVERY_LABELS).map(([value, info]) => ({ value, label: info.label }))]} />
+          <SelectMenu id="order-delivery-filter" label="Delivery status" value={deliveryFilter} onChange={setDeliveryFilter} options={[{ value: "all", label: "All deliveries" }, ...Object.entries(CUSTOMER_DELIVERY_LABELS).map(([value, label]) => ({ value, label }))]} />
         </div>
         {hasFilters && <button type="button" onClick={() => { setPaymentFilter("all"); setDeliveryFilter("all"); }} className="min-h-11 text-base text-teal-700 hover:underline">Clear filters</button>}
       </div>
@@ -167,6 +163,7 @@ export default function OrdersClient({ currentUser }: OrdersClientProps) {
           <tbody className="divide-y divide-slate-100">
             {filteredOrders.map((order) => {
               const date = new Date(order.createDate).toLocaleDateString("en-US", {
+                timeZone: "Asia/Ho_Chi_Minh",
                 month: "short",
                 day: "numeric",
                 year: "numeric",
@@ -174,12 +171,10 @@ export default function OrdersClient({ currentUser }: OrdersClientProps) {
               const firstProduct = order.products[0];
               const remaining = order.products.length - 1;
               const status = STATUS_LABELS[order.status] || {
-                label: order.status,
+                label: "Status unconfirmed",
                 className: "bg-slate-50 text-slate-600 border-slate-200",
               };
-              const delivery = order.deliveryStatus
-                ? DELIVERY_LABELS[order.deliveryStatus]
-                : null;
+              const delivery = getCustomerDeliveryInfo(order.deliveryStatus);
 
               return (
                 <tr
@@ -255,6 +250,7 @@ export default function OrdersClient({ currentUser }: OrdersClientProps) {
       <div className="md:hidden flex flex-col gap-3">
         {filteredOrders.map((order) => {
           const date = new Date(order.createDate).toLocaleDateString("en-US", {
+            timeZone: "Asia/Ho_Chi_Minh",
             month: "short",
             day: "numeric",
             year: "numeric",
@@ -263,9 +259,10 @@ export default function OrdersClient({ currentUser }: OrdersClientProps) {
           const remaining = order.products.length - 1;
           const totalQty = order.products.reduce((s, p) => s + p.quantity, 0);
           const status = STATUS_LABELS[order.status] || {
-            label: order.status,
+            label: "Status unconfirmed",
             className: "bg-slate-50 text-slate-600 border-slate-200",
           };
+          const delivery = getCustomerDeliveryInfo(order.deliveryStatus);
 
           return (
             <Link
@@ -319,11 +316,9 @@ export default function OrdersClient({ currentUser }: OrdersClientProps) {
                 <span className={`inline-block rounded border px-2 py-1 text-xs font-medium ${status.className}`}>
                   Payment: {status.label}
                 </span>
-                {order.deliveryStatus && DELIVERY_LABELS[order.deliveryStatus] && (
-                  <span className={`inline-block rounded border px-2 py-1 text-xs font-medium ${DELIVERY_LABELS[order.deliveryStatus].className}`}>
-                    Delivery: {DELIVERY_LABELS[order.deliveryStatus].label}
-                  </span>
-                )}
+                <span className={`inline-block rounded border px-2 py-1 text-xs font-medium ${delivery.className}`}>
+                  Delivery: {delivery.label}
+                </span>
               </div>
             </Link>
           );

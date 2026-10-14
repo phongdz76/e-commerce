@@ -22,7 +22,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
     const delivery = getOrderDelivery(body);
-    const cart = getOrderItems(body?.items);
+    const cart = await getOrderItems(body?.items);
     if (
       !delivery ||
       !cart ||

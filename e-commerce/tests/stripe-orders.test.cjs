@@ -768,6 +768,29 @@ test("repeated and concurrent COD/VNPay checkout requests create one order and o
   }
 });
 
+test("COD checkout replay never exposes internal collection, settlement or shipment evidence", async () => {
+  const f = fixture();
+  await f.deliveryRoutes.COD(f.request(checkoutBody()));
+  const order = [...f.rows.values()][0];
+  order.status = "paid";
+  order.codPaymentInfo = {
+    version: 2,
+    collection: { requestId: "private-request", recordedBy: "private-staff", note: "private-collection-note", reference: "private-receipt" },
+    settlement: { note: "private-settlement-note", reference: "private-bank-reference" },
+  };
+  order.shippingInfo = { note: "private-shipment-note" };
+  const response = await f.deliveryRoutes.COD(f.request(checkoutBody()));
+  const data = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "private, no-store");
+  assert.equal(data.order.id, order.id);
+  assert.equal(data.order.amount, order.amount);
+  assert.equal(data.order.status, "paid");
+  assert.doesNotMatch(JSON.stringify(data), /private|codPaymentInfo|shippingInfo|recordedBy|requestId/);
+  assert.equal(f.rows.size, 1);
+  assert.equal(order.codPaymentInfo.collection.note, "private-collection-note");
+});
+
 test("same checkout key rejects changed delivery, products, bank or payment method", async () => {
   const f = fixture();
   assert.equal(

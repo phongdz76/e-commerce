@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createHash, timingSafeEqual } from "crypto";
 import { reconcilePendingPayments } from "@/libs/reconcilePayment";
 import { cleanupExpiredAuthRateLimits } from "@/libs/authRateLimit";
+import { expireUnconfirmedCodStock } from "@/libs/orderStock";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -24,10 +25,12 @@ export async function GET(request: Request) {
   try {
     const expiredAuthBucketsRemoved = await cleanupExpiredAuthRateLimits();
     const results = await reconcilePendingPayments();
+    const expiredCodHolds = await expireUnconfirmedCodStock();
     return NextResponse.json({
       processed: results.length,
       results,
       expiredAuthBucketsRemoved,
+      expiredCodHolds,
     });
   } catch {
     return NextResponse.json(

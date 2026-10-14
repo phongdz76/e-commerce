@@ -1,6 +1,7 @@
 import type { Order } from "@prisma/client";
 import prisma from "@/libs/prismadb";
 import { callZaloPay, getZaloPayConfig, zaloPayMac } from "./zalopay";
+import { releaseVerifiedFailedStock, reviewPaidReleasedStock } from "@/libs/orderStock";
 
 type ZaloPayOrder = Pick<
   Order,
@@ -15,6 +16,7 @@ export async function syncZaloPayOrder<T extends ZaloPayOrder>(
     order.paymentMethod !== "ZALOPAY" ||
     PAID_STATUSES.includes(order.status)
   ) {
+    if (PAID_STATUSES.includes(order.status) && "stockReservation" in order && order.stockReservation) await reviewPaidReleasedStock(order.id);
     return order;
   }
   if (!order.paymentIntentId) {
@@ -76,5 +78,8 @@ export async function syncZaloPayOrder<T extends ZaloPayOrder>(
   ) {
     throw new Error("Order no longer exists");
   }
+  if (updated.stockReservation && updated.status === "failed" && result.return_code === 3 && result.is_processing === false &&
+      order.paymentExpiresAt && order.paymentExpiresAt.getTime() <= Date.now()) await releaseVerifiedFailedStock(updated.id, order.paymentIntentId);
+  if (updated.stockReservation?.state === "RELEASED" && PAID_STATUSES.includes(updated.status)) await reviewPaidReleasedStock(updated.id);
   return { ...order, ...updated };
 }

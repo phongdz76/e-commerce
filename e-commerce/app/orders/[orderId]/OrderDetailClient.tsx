@@ -1,7 +1,7 @@
 "use client";
 
 import { safeUser } from "@/types";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -12,6 +12,9 @@ import { API_PATHS } from "@/utils/apiPaths";
 import { formatPrice } from "@/utils/formatPrice";
 import { MdArrowBack, MdLocalShipping, MdPayment } from "react-icons/md";
 import { FaBoxOpen, FaClipboardList } from "react-icons/fa";
+import { getCustomerDeliveryInfo, normalizeCustomerDeliveryStatus } from "@/utils/orderShipment";
+import ShipmentTracking from "./ShipmentTracking";
+import OrderStock from "./OrderStock";
 
 interface OrderProduct {
   id: string;
@@ -80,17 +83,17 @@ const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> =
       bg: "bg-blue-50 border-blue-200",
     },
     complete: {
-      label: "Done",
+      label: "Paid",
       color: "text-emerald-700",
       bg: "bg-emerald-50 border-emerald-200",
     },
     paid: {
-      label: "Done",
+      label: "Paid",
       color: "text-emerald-700",
       bg: "bg-emerald-50 border-emerald-200",
     },
     done: {
-      label: "Done",
+      label: "Paid",
       color: "text-emerald-700",
       bg: "bg-emerald-50 border-emerald-200",
     },
@@ -105,27 +108,6 @@ const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> =
       bg: "bg-rose-50 border-rose-200",
     },
   };
-
-const DELIVERY_MAP: Record<
-  string,
-  { label: string; color: string; bg: string }
-> = {
-  pending: {
-    label: "Pending",
-    color: "text-amber-700",
-    bg: "bg-amber-50 border-amber-200",
-  },
-  dispatched: {
-    label: "Dispatched",
-    color: "text-blue-700",
-    bg: "bg-blue-50 border-blue-200",
-  },
-  delivered: {
-    label: "Delivered",
-    color: "text-emerald-700",
-    bg: "bg-emerald-50 border-emerald-200",
-  },
-};
 
 const PAYMENT_LABELS: Record<string, string> = {
   COD: "Cash on Delivery (COD)",
@@ -162,6 +144,10 @@ export default function OrderDetailClient({
   const [isLoading, setIsLoading] = useState(true);
   const [isCheckingPayment, setIsCheckingPayment] = useState(false);
   const [isRetryingPayment, setIsRetryingPayment] = useState(false);
+  const [shipmentDeliveryStatus, setShipmentDeliveryStatus] = useState<string | null>(null);
+  const handleShipmentStatusChange = useCallback((status: string) => {
+    setShipmentDeliveryStatus(status);
+  }, []);
   const paymentAction = useRef(false);
   const retryRequest = useRef<{
     orderId: string;
@@ -303,29 +289,28 @@ export default function OrderDetailClient({
 
   const orderDate = new Date(order.createDate);
   const formattedDate = orderDate.toLocaleDateString("en-US", {
+    timeZone: "Asia/Ho_Chi_Minh",
     weekday: "long",
     year: "numeric",
     month: "long",
     day: "numeric",
   });
   const formattedTime = orderDate.toLocaleTimeString("en-US", {
+    timeZone: "Asia/Ho_Chi_Minh",
     hour: "2-digit",
     minute: "2-digit",
   });
 
   const totalQuantity = order.products.reduce((s, p) => s + p.quantity, 0);
   const statusInfo = STATUS_MAP[order.status] || {
-    label: order.status,
+    label: "Status unconfirmed",
     color: "text-slate-700",
     bg: "bg-slate-50 border-slate-200",
   };
-  const deliveryInfo = order.deliveryStatus
-    ? DELIVERY_MAP[order.deliveryStatus] || {
-        label: order.deliveryStatus,
-        color: "text-slate-700",
-        bg: "bg-slate-50 border-slate-200",
-      }
-    : null;
+  const deliveryInfo = getCustomerDeliveryInfo(shipmentDeliveryStatus || order.deliveryStatus);
+  const canRetryDelivery = ["not_recorded", "pending"].includes(
+    shipmentDeliveryStatus || normalizeCustomerDeliveryStatus(order.deliveryStatus),
+  );
 
   const addressText = [
     order.address?.line1,
@@ -335,8 +320,6 @@ export default function OrderDetailClient({
   ]
     .filter(Boolean)
     .join(", ");
-  const deliverySteps = ["pending", "dispatched", "delivered"];
-  const deliveryStep = deliverySteps.indexOf(order.deliveryStatus ?? "");
 
   return (
     <div className="pb-10">
@@ -362,17 +345,14 @@ export default function OrderDetailClient({
               </span>
             </h1>
             <p className="text-sm text-slate-500 mt-1">
-              {formattedDate} at {formattedTime}
+              {formattedDate} at {formattedTime} (Vietnam time)
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Badge {...statusInfo} label={`Payment: ${statusInfo.label}`} />
-            {deliveryInfo && (
-              <Badge
-                {...deliveryInfo}
-                label={`Delivery: ${deliveryInfo.label}`}
-              />
-            )}
+            <span className={`inline-block rounded-md border px-2.5 py-1 text-xs font-medium ${deliveryInfo.className}`}>
+              Delivery: {deliveryInfo.label}
+            </span>
           </div>
         </div>
       </div>
@@ -497,8 +477,7 @@ export default function OrderDetailClient({
                       ["RESERVED", "CREATED"].includes(
                         order.paymentAttemptState || "",
                       ))) &&
-                    (!order.deliveryStatus ||
-                      order.deliveryStatus === "pending") && (
+                    canRetryDelivery && (
                       <>
                         <p className="text-xs leading-5 text-slate-500">
                           We will verify the previous payment before preparing
@@ -520,42 +499,18 @@ export default function OrderDetailClient({
           </div>
 
           {/* Delivery */}
+          <OrderStock key={order.id} orderId={order.id} />
           <div className="rounded-lg border border-slate-200 bg-white p-5">
             <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-3">
               <MdLocalShipping size={16} className="text-slate-400" />
               Delivery
             </h3>
-            {deliveryStep >= 0 && (
-              <ol
-                aria-label="Delivery progress"
-                className="mb-5 flex gap-2 border-b border-slate-100 pb-4"
-              >
-                {deliverySteps.map((step, index) => (
-                  <li
-                    key={step}
-                    aria-current={index === deliveryStep ? "step" : undefined}
-                    className={`flex min-w-0 flex-1 flex-col items-center gap-2 text-center text-xs ${index <= deliveryStep ? "text-teal-700" : "text-slate-400"}`}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={`flex h-7 w-7 items-center justify-center rounded-full border font-medium ${index <= deliveryStep ? "border-teal-200 bg-teal-50" : "border-slate-200 bg-slate-50"}`}
-                    >
-                      {index + 1}
-                    </span>
-                    {DELIVERY_MAP[step].label}
-                  </li>
-                ))}
-              </ol>
-            )}
+            <ShipmentTracking
+              key={order.id}
+              orderId={order.id}
+              onStatusChange={handleShipmentStatusChange}
+            />
             <dl className="space-y-2 text-sm">
-              {deliveryInfo && (
-                <div className="flex justify-between">
-                  <dt className="text-slate-500">Status</dt>
-                  <dd>
-                    <Badge {...deliveryInfo} />
-                  </dd>
-                </div>
-              )}
               {order.recipientName && (
                 <div>
                   <dt className="text-slate-500 mb-1">Recipient</dt>
@@ -585,7 +540,7 @@ export default function OrderDetailClient({
                   </dd>
                 </div>
               )}
-              {!addressText && !deliveryInfo && (
+              {!addressText && !order.recipientName && !order.recipientPhone && (
                 <p className="text-slate-400 text-xs">
                   No delivery information available
                 </p>

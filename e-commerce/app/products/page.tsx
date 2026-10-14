@@ -5,6 +5,7 @@ import type { ProductFilters } from "@/utils/productFilters";
 import { getStorefrontProducts } from "@/libs/storefrontProductNames";
 
 export const metadata: Metadata = { title: "Shop Products | SGTech" };
+export const dynamic = "force-dynamic";
 
 export default async function ProductsPage({ searchParams }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;

@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/actions/getCurrentUser";
 import prisma from "@/libs/prismadb";
 import { startAdminAudit, finishAdminAudit } from "@/libs/adminAudit";
 import { isCatalogImageUrl } from "@/utils/catalogImage";
+import { readInventoryBalance } from "@/utils/adminInventory";
 
 const catalogInclude = {
   category: true,
@@ -35,6 +36,7 @@ function serializeProduct(product: CatalogProduct) {
       attributes: variant.attributes || {},
       isActive: variant.isActive,
       inStock: variant.inStock,
+      inventory: readInventoryBalance(variant.inventory),
     })),
   };
 }

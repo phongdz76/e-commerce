@@ -166,6 +166,7 @@ export interface AdminCatalogVariant {
   attributes: Record<string, string>;
   isActive: boolean;
   inStock: boolean;
+  inventory?: import("./adminInventory").InventoryBalance | null;
 }
 
 export interface AdminCatalogProduct {

@@ -16,7 +16,7 @@ export default function AdminHeader({ currentUser }: { currentUser: safeUser | n
   const isProductChild = pathname.startsWith("/admin/products/");
   const isOrderChild = pathname.startsWith("/admin/orders/");
   const isShipmentChild = pathname.startsWith("/admin/shipments/");
-  const childTitle = pathname === "/admin/products/new" ? "Add product" : isProductChild ? "Edit product" : isOrderChild ? "Order details" : isShipmentChild ? "Shipment details" : null;
+  const childTitle = pathname === "/admin/products/new" ? "Add product" : isProductChild ? "Edit product" : isOrderChild ? "Order details" : isShipmentChild ? pathname.endsWith("/packing-slip") ? "Packing slip" : "Shipment details" : null;
 
   return (
     <>
