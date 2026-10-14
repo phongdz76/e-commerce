@@ -89,7 +89,7 @@ async function main() {
     checks.push("concurrent dispatch deducts physical stock exactly once");
     await prisma.productVariant.update({ where: { id: variant.id }, data: { inventory: { set: { onHand: 1, reserved: 0, version: afterDispatch.inventory.version + 1, updatedAt: new Date() } } } });
     const expiring = await checkout.prepareCheckoutRequest(randomUUID(), users[0].id, "COD", cart, delivery);
-    await prisma.order.update({ where: { id: expiring.order.id }, data: { stockReservation: { update: { expiresAt: new Date(Date.now() - 1000) } } } });
+    await prisma.order.update({ where: { id: expiring.order.id }, data: { stockReservation: { set: { ...expiring.order.stockReservation, expiresAt: new Date(Date.now() - 1000) } } } });
     assert.equal(await stock.expireUnconfirmedCodStock(), 1);
     assert.equal(await stock.expireUnconfirmedCodStock(), 0);
     assert.equal((await prisma.productVariant.findUnique({ where: { id: variant.id } })).inventory.reserved, 0);
@@ -115,4 +115,4 @@ async function main() {
     await prisma.$disconnect();
   }
 }
-main().catch((error) => { console.error("Stock concurrency QA failed (code):", error.code || error.name); if (error.name === "AssertionError") console.error(error.message); process.exitCode = 1; });
+main().catch((error) => { console.error("Stock concurrency QA failed (code):", error.code || error.name); if (["AssertionError", "PrismaClientValidationError"].includes(error.name)) console.error(error.message.replace(/mongodb(?:\+srv)?:\/\/[^\s'"`]+/g, "[REDACTED]")); process.exitCode = 1; });

@@ -7,6 +7,7 @@ const { Readable } = require("node:stream");
 const { createHmac, randomUUID } = require("node:crypto");
 const ts = require("typescript");
 const Stripe = require("stripe");
+const { installStockDatabase } = require("./fixtures/stock-db.cjs");
 
 // Isolated test-process configuration; never load the app's private credentials.
 process.env.VNP_TMNCODE = "FIXTURE1";
@@ -31,7 +32,7 @@ function loadSource(file, mocks = {}) {
   vm.runInThisContext(`(function(require,module,exports){${compiled}\n})`, {
     filename,
   })(
-    (name) => (name in mocks ? mocks[name] : require(name)),
+    (name) => (name in mocks ? mocks[name] : name.startsWith("@/") ? loadSource(name.slice(2) + ".ts", mocks) : require(name)),
     loadedModule,
     loadedModule.exports,
   );
@@ -39,9 +40,6 @@ function loadSource(file, mocks = {}) {
 }
 
 const { products } = loadSource("utils/products.tsx");
-const orderItems = loadSource("libs/orderItems.ts", {
-  "@/utils/products": { products },
-});
 const orderDelivery = loadSource("libs/orderDelivery.ts");
 const product = products.find((p) => p.inStock);
 const cart = [{ ...product, selectedImg: product.images[0], quantity: 1 }];
@@ -68,6 +66,7 @@ function fixture() {
         return value.some((condition) => matches(row, condition));
       if (value === null) return row[key] == null;
       if (value && typeof value === "object") {
+        if ("is" in value) return !!row[key] && matches(row[key], value.is);
         if ("isSet" in value) return (row[key] !== undefined) === value.isSet;
         if (value.in) return value.in.includes(row[key]);
         if (value.notIn) return !value.notIn.includes(row[key]);
@@ -191,6 +190,7 @@ function fixture() {
   });
   prisma.checkoutRequest = createModel(checkoutRequests);
   prisma.paymentAttempt = createModel(paymentAttempts);
+  installStockDatabase(prisma, products, [rows, checkoutRequests, paymentAttempts]);
   const stripe = {
     webhooks: new Stripe("sk_test_fixture").webhooks,
     paymentIntents: {
@@ -225,7 +225,6 @@ function fixture() {
     "@/libs/stripe": { getStripe: () => stripe },
     "./stripe": { getStripe: () => stripe },
     "@/utils/products": { products },
-    "@/libs/orderItems": orderItems,
     "@/libs/orderDelivery": orderDelivery,
     "@/libs/syncZaloPayOrder": { syncZaloPayOrder: async (order) => order },
     "next/server": {

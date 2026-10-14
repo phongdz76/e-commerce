@@ -121,7 +121,7 @@ test("empty sales stay empty, outages and malformed summaries do not become fake
   assert.doesNotMatch(await response.text(), /private|password/);
 });
 
-test("storefront names follow admin data without modifying legacy prices, reviews or catalog records", async () => {
+test("storefront names, prices, options and availability come from the current database catalog", async () => {
   const original = [{ id: "a".repeat(24), name: "Original", price: 1000, reviews: [], images: [], inStock: true }];
   let name = "Updated name";
   const queries = [];
@@ -129,14 +129,18 @@ test("storefront names follow admin data without modifying legacy prices, review
     "@/utils/products": { products: original },
     "@/libs/prismadb": { __esModule: true, default: { product: { findMany: async (options) => {
       queries.push(options);
-      return [{ id: original[0].id, name }];
+      return [{ id: original[0].id, name, description: "Database description", category: { name: "Phone" }, brand: { name: "Brand" },
+        variants: [{ id: "b".repeat(24), sku: "DB-SKU", name: "Black", price: 2000, inStock: true,
+          image: { color: "Black", colorCode: "#000000", image: "/products/phone.webp" }, inventory: { onHand: 3, reserved: 2, version: 1, updatedAt: new Date() } }] }];
     } } } },
   }).getStorefrontProducts;
   assert.equal((await getStorefrontProducts())[0].name, "Updated name");
   name = "Another name";
   const products = await getStorefrontProducts();
   assert.equal(products[0].name, name);
-  assert.equal(products[0].price, 1000);
-  assert.deepEqual(queries[0].select, { id: true, name: true });
+  assert.equal(products[0].price, 2000);
+  assert.equal(products[0].variants[0].available, 1);
+  assert.equal(products[0].variants[0].sku, "DB-SKU");
+  assert.equal(queries[0].where.status, "ACTIVE");
   assert.equal(original[0].name, "Original");
 });

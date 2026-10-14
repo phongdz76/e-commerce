@@ -5,6 +5,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const { createHmac } = require("node:crypto");
 const ts = require("typescript");
+const { installStockDatabase, matches: stockMatches } = require("./fixtures/stock-db.cjs");
 
 // No real credentials, database, network calls or payments.
 Object.assign(process.env, {
@@ -29,7 +30,7 @@ function load(file, mocks = {}) {
   vm.runInThisContext(`(function(require,module,exports){${js}\n})`, {
     filename,
   })(
-    (name) => (name in mocks ? mocks[name] : require(name)),
+    (name) => (name in mocks ? mocks[name] : name.startsWith("@/") ? load(name.slice(2) + ".ts", mocks) : require(name)),
     loadedModule,
     loadedModule.exports,
   );
@@ -37,15 +38,12 @@ function load(file, mocks = {}) {
 }
 const mac = (data, key) => createHmac("sha256", key).update(data).digest("hex");
 const { products } = load("utils/products.tsx");
-const orderItems = load("libs/orderItems.ts", {
-  "@/utils/products": { products },
-});
 const orderDelivery = load("libs/orderDelivery.ts");
 const zalo = load("libs/zalopay.ts");
 const product = products.find((p) => p.inStock);
 const payload = {
   items: [
-    { id: product.id, quantity: 1, selectedImg: product.images[0], price: 1 },
+    { id: product.id, quantity: 1, selectedImg: product.images[0], price: product.price },
   ],
   amount: 1,
   address: "12 Example Street",
@@ -71,7 +69,7 @@ function fixture() {
     Object.entries(where).every(([key, value]) =>
       value && typeof value === "object" && value.notIn
         ? !value.notIn.includes(row[key])
-        : row[key] === value,
+        : value && typeof value === "object" && ("is" in value || "isSet" in value) ? stockMatches(row, { [key]: value }) : row[key] === value,
     );
   const prisma = {
     order: {
@@ -132,10 +130,20 @@ function fixture() {
       );
     },
   };
+  const checkoutRequests = new Map();
+  const attempts = new Map();
+  const model = (records) => ({
+    findUnique: async ({ where }) => structuredClone(records.get(where.id) || null),
+    create: async ({ data }) => { if (records.has(data.id)) throw Object.assign(new Error("Duplicate"), { code: "P2002" }); const row = { state: "CREATED", ...structuredClone(data) }; records.set(row.id, row); return structuredClone(row); },
+    updateMany: async ({ where, data }) => { let count = 0; for (const row of records.values()) if (stockMatches(row, where)) { Object.assign(row, structuredClone(data)); count++; } return { count }; },
+    findMany: async ({ where }) => [...records.values()].filter((row) => stockMatches(row, where)),
+  });
+  prisma.checkoutRequest = model(checkoutRequests);
+  prisma.paymentAttempt = model(attempts);
+  installStockDatabase(prisma, products, [rows, checkoutRequests, attempts]);
   const mocks = {
     "@/actions/getCurrentUser": { getCurrentUser: async () => state.user },
     "@/libs/prismadb": { __esModule: true, default: prisma },
-    "@/libs/orderItems": orderItems,
     "@/libs/orderDelivery": orderDelivery,
     "@/libs/zalopay": provider,
     "./zalopay": provider,
