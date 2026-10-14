@@ -6,7 +6,7 @@ import { PRODUCTS_PER_PAGE } from "@/utils/productFilters";
 import { getCatalogSearchPatterns, resolveCatalogGroup } from "@/utils/catalogQuery";
 import type { CatalogAttributeFacet, CatalogGroup, CatalogPage, CatalogSuggestion } from "@/types/catalog";
 
-type Stage = Prisma.InputJsonObject;
+type Stage = Record<string, Prisma.InputJsonValue | undefined>;
 const number = (field: string) => ({ $convert: { input: field, to: "long", onError: -1, onNull: -1 } });
 const validInteger = (field: string, minimum: number) => ({ $and: [{ $in: [{ $type: field }, ["int", "long", "double", "decimal"]] }, { $eq: [number(field), field] }, { $gte: [number(field), minimum] }, { $lte: [number(field), 2000000000] }] });
 const attributePairs = (field: string) => ({ $objectToArray: { $cond: [{ $eq: [{ $type: field }, "object"] }, field, {}] } });
@@ -67,7 +67,7 @@ export function buildCatalogPipeline(filters: ProductFilters, page = 1, pageSize
     products: [...searched, ...filterStages(filters), { $sort: sort }, { $skip: (page - 1) * pageSize }, { $limit: pageSize }, { $project: {
       _id: 0, id: { $toString: "$_id" }, name: 1, description: 1, category: "$category.name", categorySlug: "$category.slug", brand: "$brand.name", brandSlug: "$brand.slug", price: 1,
       inStock: { $anyElementTrue: [{ $map: { input: "$eligible", as: "variant", in: { $gt: ["$$variant.available", 0] } } }] },
-      images: { $map: { input: "$eligible", as: "variant", in: "$$variant.image" } },
+      images: { $let: { vars: { cheapest: { $arrayElemAt: [{ $filter: { input: "$eligible", as: "variant", cond: { $eq: ["$$variant.price", "$price"] } } }, 0] } }, in: ["$$cheapest.image"] } },
     } }],
     totals: [...searched, ...filterStages(filters), { $count: "count" }],
     catalogTotals: [{ $count: "count" }],
@@ -121,7 +121,8 @@ export async function getCatalogPage(input: ProductFilters, page = 1, pageSize =
   }
   return { products: array(summary.products).map(readProduct), filters, total, catalogTotal, page, totalPages: Math.max(1, Math.ceil(total / pageSize)),
     categories: groups.categories.map(group => ({ ...group, count: categoryCounts.get(group.value) || 0 })), brands,
-    attributes: [...facets.values()].sort((a, b) => a.name.localeCompare(b.name)).slice(0, 8) };
+    attributes: [...facets.values()].sort((a, b) => a.name.localeCompare(b.name)).slice(0, 8),
+    attributesLimited: facets.size > 8 };
 }
 
 export async function getCatalogSuggestions(query: string): Promise<CatalogSuggestion[]> {

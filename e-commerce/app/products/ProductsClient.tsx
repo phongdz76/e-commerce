@@ -58,17 +58,18 @@ export default function ProductsClient({ data }: ProductsClientProps) {
         <div className="mb-5 flex flex-wrap items-center gap-x-6 gap-y-3">
           <p role="status" className="shrink-0 text-base text-slate-700"><span className="font-bold">{total}</span> product{total === 1 ? "" : "s"} found{isPending ? " · Updating..." : ""}</p>
           {chips.length > 0 && <div className="flex min-w-0 flex-wrap items-center gap-2">
-            {chips.map((chip) => <button key={chip.label} onClick={() => update(chip.clear)} aria-label={`Remove filter: ${chip.label}`} className="flex max-w-full items-center gap-2 rounded-full border border-teal-100 bg-teal-50/60 px-3 py-1.5 text-base text-teal-700"><span className="truncate">{chip.label}</span><FiX size={14} className="shrink-0" /></button>)}
+              {chips.map((chip) => <button key={chip.label} disabled={isPending} onClick={() => update(chip.clear)} aria-label={`Remove filter: ${chip.label}`} className="flex max-w-full items-center gap-2 rounded-full border border-teal-100 bg-teal-50/60 px-3 py-1.5 text-base text-teal-700"><span className="truncate">{chip.label}</span><FiX size={14} className="shrink-0" /></button>)}
             <Link href="/products" className="px-2 py-1.5 text-base text-slate-500 transition hover:text-teal-600">Clear all filters</Link>
           </div>}
-          <div className="ml-auto flex w-full flex-wrap items-center gap-3 sm:w-auto">
+          <fieldset disabled={isPending} className="ml-auto flex w-full flex-wrap items-center gap-3 sm:w-auto">
+            <legend className="sr-only">Brand, category and sort</legend>
             <BrandFilter options={brandOptions} selected={selectedBrands} categoryLabel={category?.label} onChange={(brands) => update({ brand: brands.join(",") })} />
             <SelectMenu id="catalog-category" label="Categories" value={filters.category} options={[{ value: "", label: "All categories" }, ...categories.map(group => ({ value: group.value, label: group.label })), ...(filters.category && !category ? [{ value: filters.category, label: "Unavailable category" }] : [])]} onChange={(value) => update({ category: value, attributes: {} })} className="w-40 max-w-full" />
             {<div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
             <label htmlFor="catalog-sort" className="whitespace-nowrap text-base text-slate-700">Sort by</label>
             <SelectMenu id="catalog-sort" label="Sort by" value={filters.sort} options={[{ value: "", label: "Newest products" }, { value: "price-asc", label: "Price: low to high" }, { value: "price-desc", label: "Price: high to low" }, { value: "name", label: "Product name" }]} onChange={(value) => update({ sort: value })} className="flex-1 sm:w-52 sm:flex-none" />
             </div>}
-          </div>
+          </fieldset>
         </div>
       )}
 
