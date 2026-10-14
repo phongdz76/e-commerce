@@ -1,5 +1,52 @@
 @import "tailwindcss";
 
+@media print {
+  body:has(.sgtech-packing-slip) .sgtech-admin aside,
+  body:has(.sgtech-packing-slip) .sgtech-admin header {
+    display: none !important;
+  }
+
+  body:has(.sgtech-packing-slip) .sgtech-admin,
+  body:has(.sgtech-packing-slip) .sgtech-admin main {
+    min-height: 0;
+    background: white;
+    padding: 0;
+    max-width: none;
+  }
+}
+@layer base {
+  :root {
+    font-family: var(--font-poppins), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  body,
+  input,
+  button,
+  select,
+  textarea {
+    font-family: inherit;
+  }
+}
+
+.sgtech-admin {
+  font-family: inherit;
+}
+
+.sgtech-admin :is(a, button, input, select, textarea, summary):focus-visible {
+  outline: 2px solid #0d9488;
+  outline-offset: 3px;
+}
+
+.sgtech-admin table th {
+  text-transform: none;
+  font-weight: 600;
+  letter-spacing: normal;
+}
+
+.sgtech-admin pre,
+.sgtech-admin code {
+  font-family: inherit;
+}
+
 .sgtech-search {
   border-color: #cbd5e1;
   transition: border-color 200ms ease, box-shadow 200ms ease;

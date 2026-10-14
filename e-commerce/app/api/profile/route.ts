@@ -1,14 +1,18 @@
 import bcrypt from "bcrypt";
-import { User } from "@prisma/client";
+import { User, Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/actions/getCurrentUser";
+import { getCurrentUser, getSession } from "@/actions/getCurrentUser";
 import prisma from "@/libs/prismadb";
-
-const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-const PASSWORD_REGEX =
-  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-const PASSWORD_MESSAGE =
-  "Password must contain at least one uppercase letter, one lowercase letter, one number and one special character (@$!%*?&)";
+import { EMAIL_REGEX, getPasswordValidationError } from "@/libs/authValidation";
+import {
+  CLEARED_VERIFICATION_FIELDS,
+  getActiveUserWhere,
+} from "@/libs/authSession";
+import {
+  requestEmailVerification,
+  EmailVerificationError,
+} from "@/libs/emailVerification";
+import { AuthRateLimitError, checkAuthRateLimit } from "@/libs/authRateLimit";
 const PHONE_REGEX = /^\+?[0-9]{9,15}$/;
 
 interface NormalizeOptionalHttpUrlResult {
@@ -61,6 +65,8 @@ const mapProfileResponse = (user: User) => {
     address: user.address,
     phoneNumber: user.phoneNumber,
     role: user.role,
+    status: user.status || "ACTIVE",
+    pendingEmail: user.pendingEmail || null,
     emailVerified: user.emailVerified,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
@@ -86,10 +92,9 @@ export async function GET() {
     }
 
     return NextResponse.json(mapProfileResponse(user), { status: 200 });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unknown error";
+  } catch {
     return NextResponse.json(
-      { message: "Server error", error: message },
+      { message: "Unable to load your profile. Please try again." },
       { status: 500 },
     );
   }
@@ -103,7 +108,12 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ message: "Invalid request" }, { status: 400 });
+    }
     const username =
       body?.username !== undefined ? String(body.username).trim() : undefined;
     const email =
@@ -115,9 +125,7 @@ export async function PATCH(request: Request) {
       body?.currentPassword !== undefined
         ? String(body.currentPassword)
         : undefined;
-    const newPassword = body?.newPassword
-      ? String(body.newPassword).trim()
-      : "";
+    const newPassword = body?.newPassword ? String(body.newPassword) : "";
     let phoneNumber =
       body?.phoneNumber !== undefined
         ? normalizeOptionalText(body.phoneNumber)
@@ -160,17 +168,23 @@ export async function PATCH(request: Request) {
       );
     }
 
-    if (email && !EMAIL_REGEX.test(email)) {
+    if (
+      email !== undefined &&
+      (!email || email.length > 254 || !EMAIL_REGEX.test(email))
+    ) {
       return NextResponse.json(
         { message: "Invalid email format" },
         { status: 400 },
       );
     }
 
-    if (newPassword && !PASSWORD_REGEX.test(newPassword)) {
+    const passwordError = newPassword
+      ? getPasswordValidationError(newPassword)
+      : null;
+    if (passwordError) {
       return NextResponse.json(
         {
-          message: PASSWORD_MESSAGE,
+          message: passwordError,
         },
         { status: 400 },
       );
@@ -194,14 +208,32 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ message: "User not found" }, { status: 404 });
     }
 
+    const session = await getSession();
+    const sessionUser = session?.user as
+      | { id?: string; sessionVersion?: number; authenticatedAt?: number }
+      | undefined;
+    const sessionVersion = sessionUser?.sessionVersion ?? 0;
+    if (
+      sessionUser?.id !== user.id ||
+      sessionVersion !== (user.sessionVersion || 0) ||
+      (user.status || "ACTIVE") !== "ACTIVE"
+    ) {
+      return NextResponse.json(
+        { message: "Your session has changed. Please sign in again." },
+        { status: 401 },
+      );
+    }
+
+    const isEmailChange = Boolean(email && email !== user.email?.toLowerCase());
+
     if (!user.hashedPassword && !newPassword) {
-      const isOnlyUpdatingAddressOrPhone = 
+      const isOnlyUpdatingAddressOrPhone =
         (address !== undefined || phoneNumber !== undefined) &&
         username === undefined &&
         email === undefined &&
         profileImageUrl === undefined &&
         currentPassword === undefined;
-        
+
       if (!isOnlyUpdatingAddressOrPhone) {
         return NextResponse.json(
           {
@@ -215,25 +247,28 @@ export async function PATCH(request: Request) {
       }
     }
 
-    const updateData: {
-      name?: string;
-      email?: string;
-      image?: string | null;
-      address?: string | null;
-      phoneNumber?: string | null;
-      hashedPassword?: string;
-    } = {};
+    const updateData: Prisma.UserUpdateManyMutationInput = {
+      updatedAt: new Date(),
+    };
 
-    if (newPassword) {
+    if (newPassword || isEmailChange) {
       if (user.hashedPassword) {
         if (!currentPassword) {
           return NextResponse.json(
             {
-              message: "Current password is required to set a new password",
+              message:
+                "Current password is required to change your password or email",
             },
             { status: 400 },
           );
         }
+
+        await checkAuthRateLimit(
+          "profile-password",
+          user.id,
+          5,
+          15 * 60 * 1000,
+        );
 
         const isMatch = await bcrypt.compare(
           currentPassword,
@@ -245,12 +280,37 @@ export async function PATCH(request: Request) {
             { status: 401 },
           );
         }
+      } else if (
+        !sessionUser.authenticatedAt ||
+        Date.now() - sessionUser.authenticatedAt > 5 * 60 * 1000 ||
+        sessionUser.authenticatedAt > Date.now()
+      ) {
+        return NextResponse.json(
+          {
+            message:
+              "Please sign in again before setting a password or changing your email.",
+            code: "AUTH_REAUTH_REQUIRED",
+          },
+          { status: 401 },
+        );
       }
-
-      updateData.hashedPassword = await bcrypt.hash(newPassword, 10);
     }
 
-    if (email && email !== (user.email || "").toLowerCase()) {
+    if (newPassword) {
+      updateData.hashedPassword = await bcrypt.hash(newPassword, 10);
+      updateData.sessionVersion = sessionVersion + 1;
+      updateData.resetPasswordToken = null;
+      updateData.resetPasswordExpires = null;
+      Object.assign(updateData, CLEARED_VERIFICATION_FIELDS);
+    }
+
+    if (isEmailChange && email) {
+      await checkAuthRateLimit(
+        "email-verification-user",
+        user.id,
+        3,
+        60 * 60 * 1000,
+      );
       const emailTaken = await prisma.user.findUnique({ where: { email } });
       if (emailTaken && emailTaken.id !== user.id) {
         return NextResponse.json(
@@ -258,8 +318,6 @@ export async function PATCH(request: Request) {
           { status: 400 },
         );
       }
-
-      updateData.email = email;
     }
 
     if (username) {
@@ -278,16 +336,76 @@ export async function PATCH(request: Request) {
       updateData.phoneNumber = phoneNumber;
     }
 
-    const updatedUser = await prisma.user.update({
-      where: { id: user.id },
+    const updated = await prisma.user.updateMany({
+      where: getActiveUserWhere(user.id, sessionVersion),
       data: updateData,
     });
 
-    return NextResponse.json(mapProfileResponse(updatedUser), { status: 200 });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unknown error";
+    if (updated.count !== 1) {
+      return NextResponse.json(
+        { message: "Your session has changed. Please sign in again." },
+        { status: 409 },
+      );
+    }
+
+    let updatedUser = await prisma.user.findUnique({ where: { id: user.id } });
+    if (
+      !updatedUser ||
+      (updatedUser.sessionVersion || 0) !==
+        sessionVersion + (newPassword ? 1 : 0)
+    ) {
+      return NextResponse.json(
+        { message: "Your session has changed. Please sign in again." },
+        { status: 409 },
+      );
+    }
+
+    let verificationSent = false;
+    let emailVerificationError: string | undefined;
+    if (isEmailChange && email) {
+      try {
+        await requestEmailVerification(updatedUser, email);
+        verificationSent = true;
+      } catch {
+        emailVerificationError =
+          "Profile saved, but verification email could not be sent. Please request a new link.";
+      }
+      updatedUser = await prisma.user.findUnique({ where: { id: user.id } });
+      if (!updatedUser) {
+        return NextResponse.json(
+          { message: "Unable to load your updated profile." },
+          { status: 500 },
+        );
+      }
+    }
+
     return NextResponse.json(
-      { message: "Server error", error: message },
+      {
+        ...mapProfileResponse(updatedUser),
+        verificationSent,
+        emailVerificationError,
+        sessionRevoked: Boolean(newPassword),
+      },
+      { status: 200 },
+    );
+  } catch (error: unknown) {
+    if (
+      error instanceof AuthRateLimitError ||
+      error instanceof EmailVerificationError
+    ) {
+      return NextResponse.json(
+        { message: error.message },
+        {
+          status: error instanceof AuthRateLimitError ? 429 : error.status,
+          headers:
+            error instanceof AuthRateLimitError
+              ? { "Retry-After": String(error.retryAfter) }
+              : undefined,
+        },
+      );
+    }
+    return NextResponse.json(
+      { message: "Unable to update your profile. Please try again." },
       { status: 500 },
     );
   }

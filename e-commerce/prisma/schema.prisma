@@ -1,99 +1,319 @@
 datasource db {
-    provider = "mongodb"
-    url      = env("DATABASE_URL")
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
 }
 
 generator client {
-    provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 model User {
-    id                   String    @id @default(auto()) @map("_id") @db.ObjectId
-    name                 String?
-    email                String?   @unique
-    emailVerified        DateTime?
-    image                String?
-    address              String?
-    phoneNumber          String?
-    accounts             Account[]
-    hashedPassword       String?
-    role                 Role      @default(USER)
-    resetPasswordToken   String?
-    resetPasswordExpires DateTime?
-    createdAt            DateTime  @default(now())
-    updatedAt            DateTime  @updatedAt
-    orders               Order[]
+  id                       String      @id @default(auto()) @map("_id") @db.ObjectId
+  name                     String?
+  email                    String?     @unique
+  emailVerified            DateTime?
+  image                    String?
+  address                  String?
+  phoneNumber              String?
+  accounts                 Account[]
+  hashedPassword           String?
+  role                     Role        @default(USER)
+  resetPasswordToken       String?
+  resetPasswordExpires     DateTime?
+  status                   UserStatus? @default(ACTIVE)
+  sessionVersion           Int?        @default(0)
+  pendingEmail             String?
+  emailVerificationToken   String?
+  emailVerificationExpires DateTime?
+  emailVerificationVersion Int?
+  createdAt                DateTime    @default(now())
+  updatedAt                DateTime    @updatedAt
+  orders                   Order[]
 }
 
 enum Role {
-    USER
-    ADMIN
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+}
+
+model AuthRateLimit {
+  id        String   @id @map("_id")
+  attempts  Int
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
+
+model CheckoutRequest {
+  id               String   @id @map("_id")
+  userId           String   @db.ObjectId
+  fingerprint      String
+  paymentMethod    String
+  paymentReference String
+  orderId          String?  @db.ObjectId
+  createDate       DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  actorId    String   @db.ObjectId
+  action     String
+  entityType String
+  entityId   String
+  status     String   @default("STARTED")
+  details    Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+model Category {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  slug      String    @unique
+  isVisible Boolean   @default(true)
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Brand {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  slug      String    @unique
+  isVisible Boolean   @default(true)
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Product {
+  id          String           @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  slug        String           @unique
+  description String
+  status      ProductStatus    @default(DRAFT)
+  categoryId  String           @db.ObjectId
+  brandId     String           @db.ObjectId
+  category    Category         @relation(fields: [categoryId], references: [id])
+  brand       Brand            @relation(fields: [brandId], references: [id])
+  variants    ProductVariant[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([categoryId, status])
+  @@index([brandId, status])
+}
+
+model ProductVariant {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  productId  String   @db.ObjectId
+  sku        String   @unique
+  name       String
+  price      Int
+  currency   String   @default("vnd")
+  image      Image
+  attributes Json?
+  isActive   Boolean  @default(true)
+  inStock    Boolean  @default(false)
+  inventory  VariantInventory?
+  product    Product  @relation(fields: [productId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([productId, isActive])
+}
+
+type VariantInventory {
+  onHand    Int
+  reserved  Int
+  version   Int
+  updatedAt DateTime
+}
+
+model PaymentAttempt {
+  id                    String    @id @map("_id")
+  orderId               String    @db.ObjectId
+  paymentMethod         String
+  merchantId            String?
+  amount                Float
+  currency              String
+  state                 String    @default("CREATED")
+  paymentUrl            String?
+  deeplink              String?
+  expiresAt             DateTime?
+  providerTransactionId String?
+  resultCode            String?
+  failureVerifiedAt     DateTime?
+  previousAttemptId     String?
+  exceptionPending      Boolean?
+  createDate            DateTime  @default(now())
+  startedAt             DateTime?
+  lastCheckedAt         DateTime?
+  nextCheckAt           DateTime?
+  checkCount            Int       @default(0)
+  lastError             String?
+  leaseToken            String?
+  leaseExpiresAt        DateTime?
+
+  @@index([orderId])
+  @@index([state, nextCheckAt])
+  @@index([exceptionPending, state])
 }
 
 model Order {
-    id              String             @id @default(auto()) @map("_id") @db.ObjectId
-    userId          String             @db.ObjectId
-    amount          Float
-    currency        String
-    status          String
-    deliveryStatus  String?
-    createDate      DateTime           @default(now())
-    paymentIntentId String?            @unique
-    paymentMethod   String             @default("VNPAY")
-    paymentUrl      String?
-    paymentExpiresAt DateTime?
-    products        CartProductProps[]
-    address         Address?
-    recipientName   String?
-    recipientPhone  String?
+  id                     String             @id @default(auto()) @map("_id") @db.ObjectId
+  userId                 String             @db.ObjectId
+  amount                 Float
+  currency               String
+  status                 String
+  deliveryStatus         String?
+  createDate             DateTime           @default(now())
+  paymentIntentId        String?            @unique
+  paymentMethod          String             @default("VNPAY")
+  paymentUrl             String?
+  paymentExpiresAt       DateTime?
+  paymentAttemptTracked  Boolean?
+  activePaymentAttemptId String?
+  paidPaymentAttemptId   String?
+  products               CartProductProps[]
+  address                Address?
+  recipientName          String?
+  recipientPhone         String?
+  shippingInfo           ShippingInfo?
+  codPaymentInfo         CodPaymentInfo?
+  stockReservation       OrderStockReservation?
 
-    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+type ShippingInfo {
+  carrier        String
+  trackingNumber String
+  note           String
+  version        Int
+  updatedAt      DateTime
+}
+
+type CodPaymentInfo {
+  version    Int
+  collection CodCollection?
+  settlement CodSettlement?
+}
+
+type CodCollection {
+  requestId  String
+  collector  String
+  amount     Float
+  reference  String
+  occurredAt DateTime
+  note       String
+  recordedAt DateTime
+  recordedBy String   @db.ObjectId
+}
+
+type CodSettlement {
+  requestId  String
+  amount     Float
+  carrierFee Float
+  reference  String
+  occurredAt DateTime
+  note       String
+  recordedAt DateTime
+  recordedBy String   @db.ObjectId
 }
 
 type CartProductProps {
-    id          String @db.ObjectId
-    name        String
-    description String
-    category    String
-    brand       String
-    selectedImg Image
-    quantity    Int
-    price       Float
+  id          String @db.ObjectId
+  variantId   String? @db.ObjectId
+  sku         String?
+  name        String
+  description String
+  category    String
+  brand       String
+  selectedImg Image
+  quantity    Int
+  price       Float
+}
+
+type OrderStockReservation {
+  state     String
+  version   Int
+  expiresAt DateTime?
+  updatedAt DateTime
+  lines     ReservedStockLine[]
+}
+
+type ReservedStockLine {
+  variantId String @db.ObjectId
+  sku       String
+  quantity  Int
 }
 
 type Image {
-    color     String
-    colorCode String
-    image     String
+  color     String
+  colorCode String
+  image     String
 }
 
 type Address {
-    city        String
-    country     String
-    line1       String
-    line2       String?
-    postal_code String
-    state       String
+  city        String
+  country     String
+  line1       String
+  line2       String?
+  postal_code String
+  state       String
+}
+
+model PaymentException {
+  id                    String    @id @map("_id")
+  orderId               String    @db.ObjectId
+  attemptId             String
+  paidAttemptId         String?
+  reason                String
+  amount                Float
+  currency              String
+  providerTransactionId String?
+  status                String    @default("OPEN")
+  note                  String?
+  reviewedBy            String?   @db.ObjectId
+  reviewedAt            DateTime?
+  createdAt             DateTime  @default(now())
+
+  @@index([status, createdAt])
+  @@index([orderId])
 }
 
 model Account {
-    id                String  @id @default(auto()) @map("_id") @db.ObjectId
-    userId            String  @db.ObjectId
-    type              String
-    provider          String
-    providerAccountId String
-    refresh_token     String? @db.String
-    access_token      String? @db.String
-    expires_at        Int?
-    token_type        String?
-    scope             String?
-    id_token          String? @db.String
-    session_state     String?
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String  @db.ObjectId
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.String
+  access_token      String? @db.String
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.String
+  session_state     String?
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@unique([provider, providerAccountId])
+  @@unique([provider, providerAccountId])
 }

@@ -2,54 +2,107 @@ import type { Order } from "@prisma/client";
 import type Stripe from "stripe";
 import prisma from "@/libs/prismadb";
 import { getStripe } from "./stripe";
+import { releaseVerifiedFailedStock, reviewPaidReleasedStock } from "@/libs/orderStock";
 
-type StripeOrder = Pick<Order, "id" | "paymentIntentId" | "paymentMethod" | "status" | "amount" | "currency">;
+type StripeOrder = Pick<
+  Order,
+  "id" | "paymentIntentId" | "paymentMethod" | "status" | "amount" | "currency"
+>;
 
 export function getStripeOrderStatus(intent: Stripe.PaymentIntent) {
   if (intent.status === "succeeded") return "complete";
-  if (intent.status === "processing" || intent.status === "requires_capture") return "processing";
+  if (intent.status === "processing" || intent.status === "requires_capture")
+    return "processing";
   if (intent.status === "requires_action") return "pending";
-  if (intent.status === "canceled" || intent.last_payment_error) return "failed";
+  if (intent.status === "canceled" || intent.last_payment_error)
+    return "failed";
   return "draft";
 }
 
 export async function syncStripeOrder<T extends StripeOrder>(order: T) {
-  if (order.paymentMethod !== "STRIPE" || !order.paymentIntentId?.startsWith("pi_")) return order;
-  const intent = await getStripe().paymentIntents.retrieve(order.paymentIntentId);
-  if (intent.currency.toLowerCase() !== order.currency.toLowerCase() || intent.amount !== Math.round(order.amount)) {
+  if (
+    order.paymentMethod !== "STRIPE" ||
+    !order.paymentIntentId?.startsWith("pi_")
+  )
+    return order;
+  const intent = await getStripe().paymentIntents.retrieve(
+    order.paymentIntentId,
+  );
+  if (
+    intent.currency.toLowerCase() !== order.currency.toLowerCase() ||
+    intent.amount !== Math.round(order.amount)
+  ) {
     throw new Error("Payment amount does not match the order");
   }
-  if (intent.status === "succeeded" && intent.amount_received < Math.round(order.amount)) {
+  if (
+    intent.status === "succeeded" &&
+    intent.amount_received < Math.round(order.amount)
+  ) {
     throw new Error("Payment has not been received in full");
   }
   const status = getStripeOrderStatus(intent);
   // An older event must never move a confirmed payment back to Pending.
-  if (["complete", "paid", "done"].includes(order.status) && status !== "complete") return order;
+  if (
+    ["complete", "paid", "done"].includes(order.status) &&
+    status !== "complete"
+  )
+    return order;
   const shipping = intent.shipping?.address;
-  if (order.status !== status || shipping?.line1 || intent.shipping?.name || intent.shipping?.phone) {
+  if (
+    order.status !== status ||
+    shipping?.line1 ||
+    intent.shipping?.name ||
+    intent.shipping?.phone
+  ) {
     await prisma.order.updateMany({
       where: {
         id: order.id,
+        paymentIntentId: order.paymentIntentId,
+        paymentMethod: "STRIPE",
+        amount: order.amount,
+        currency: order.currency,
         // Another webhook may have confirmed payment since this order was read.
-        ...(status !== "complete" ? { status: { notIn: ["complete", "paid", "done"] } } : {}),
+        ...(status !== "complete"
+          ? { status: { notIn: ["complete", "paid", "done"] } }
+          : {}),
       },
       data: {
         status,
-        ...(intent.shipping?.name ? { recipientName: intent.shipping.name } : {}),
-        ...(intent.shipping?.phone ? { recipientPhone: intent.shipping.phone } : {}),
-        ...(shipping?.line1 ? { address: {
-          city: shipping.city ?? "",
-          country: shipping.country ?? "VN",
-          line1: shipping.line1,
-          line2: shipping.line2,
-          postal_code: shipping.postal_code ?? "",
-          state: shipping.state ?? "",
-        } } : {}),
+        ...(intent.shipping?.name
+          ? { recipientName: intent.shipping.name }
+          : {}),
+        ...(intent.shipping?.phone
+          ? { recipientPhone: intent.shipping.phone }
+          : {}),
+        ...(shipping?.line1
+          ? {
+              address: {
+                city: shipping.city ?? "",
+                country: shipping.country ?? "VN",
+                line1: shipping.line1,
+                line2: shipping.line2,
+                postal_code: shipping.postal_code ?? "",
+                state: shipping.state ?? "",
+              },
+            }
+          : {}),
       },
     });
     const updated = await prisma.order.findUnique({ where: { id: order.id } });
-    if (!updated) throw new Error("Order no longer exists");
+    if (
+      !updated ||
+      updated.paymentIntentId !== order.paymentIntentId ||
+      updated.paymentMethod !== order.paymentMethod ||
+      updated.amount !== order.amount ||
+      updated.currency !== order.currency
+    ) {
+      throw new Error("Order changed during payment confirmation");
+    }
+    if (updated.stockReservation && intent.status === "canceled") await releaseVerifiedFailedStock(updated.id, updated.activePaymentAttemptId || intent.id);
+    if (updated.stockReservation?.state === "RELEASED" && status === "complete") await reviewPaidReleasedStock(updated.id);
     return { ...order, ...updated };
   }
+  if (intent.status === "canceled" && "stockReservation" in order && order.stockReservation) await releaseVerifiedFailedStock(order.id, "activePaymentAttemptId" in order && typeof order.activePaymentAttemptId === "string" ? order.activePaymentAttemptId : intent.id);
+  if (status === "complete" && "stockReservation" in order && order.stockReservation) await reviewPaidReleasedStock(order.id);
   return order;
 }

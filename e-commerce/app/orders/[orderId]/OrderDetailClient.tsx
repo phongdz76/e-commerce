@@ -1,18 +1,20 @@
 "use client";
 
 import { safeUser } from "@/types";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import Image from "next/image";
+import Button from "@/app/components/Button";
+import { API_PATHS } from "@/utils/apiPaths";
 import { formatPrice } from "@/utils/formatPrice";
 import { MdArrowBack, MdLocalShipping, MdPayment } from "react-icons/md";
-import {
-  FaBoxOpen,
-  FaClipboardList,
-} from "react-icons/fa";
+import { FaBoxOpen, FaClipboardList } from "react-icons/fa";
+import { getCustomerDeliveryInfo, normalizeCustomerDeliveryStatus } from "@/utils/orderShipment";
+import ShipmentTracking from "./ShipmentTracking";
+import OrderStock from "./OrderStock";
 
 interface OrderProduct {
   id: string;
@@ -46,6 +48,10 @@ interface OrderDetail {
   deliveryStatus: string | null;
   paymentMethod: string;
   paymentIntentId: string | null;
+  activePaymentAttemptId?: string | null;
+  resumePaymentUrl?: string | null;
+  paymentAttemptState?: string | null;
+  previousPaymentAttemptId?: string | null;
   products: OrderProduct[];
   address: OrderAddress | null;
   recipientName?: string | null;
@@ -66,20 +72,41 @@ interface OrderDetailClientProps {
 
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> =
   {
-    pending: { label: "Pending", color: "text-amber-700", bg: "bg-amber-50 border-amber-200" },
-    processing: { label: "Processing", color: "text-blue-700", bg: "bg-blue-50 border-blue-200" },
-    complete: { label: "Done", color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
-    paid: { label: "Done", color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
-    done: { label: "Done", color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
-    failed: { label: "Failed", color: "text-rose-700", bg: "bg-rose-50 border-rose-200" },
-    cancelled: { label: "Cancelled", color: "text-rose-700", bg: "bg-rose-50 border-rose-200" },
-  };
-
-const DELIVERY_MAP: Record<string, { label: string; color: string; bg: string }> =
-  {
-    pending: { label: "Pending", color: "text-amber-700", bg: "bg-amber-50 border-amber-200" },
-    dispatched: { label: "Dispatched", color: "text-blue-700", bg: "bg-blue-50 border-blue-200" },
-    delivered: { label: "Delivered", color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
+    pending: {
+      label: "Pending",
+      color: "text-amber-700",
+      bg: "bg-amber-50 border-amber-200",
+    },
+    processing: {
+      label: "Processing",
+      color: "text-blue-700",
+      bg: "bg-blue-50 border-blue-200",
+    },
+    complete: {
+      label: "Paid",
+      color: "text-emerald-700",
+      bg: "bg-emerald-50 border-emerald-200",
+    },
+    paid: {
+      label: "Paid",
+      color: "text-emerald-700",
+      bg: "bg-emerald-50 border-emerald-200",
+    },
+    done: {
+      label: "Paid",
+      color: "text-emerald-700",
+      bg: "bg-emerald-50 border-emerald-200",
+    },
+    failed: {
+      label: "Failed",
+      color: "text-rose-700",
+      bg: "bg-rose-50 border-rose-200",
+    },
+    cancelled: {
+      label: "Cancelled",
+      color: "text-rose-700",
+      bg: "bg-rose-50 border-rose-200",
+    },
   };
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -90,18 +117,123 @@ const PAYMENT_LABELS: Record<string, string> = {
   ZALOPAY: "ZaloPay",
 };
 
-function Badge({ label, color, bg }: { label: string; color: string; bg: string }) {
+function Badge({
+  label,
+  color,
+  bg,
+}: {
+  label: string;
+  color: string;
+  bg: string;
+}) {
   return (
-    <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-medium border ${bg} ${color}`}>
+    <span
+      className={`inline-block px-2.5 py-1 rounded-md text-xs font-medium border ${bg} ${color}`}
+    >
       {label}
     </span>
   );
 }
 
-export default function OrderDetailClient({ currentUser, orderId }: OrderDetailClientProps) {
+export default function OrderDetailClient({
+  currentUser,
+  orderId,
+}: OrderDetailClientProps) {
   const router = useRouter();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCheckingPayment, setIsCheckingPayment] = useState(false);
+  const [isRetryingPayment, setIsRetryingPayment] = useState(false);
+  const [shipmentDeliveryStatus, setShipmentDeliveryStatus] = useState<string | null>(null);
+  const handleShipmentStatusChange = useCallback((status: string) => {
+    setShipmentDeliveryStatus(status);
+  }, []);
+  const paymentAction = useRef(false);
+  const retryRequest = useRef<{
+    orderId: string;
+    attemptId: string;
+    requestId: string;
+  } | null>(null);
+
+  const refreshOrder = async () => {
+    const response = await axios.get(API_PATHS.ORDER.GET_BY_ID(orderId));
+    setOrder(response.data);
+  };
+
+  const handleCheckPayment = async () => {
+    if (paymentAction.current) {
+      return;
+    }
+    paymentAction.current = true;
+    setIsCheckingPayment(true);
+    try {
+      await axios.post(API_PATHS.PAYMENT.PAYMENT_STATUS, { orderId });
+      await refreshOrder();
+      toast.success("Payment status updated.");
+    } catch (error: unknown) {
+      toast.error(
+        axios.isAxiosError(error)
+          ? error.response?.data?.error || "Unable to check payment."
+          : "Unable to check payment.",
+      );
+    } finally {
+      paymentAction.current = false;
+      setIsCheckingPayment(false);
+    }
+  };
+
+  const handleRetryPayment = async () => {
+    if (!order || paymentAction.current) {
+      return;
+    }
+    paymentAction.current = true;
+    setIsRetryingPayment(true);
+    try {
+      const attemptId =
+        ["RESERVED", "CREATED"].includes(order.paymentAttemptState || "") &&
+        order.previousPaymentAttemptId
+          ? order.previousPaymentAttemptId
+          : order.activePaymentAttemptId || order.paymentIntentId || "";
+      const storageKey = `paymentRetry:${orderId}:${attemptId}`;
+      if (
+        !retryRequest.current ||
+        retryRequest.current.orderId !== orderId ||
+        retryRequest.current.attemptId !== attemptId
+      ) {
+        let requestId = crypto.randomUUID();
+        try {
+          requestId = localStorage.getItem(storageKey) || requestId;
+          localStorage.setItem(storageKey, requestId);
+        } catch {
+          // Keep the request in memory if browser storage is unavailable.
+        }
+        retryRequest.current = { orderId, attemptId, requestId };
+      }
+      const response = await axios.post(
+        API_PATHS.ORDER.RETRY_PAYMENT(orderId),
+        { retry_request_id: retryRequest.current.requestId },
+      );
+      if (response.data.alreadyPaid) {
+        await refreshOrder();
+        toast.success("Payment confirmed.");
+      } else if (typeof response.data.url === "string") {
+        window.location.assign(response.data.url);
+      } else {
+        toast.error("Check this order before trying again.");
+        await refreshOrder();
+      }
+    } catch (error: unknown) {
+      toast.error(
+        axios.isAxiosError(error)
+          ? error.response?.data?.error || "Unable to retry payment."
+          : "Unable to retry payment.",
+      );
+      // Preserve the request key so a timeout cannot create another attempt.
+    } finally {
+      paymentAction.current = false;
+      setIsRetryingPayment(false);
+    }
+  };
 
   useEffect(() => {
     if (!currentUser) {
@@ -111,7 +243,7 @@ export default function OrderDetailClient({ currentUser, orderId }: OrderDetailC
 
     const fetchOrder = async () => {
       try {
-        const res = await axios.get(`/api/order/${orderId}`);
+        const res = await axios.get(API_PATHS.ORDER.GET_BY_ID(orderId));
         setOrder(res.data);
       } catch (error: unknown) {
         if (axios.isAxiosError(error)) {
@@ -157,29 +289,28 @@ export default function OrderDetailClient({ currentUser, orderId }: OrderDetailC
 
   const orderDate = new Date(order.createDate);
   const formattedDate = orderDate.toLocaleDateString("en-US", {
+    timeZone: "Asia/Ho_Chi_Minh",
     weekday: "long",
     year: "numeric",
     month: "long",
     day: "numeric",
   });
   const formattedTime = orderDate.toLocaleTimeString("en-US", {
+    timeZone: "Asia/Ho_Chi_Minh",
     hour: "2-digit",
     minute: "2-digit",
   });
 
   const totalQuantity = order.products.reduce((s, p) => s + p.quantity, 0);
   const statusInfo = STATUS_MAP[order.status] || {
-    label: order.status,
+    label: "Status unconfirmed",
     color: "text-slate-700",
     bg: "bg-slate-50 border-slate-200",
   };
-  const deliveryInfo = order.deliveryStatus
-    ? DELIVERY_MAP[order.deliveryStatus] || {
-        label: order.deliveryStatus,
-        color: "text-slate-700",
-        bg: "bg-slate-50 border-slate-200",
-      }
-    : null;
+  const deliveryInfo = getCustomerDeliveryInfo(shipmentDeliveryStatus || order.deliveryStatus);
+  const canRetryDelivery = ["not_recorded", "pending"].includes(
+    shipmentDeliveryStatus || normalizeCustomerDeliveryStatus(order.deliveryStatus),
+  );
 
   const addressText = [
     order.address?.line1,
@@ -189,20 +320,18 @@ export default function OrderDetailClient({ currentUser, orderId }: OrderDetailC
   ]
     .filter(Boolean)
     .join(", ");
-  const deliverySteps = ["pending", "dispatched", "delivered"];
-  const deliveryStep = deliverySteps.indexOf(order.deliveryStatus ?? "");
 
   return (
     <div className="pb-10">
       {/* Back */}
       <div className="mb-5 flex flex-wrap items-center gap-4">
-      <Link
-        href="/orders"
-        className="inline-flex min-h-11 items-center gap-1 text-base text-slate-500 hover:text-slate-700"
-      >
-        <MdArrowBack size={18} />
-        Back to Orders
-      </Link>
+        <Link
+          href="/orders"
+          className="inline-flex min-h-11 items-center gap-1 text-base text-slate-500 hover:text-slate-700"
+        >
+          <MdArrowBack size={18} />
+          Back to Orders
+        </Link>
       </div>
 
       {/* Header card */}
@@ -216,12 +345,14 @@ export default function OrderDetailClient({ currentUser, orderId }: OrderDetailC
               </span>
             </h1>
             <p className="text-sm text-slate-500 mt-1">
-              {formattedDate} at {formattedTime}
+              {formattedDate} at {formattedTime} (Vietnam time)
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Badge {...statusInfo} label={`Payment: ${statusInfo.label}`} />
-            {deliveryInfo && <Badge {...deliveryInfo} label={`Delivery: ${deliveryInfo.label}`} />}
+            <span className={`inline-block rounded-md border px-2.5 py-1 text-xs font-medium ${deliveryInfo.className}`}>
+              Delivery: {deliveryInfo.label}
+            </span>
           </div>
         </div>
       </div>
@@ -268,7 +399,8 @@ export default function OrderDetailClient({ currentUser, orderId }: OrderDetailC
                           <span
                             className="w-2.5 h-2.5 rounded-full border border-slate-300 inline-block"
                             style={{
-                              backgroundColor: product.selectedImg.colorCode || "#ccc",
+                              backgroundColor:
+                                product.selectedImg.colorCode || "#ccc",
                             }}
                           />
                           {product.selectedImg.color}
@@ -320,31 +452,86 @@ export default function OrderDetailClient({ currentUser, orderId }: OrderDetailC
                 </dd>
               </div>
             </dl>
+            {["VNPAY", "MOMO"].includes(order.paymentMethod) &&
+              ["pending", "processing", "failed"].includes(order.status) &&
+              currentUser?.id === order.user.id && (
+                <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
+                  <Button
+                    label={
+                      isCheckingPayment ? "Checking..." : "Check payment status"
+                    }
+                    outline
+                    disabled={isCheckingPayment || isRetryingPayment}
+                    onClick={handleCheckPayment}
+                  />
+                  {order.resumePaymentUrl && (
+                    <a
+                      href={order.resumePaymentUrl}
+                      className="block rounded-md bg-slate-700 px-4 py-3 text-center text-sm font-bold text-white"
+                    >
+                      Continue payment
+                    </a>
+                  )}
+                  {(order.status === "failed" ||
+                    (order.previousPaymentAttemptId &&
+                      ["RESERVED", "CREATED"].includes(
+                        order.paymentAttemptState || "",
+                      ))) &&
+                    canRetryDelivery && (
+                      <>
+                        <p className="text-xs leading-5 text-slate-500">
+                          We will verify the previous payment before preparing
+                          another payment for this order.
+                        </p>
+                        <Button
+                          label={
+                            isRetryingPayment
+                              ? "Preparing payment..."
+                              : "Retry payment"
+                          }
+                          disabled={isCheckingPayment || isRetryingPayment}
+                          onClick={handleRetryPayment}
+                        />
+                      </>
+                    )}
+                </div>
+              )}
           </div>
 
           {/* Delivery */}
+          <OrderStock key={order.id} orderId={order.id} />
           <div className="rounded-lg border border-slate-200 bg-white p-5">
             <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-3">
               <MdLocalShipping size={16} className="text-slate-400" />
               Delivery
             </h3>
-            {deliveryStep >= 0 && <ol aria-label="Delivery progress" className="mb-5 flex gap-2 border-b border-slate-100 pb-4">
-              {deliverySteps.map((step, index) => <li key={step} aria-current={index === deliveryStep ? "step" : undefined} className={`flex min-w-0 flex-1 flex-col items-center gap-2 text-center text-xs ${index <= deliveryStep ? "text-teal-700" : "text-slate-400"}`}>
-                <span aria-hidden="true" className={`flex h-7 w-7 items-center justify-center rounded-full border font-medium ${index <= deliveryStep ? "border-teal-200 bg-teal-50" : "border-slate-200 bg-slate-50"}`}>{index + 1}</span>
-                {DELIVERY_MAP[step].label}
-              </li>)}
-            </ol>}
+            <ShipmentTracking
+              key={order.id}
+              orderId={order.id}
+              onStatusChange={handleShipmentStatusChange}
+            />
             <dl className="space-y-2 text-sm">
-              {deliveryInfo && (
-                <div className="flex justify-between">
-                  <dt className="text-slate-500">Status</dt>
-                  <dd>
-                    <Badge {...deliveryInfo} />
+              {order.recipientName && (
+                <div>
+                  <dt className="text-slate-500 mb-1">Recipient</dt>
+                  <dd className="text-slate-700 break-words">
+                    {order.recipientName}
                   </dd>
                 </div>
               )}
-              {order.recipientName && <div><dt className="text-slate-500 mb-1">Recipient</dt><dd className="text-slate-700 break-words">{order.recipientName}</dd></div>}
-              {order.recipientPhone && <div><dt className="text-slate-500 mb-1">Phone</dt><dd><a href={`tel:${order.recipientPhone}`} className="text-teal-700 hover:underline">{order.recipientPhone}</a></dd></div>}
+              {order.recipientPhone && (
+                <div>
+                  <dt className="text-slate-500 mb-1">Phone</dt>
+                  <dd>
+                    <a
+                      href={`tel:${order.recipientPhone}`}
+                      className="text-teal-700 hover:underline"
+                    >
+                      {order.recipientPhone}
+                    </a>
+                  </dd>
+                </div>
+              )}
               {addressText && (
                 <div>
                   <dt className="text-slate-500 mb-1">Address</dt>
@@ -353,7 +540,7 @@ export default function OrderDetailClient({ currentUser, orderId }: OrderDetailC
                   </dd>
                 </div>
               )}
-              {!addressText && !deliveryInfo && (
+              {!addressText && !order.recipientName && !order.recipientPhone && (
                 <p className="text-slate-400 text-xs">
                   No delivery information available
                 </p>

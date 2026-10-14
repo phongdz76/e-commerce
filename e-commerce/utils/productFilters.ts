@@ -1,6 +1,8 @@
 import { products } from "./products";
 
-export type CatalogProduct = (typeof products)[number];
+export type CatalogProduct = (typeof products)[number] & {
+  variants?: { id: string; sku: string; name: string; price: number; available: number; image: { color: string; colorCode: string; image: string } }[];
+};
 export const PRODUCTS_PER_PAGE = 12;
 
 // Keep the original category values, including the spelling used by the existing data.

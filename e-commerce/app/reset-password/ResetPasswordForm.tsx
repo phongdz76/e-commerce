@@ -10,6 +10,7 @@ import Link from "next/link";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { API_PATHS } from "../../utils/apiPaths";
+import { getPasswordValidationError } from "@/libs/authValidation";
 
 export default function ResetPasswordForm() {
   const [isLoading, setIsLoading] = useState(false);
@@ -44,8 +45,9 @@ export default function ResetPasswordForm() {
       return;
     }
 
-    if (data.password.length < 8) {
-      toast.error("Password must be at least 8 characters");
+    const passwordError = getPasswordValidationError(data.password);
+    if (passwordError) {
+      toast.error(passwordError);
       return;
     }
 
@@ -63,9 +65,17 @@ export default function ResetPasswordForm() {
       setTimeout(() => {
         router.push("/login");
       }, 2000);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || "Failed to reset password");
-      if (error?.response?.data?.error?.includes("Invalid or expired")) {
+    } catch (error: unknown) {
+      const message = axios.isAxiosError(error)
+        ? error.response?.data?.error
+        : undefined;
+      toast.error(
+        typeof message === "string" ? message : "Failed to reset password",
+      );
+      if (
+        typeof message === "string" &&
+        message.includes("Invalid or expired")
+      ) {
         setTokenValid(false);
       }
     } finally {
@@ -111,7 +121,10 @@ export default function ResetPasswordForm() {
   const password = watch("password");
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="w-full items-center flex flex-col gap-6">
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      className="w-full items-center flex flex-col gap-6"
+    >
       <Heading title="Reset Password" />
 
       <p className="text-center text-gray-600">

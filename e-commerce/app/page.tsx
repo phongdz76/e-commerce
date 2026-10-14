@@ -1,12 +1,12 @@
-"use client";
-
-import { products } from "@/utils/products";
+import { getStorefrontProducts } from "@/libs/storefrontProductNames";
 import Container from "./components/Container";
 import HomeBanner from "./components/banner/HomeBanner";
 import ProductCard from "./components/products/ProductCard";
 import Link from "next/link";
 import { catalogCategories, PRODUCTS_PER_PAGE } from "@/utils/productFilters";
-export default function Home() {
+export const dynamic = "force-dynamic";
+export default async function Home() {
+  const products = await getStorefrontProducts();
   return (
     <div>
       <Container>

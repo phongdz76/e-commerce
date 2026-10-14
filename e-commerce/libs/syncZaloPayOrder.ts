@@ -1,6 +1,7 @@
 import type { Order } from "@prisma/client";
 import prisma from "@/libs/prismadb";
 import { callZaloPay, getZaloPayConfig, zaloPayMac } from "./zalopay";
+import { releaseVerifiedFailedStock, reviewPaidReleasedStock } from "@/libs/orderStock";
 
 type ZaloPayOrder = Pick<
   Order,
@@ -15,6 +16,7 @@ export async function syncZaloPayOrder<T extends ZaloPayOrder>(
     order.paymentMethod !== "ZALOPAY" ||
     PAID_STATUSES.includes(order.status)
   ) {
+    if (PAID_STATUSES.includes(order.status) && "stockReservation" in order && order.stockReservation) await reviewPaidReleasedStock(order.id);
     return order;
   }
   if (!order.paymentIntentId) {
@@ -37,6 +39,9 @@ export async function syncZaloPayOrder<T extends ZaloPayOrder>(
       where: {
         id: order.id,
         paymentMethod: "ZALOPAY",
+        paymentIntentId: order.paymentIntentId,
+        amount: order.amount,
+        currency: order.currency,
         status: { notIn: PAID_STATUSES },
       },
       data: { status: "paid" },
@@ -52,6 +57,9 @@ export async function syncZaloPayOrder<T extends ZaloPayOrder>(
       where: {
         id: order.id,
         paymentMethod: "ZALOPAY",
+        paymentIntentId: order.paymentIntentId,
+        amount: order.amount,
+        currency: order.currency,
         status: { notIn: PAID_STATUSES },
       },
       data: { status: "failed" },
@@ -61,8 +69,17 @@ export async function syncZaloPayOrder<T extends ZaloPayOrder>(
     throw new Error("Unable to verify ZaloPay payment. Please try again.");
   }
   const updated = await prisma.order.findUnique({ where: { id: order.id } });
-  if (!updated) {
+  if (
+    !updated ||
+    updated.paymentIntentId !== order.paymentIntentId ||
+    updated.paymentMethod !== order.paymentMethod ||
+    updated.amount !== order.amount ||
+    updated.currency !== order.currency
+  ) {
     throw new Error("Order no longer exists");
   }
+  if (updated.stockReservation && updated.status === "failed" && result.return_code === 3 && result.is_processing === false &&
+      order.paymentExpiresAt && order.paymentExpiresAt.getTime() <= Date.now()) await releaseVerifiedFailedStock(updated.id, order.paymentIntentId);
+  if (updated.stockReservation?.state === "RELEASED" && PAID_STATUSES.includes(updated.status)) await reviewPaidReleasedStock(updated.id);
   return { ...order, ...updated };
 }

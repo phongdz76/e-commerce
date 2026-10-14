@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/libs/prismadb";
 import { getZaloPayConfig, verifyZaloPayMac } from "@/libs/zalopay";
+import { reviewPaidReleasedStock } from "@/libs/orderStock";
 
 export const runtime = "nodejs";
 
@@ -70,10 +71,32 @@ export async function POST(request: Request) {
       where: {
         id: order.id,
         paymentMethod: "ZALOPAY",
+        paymentIntentId: data.app_trans_id,
+        userId: data.app_user,
+        amount: data.amount,
+        currency: order.currency,
         status: { notIn: ["paid", "complete", "done"] },
       },
       data: { status: "paid" },
     });
+    const confirmed = await prisma.order.findUnique({
+      where: { id: order.id },
+    });
+    if (
+      !confirmed ||
+      confirmed.paymentIntentId !== data.app_trans_id ||
+      confirmed.paymentMethod !== "ZALOPAY" ||
+      confirmed.userId !== data.app_user ||
+      confirmed.amount !== data.amount ||
+      confirmed.currency.toLowerCase() !== "vnd" ||
+      !["paid", "complete", "done"].includes(confirmed.status)
+    ) {
+      return NextResponse.json({
+        return_code: 0,
+        return_message: "Order confirmation is not ready. Please retry.",
+      });
+    }
+    if (confirmed.stockReservation?.state === "RELEASED") await reviewPaidReleasedStock(confirmed.id);
     return NextResponse.json({ return_code: 1, return_message: "Success" });
   } catch {
     // Tell ZaloPay to retry when the database/configuration is temporarily unavailable.

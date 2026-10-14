@@ -4,7 +4,9 @@ import FacebookProvider from "next-auth/providers/facebook";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import prisma from "../../../libs/prismadb";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { compare } from "bcrypt";
+import { authenticateUser } from "@/libs/authenticateUser";
+import { AuthRateLimitError, getAuthClientIp } from "@/libs/authRateLimit";
+import { getActiveSessionUser, getActiveUserWhere } from "@/libs/authSession";
 
 const getGoogleProfileImage = (profile: unknown): string | null => {
   if (!profile || typeof profile !== "object") {
@@ -30,18 +32,61 @@ const getGoogleProfileImage = (profile: unknown): string | null => {
   return null;
 };
 
+async function updateOAuthProfile(
+  userId: string,
+  provider: string,
+  profile: unknown,
+) {
+  const currentUser = await prisma.user.findUnique({ where: { id: userId } });
+  if (!currentUser || (currentUser.status || "ACTIVE") !== "ACTIVE") {
+    return;
+  }
+
+  const oauthProfile = profile as
+    | {
+        email?: string;
+        email_verified?: boolean;
+        picture?: { data?: { url?: string } };
+      }
+    | undefined;
+  const image =
+    provider === "google"
+      ? getGoogleProfileImage(profile)
+      : oauthProfile?.picture?.data?.url;
+  const data: { image?: string; emailVerified?: Date } = {};
+  if (typeof image === "string" && image && !currentUser.image) {
+    data.image = image;
+  }
+  if (
+    provider === "google" &&
+    oauthProfile?.email_verified === true &&
+    typeof oauthProfile.email === "string" &&
+    oauthProfile.email.toLowerCase() === currentUser.email?.toLowerCase() &&
+    !currentUser.emailVerified
+  ) {
+    data.emailVerified = new Date();
+  }
+
+  if (Object.keys(data).length > 0) {
+    await prisma.user.updateMany({
+      where: getActiveUserWhere(userId, currentUser.sessionVersion || 0),
+      data,
+    });
+  }
+}
+
 export const authOptions: AuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-      allowDangerousEmailAccountLinking: true,
+      allowDangerousEmailAccountLinking: false,
     }),
     FacebookProvider({
       clientId: process.env.FACEBOOK_CLIENT_ID as string,
       clientSecret: process.env.FACEBOOK_CLIENT_SECRET as string,
-      allowDangerousEmailAccountLinking: true,
+      allowDangerousEmailAccountLinking: false,
     }),
     CredentialsProvider({
       name: "credentials",
@@ -49,111 +94,89 @@ export const authOptions: AuthOptions = {
         emailOrUsername: { label: "Email or Username", type: "text" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
-        if (!credentials?.emailOrUsername || !credentials?.password) {
-          throw new Error("Please enter email/username and password");
+      async authorize(credentials, request) {
+        try {
+          const authenticated = await authenticateUser(
+            credentials?.emailOrUsername,
+            credentials?.password,
+            getAuthClientIp(request.headers || {}),
+          );
+          if (!authenticated) {
+            throw new Error("Invalid email/username or password");
+          }
+
+          return {
+            ...authenticated.user,
+            sessionVersion: authenticated.sessionVersion,
+          };
+        } catch (error: unknown) {
+          if (error instanceof AuthRateLimitError) {
+            throw new Error(error.message);
+          }
+
+          if (
+            error instanceof Error &&
+            error.message === "Invalid email/username or password"
+          ) {
+            throw error;
+          }
+
+          throw new Error(
+            "Sign-in is temporarily unavailable. Please try again.",
+          );
         }
-
-        const user = await prisma.user.findFirst({
-          where: {
-            OR: [
-              { email: credentials.emailOrUsername },
-              { name: credentials.emailOrUsername },
-            ],
-          },
-        });
-
-        if (!user || !user.hashedPassword) {
-          throw new Error("No account found with this email or username");
-        }
-
-        const isCorrectPassword = await compare(
-          credentials.password,
-          user.hashedPassword,
-        );
-
-        if (!isCorrectPassword) {
-          throw new Error("Incorrect password");
-        }
-
-        return user;
       },
     }),
   ],
   pages: {
     signIn: "/login",
   },
-  debug: process.env.NODE_ENV === "development",
+  debug: false,
   session: { strategy: "jwt" },
   secret: process.env.NEXTAUTH_SECRET,
   events: {
     async linkAccount({ user, account, profile }) {
-      // Khi Google account được link, cập nhật thông tin từ Google
-      const googleProfileImage = getGoogleProfileImage(profile);
-
-      if (account.provider === "google" && googleProfileImage && !user.image) {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            image: googleProfileImage,
-            emailVerified: new Date(),
-          },
-        });
-      } else if (account.provider === "google") {
-        // Vẫn cập nhật emailVerified nếu linkAccount thành công, dù không update ảnh
-        await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            emailVerified: new Date(),
-          },
-        });
-      }
-
-      // Khi Facebook account được link
-      if (account.provider === "facebook") {
-        const fbProfile = profile as { picture?: { data?: { url?: string } } };
-        const fbImage = fbProfile?.picture?.data?.url;
-
-        await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            ...(fbImage && !user.image ? { image: fbImage } : {}),
-            emailVerified: new Date(),
-          },
-        });
+      if (account.provider === "google" || account.provider === "facebook") {
+        await updateOAuthProfile(user.id, account.provider, profile);
       }
     },
   },
   callbacks: {
     async signIn({ user, account, profile }) {
-      if (account?.provider === "google" && user.id) {
-        const googleProfileImage = getGoogleProfileImage(profile);
-
-        // Chỉ lấy ảnh từ Google nếu người dùng chưa có ảnh đại diện
-        if (googleProfileImage && !user.image) {
-          await prisma.user.update({
-            where: { id: user.id },
-            data: {
-              image: googleProfileImage,
-              emailVerified: new Date(),
-            },
-          });
-        }
+      if (account?.provider === "credentials") {
+        const authenticatedUser = user as typeof user & {
+          sessionVersion?: number;
+        };
+        return Boolean(
+          await getActiveSessionUser(
+            user.id,
+            authenticatedUser.sessionVersion ?? 0,
+          ),
+        );
       }
 
-      // Xử lý Facebook profile image
-      if (account?.provider === "facebook" && user.id) {
-        const fbProfile = profile as { picture?: { data?: { url?: string } } };
-        const fbImage = fbProfile?.picture?.data?.url;
-
-        if (fbImage && !user.image) {
-          await prisma.user.update({
-            where: { id: user.id },
-            data: {
-              image: fbImage,
-              emailVerified: new Date(),
+      if (account?.provider === "google" || account?.provider === "facebook") {
+        const linkedAccount = await prisma.account.findUnique({
+          where: {
+            provider_providerAccountId: {
+              provider: account.provider,
+              providerAccountId: account.providerAccountId,
             },
-          });
+          },
+          include: { user: true },
+        });
+        const currentUser =
+          linkedAccount?.user ||
+          (user.email
+            ? await prisma.user.findUnique({
+                where: { email: user.email.toLowerCase() },
+              })
+            : null);
+        if (currentUser && (currentUser.status || "ACTIVE") !== "ACTIVE") {
+          return false;
+        }
+        if (currentUser) {
+          await updateOAuthProfile(currentUser.id, account.provider, profile);
         }
       }
 
@@ -161,28 +184,72 @@ export const authOptions: AuthOptions = {
     },
 
     async jwt({ token, user, account }) {
-      // Khi đăng nhập lần đầu, gán thông tin từ account và user
-      if (account && user) {
-        return {
-          ...token,
-          accessToken: account.access_token,
-          idToken: account.id_token,
-          expiresIn: account.expires_at,
-          userId: user.id,
-        };
+      const revokedToken = { sessionRevoked: true };
+      if (!user && token.sessionRevoked) {
+        return revokedToken;
       }
-      return token;
+
+      const userId = user?.id || token.userId || token.sub;
+      if (typeof userId !== "string") {
+        return revokedToken;
+      }
+
+      let sessionVersion =
+        token.sessionVersion === undefined ? 0 : token.sessionVersion;
+      if (user) {
+        if (account?.provider === "credentials") {
+          sessionVersion =
+            (user as typeof user & { sessionVersion?: number })
+              .sessionVersion ?? 0;
+        } else {
+          const currentUser = await prisma.user.findUnique({
+            where: { id: userId },
+          });
+          sessionVersion = currentUser?.sessionVersion || 0;
+        }
+      }
+      if (typeof sessionVersion !== "number") {
+        return revokedToken;
+      }
+
+      const currentUser = await getActiveSessionUser(userId, sessionVersion);
+      if (!currentUser) {
+        return revokedToken;
+      }
+
+      return {
+        name: currentUser.name,
+        email: currentUser.email,
+        picture: currentUser.image,
+        role: currentUser.role,
+        sub: userId,
+        iat: token.iat,
+        exp: token.exp,
+        jti: token.jti,
+        userId,
+        sessionVersion,
+        authenticatedAt: user
+          ? Date.now()
+          : typeof token.authenticatedAt === "number"
+            ? token.authenticatedAt
+            : 0,
+      };
     },
     async session({ session, token }) {
-      // Gán thông tin token vào session để client có thể truy cập
+      if (token.sessionRevoked || typeof token.userId !== "string") {
+        return { expires: session.expires, user: undefined };
+      }
+
       return {
-        ...session,
-        accessToken: token.accessToken,
-        idToken: token.idToken,
-        expiresIn: token.expiresIn,
+        expires: session.expires,
         user: {
-          ...session.user,
+          name: token.name,
+          email: token.email,
+          image: token.picture,
+          role: token.role,
           id: token.userId,
+          sessionVersion: token.sessionVersion,
+          authenticatedAt: token.authenticatedAt,
         },
       };
     },

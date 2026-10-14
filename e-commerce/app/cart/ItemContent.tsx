@@ -30,7 +30,7 @@ export default function ItemContent({ item }: ItemContentProps) {
         </Link>
         <div className="min-w-0 flex flex-col gap-2 justify-between">
           <Link href={`/product/${item.id}`} className="line-clamp-2 leading-6 hover:text-teal-700">{item.name}</Link>
-          <div className="text-sm text-slate-500">{item.selectedImg.color}</div>
+          <div className="text-sm text-slate-500">{item.selectedImg.color}{item.sku ? " · " + item.sku : ""}</div>
           <div className="w-[70px]">
             <button
               type="button"

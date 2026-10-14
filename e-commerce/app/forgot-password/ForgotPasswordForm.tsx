@@ -29,10 +29,17 @@ export default function ForgotPasswordForm() {
 
     try {
       await axios.post(API_PATHS.AUTH.FORGOT_PASSWORD, data);
-      toast.success("Password reset email sent! Check your inbox.");
+      toast.success("If your account exists, a reset link will be sent.");
       setEmailSent(true);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || "Failed to send email");
+    } catch (error: unknown) {
+      const message = axios.isAxiosError(error)
+        ? error.response?.data?.error
+        : undefined;
+      toast.error(
+        typeof message === "string"
+          ? message
+          : "Failed to request a reset link",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -41,16 +48,16 @@ export default function ForgotPasswordForm() {
   if (emailSent) {
     return (
       <div className="w-full text-center py-6 flex flex-col gap-4 items-center">
-        
         <Heading title="Check Your Email" />
         <p className="text-gray-600">
-          We've sent a password reset link to your email address.
+          If an account exists with this email, a password reset link will be
+          sent.
         </p>
         <p className="text-sm text-gray-500">
           Please check your inbox and click the link to reset your password.
         </p>
         <p className="text-sm text-gray-500 mt-4">
-          Didn't receive the email? Check your spam folder or{" "}
+          Didn&apos;t receive the email? Check your spam folder or{" "}
           <button
             onClick={() => setEmailSent(false)}
             className="text-blue-500 hover:underline"
@@ -66,11 +73,14 @@ export default function ForgotPasswordForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="w-full items-center flex flex-col gap-6">
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      className="w-full items-center flex flex-col gap-6"
+    >
       <Heading title="Forgot Password" />
 
       <p className="text-center text-gray-600">
-        Enter your email address and we'll send you a link to reset your
+        Enter your email address and we&apos;ll send you a link to reset your
         password.
       </p>
 

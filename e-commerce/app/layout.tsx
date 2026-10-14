@@ -6,8 +6,14 @@ import Footer from "./components/footer/Footer";
 import CartProvider from "./providers/CartProvider";
 import { Toaster } from "react-hot-toast";
 import SupportWidget from "./components/support/SupportWidget";
+import StoreLayoutWrapper from "./components/layout/StoreLayoutWrapper";
 
-const poppins = Poppins({ subsets: ["latin"], weight: ["400", "700"] });
+const poppins = Poppins({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-poppins",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "SGTech",
@@ -23,7 +29,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={` ${poppins.className} text-slate-700`}>
+      <body className={`${poppins.className} text-slate-700`}>
         <Toaster
           toastOptions={{
             style: {
@@ -31,15 +37,18 @@ export default function RootLayout({
               color: "#fff",
             },
           }}
-        ></Toaster>
+        />
         <CartProvider>
-          <div className="flex flex-col min-h-screen">
-            <NavBar />
-            <main className="flex-grow min-h-[65vh]">{children}</main>
-            <Footer />
-          </div>
+          <StoreLayoutWrapper
+            navbar={<NavBar />}
+            footer={<Footer />}
+            supportWidget={
+              <SupportWidget zaloUrl={process.env.NEXT_PUBLIC_ZALO_URL} />
+            }
+          >
+            {children}
+          </StoreLayoutWrapper>
         </CartProvider>
-        <SupportWidget zaloUrl={process.env.NEXT_PUBLIC_ZALO_URL} />
       </body>
     </html>
   );

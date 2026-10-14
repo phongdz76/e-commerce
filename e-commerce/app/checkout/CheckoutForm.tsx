@@ -77,6 +77,8 @@ interface CheckoutFormProps {
     receipt?: CheckoutReceipt,
   ) => void;
   currentUser: safeUser | null;
+  stripeOrderId?: string | null;
+  availablePaymentMethods?: Record<string, boolean>;
 }
 
 export interface CheckoutReceipt {
@@ -91,6 +93,8 @@ export default function CheckoutForm({
   cardPayment,
   handleSetPaymentSuccess,
   currentUser,
+  stripeOrderId,
+  availablePaymentMethods,
 }: CheckoutFormProps) {
   const {
     cartTotalQtyAmount,
@@ -136,7 +140,46 @@ export default function CheckoutForm({
     null,
   );
   const [zaloPayOrderId, setZaloPayOrderId] = useState<string | null>(null);
+  const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
+  const checkoutRequest = useRef<{ fingerprint: string; id: string } | null>(
+    null,
+  );
   const formattedPrice = formatPrice(cartTotalQtyAmount);
+
+  const getCheckoutRequestId = () => {
+    const fingerprint = JSON.stringify([
+      currentUser?.id,
+      cartProducts?.map((item) => [
+        item.id,
+        item.variantId,
+        item.price,
+        item.selectedImg.color,
+        item.quantity,
+      ]),
+    ]);
+    if (checkoutRequest.current?.fingerprint === fingerprint) {
+      return checkoutRequest.current.id;
+    }
+    try {
+      const saved = JSON.parse(
+        localStorage.getItem("orderCheckoutRequest") || "null",
+      );
+      if (saved?.fingerprint === fingerprint && typeof saved.id === "string") {
+        checkoutRequest.current = saved;
+        return saved.id;
+      }
+    } catch {
+      // The in-memory request ID also protects retries when storage is unavailable.
+    }
+    const request = { fingerprint, id: crypto.randomUUID() };
+    checkoutRequest.current = request;
+    try {
+      localStorage.setItem("orderCheckoutRequest", JSON.stringify(request));
+    } catch {
+      // Continue using the request ID retained in this form.
+    }
+    return request.id;
+  };
 
   const loadLocations = useCallback(
     async (level: LocationLevel, url: string) => {
@@ -293,6 +336,12 @@ export default function CheckoutForm({
     if (submitting.current) {
       return;
     }
+    if (availablePaymentMethods?.[paymentMethod] === false) {
+      toast.error(
+        "This payment method is currently unavailable. Please choose another method.",
+      );
+      return;
+    }
 
     if (paymentMethod === "STRIPE" && (!stripe || !elements)) {
       toast.error(
@@ -376,31 +425,33 @@ export default function CheckoutForm({
               result.paymentIntent.status,
             )
           ) {
-            let orderId: string | undefined;
-            let amount = cartTotalQtyAmount;
+            let isConfirmed = false;
             try {
               const response = await axios.post(
                 API_PATHS.PAYMENT.SYNC_STRIPE_ORDER,
                 { payment_intent_id: result.paymentIntent.id },
               );
-              orderId = response.data.order?.id;
-              amount = response.data.order?.amount ?? amount;
               if (response.data.order?.status === "complete") {
+                isConfirmed = true;
                 toast.success("Payment successful!");
+                handleSetPaymentSuccess(true, response.data.order.id, {
+                  amount: response.data.order.amount,
+                  paymentMethod: "STRIPE",
+                });
+                handleClearCart();
+                handleSetPaymentIntent(null);
               } else {
+                setPendingOrderId(
+                  response.data.order?.id || stripeOrderId || null,
+                );
                 toast("Payment is processing. Check Your Orders for updates.");
               }
             } catch {
+              setPendingOrderId(stripeOrderId || null);
               toast("Check Your Orders for the latest payment status.");
             }
-            handleSetPaymentSuccess(true, orderId, {
-              amount,
-              paymentMethod: "STRIPE",
-            });
-            handleClearCart();
-            handleSetPaymentIntent(null);
 
-            if (currentUser && shouldSaveDeliveryInfo) {
+            if (isConfirmed && currentUser && shouldSaveDeliveryInfo) {
               try {
                 await axios.patch(API_PATHS.AUTH.PROFILE, {
                   address: finalAddress,
@@ -421,13 +472,25 @@ export default function CheckoutForm({
         });
     } else if (paymentMethod === "VNPAY") {
       try {
-        const response = await axios.post("/api/vnpay/create-payment-url", {
+        const response = await axios.post(API_PATHS.PAYMENT.VNPAY_CREATE_URL, {
+          checkout_request_id: getCheckoutRequestId(),
           items: cartProducts,
           amount: cartTotalQtyAmount,
           address: finalAddress,
           phone: finalPhone,
           fullName: fullName.trim(),
         });
+
+        if (response.data.alreadyPaid) {
+          handleSetPaymentSuccess(true, response.data.orderId, {
+            amount: response.data.amount,
+            paymentMethod: "VNPAY",
+          });
+          handleClearCart();
+          setLoading(false);
+          submitting.current = false;
+          return;
+        }
 
         if (currentUser && shouldSaveDeliveryInfo) {
           try {
@@ -449,6 +512,9 @@ export default function CheckoutForm({
         }
       } catch (error) {
         console.log(error);
+        if (axios.isAxiosError(error) && error.response?.data?.orderId) {
+          setPendingOrderId(error.response.data.orderId);
+        }
         const message = axios.isAxiosError(error)
           ? error.response?.data?.error
           : undefined;
@@ -460,13 +526,23 @@ export default function CheckoutForm({
       }
     } else if (paymentMethod === "MOMO") {
       try {
-        const response = await axios.post("/api/momo/create-payment-url", {
+        const response = await axios.post(API_PATHS.PAYMENT.MOMO_CREATE_URL, {
+          checkout_request_id: getCheckoutRequestId(),
           items: cartProducts,
           amount: cartTotalQtyAmount,
           address: finalAddress,
           phone: finalPhone,
           fullName: fullName.trim(),
         });
+
+        if (response.data.alreadyPaid) {
+          handleSetPaymentSuccess(true, response.data.orderId, {
+            amount: response.data.amount,
+            paymentMethod: "MOMO",
+          });
+          handleClearCart();
+          return;
+        }
 
         if (currentUser && shouldSaveDeliveryInfo) {
           try {
@@ -487,6 +563,9 @@ export default function CheckoutForm({
         }
       } catch (error) {
         console.log(error);
+        if (axios.isAxiosError(error) && error.response?.data?.orderId) {
+          setPendingOrderId(error.response.data.orderId);
+        }
         const message = axios.isAxiosError(error)
           ? error.response?.data?.error
           : undefined;
@@ -577,7 +656,8 @@ export default function CheckoutForm({
       }
     } else if (paymentMethod === "COD") {
       try {
-        const response = await axios.post("/api/order/create-cod", {
+        const response = await axios.post(API_PATHS.ORDER.CREATE_COD, {
+          checkout_request_id: getCheckoutRequestId(),
           items: cartProducts,
           amount: cartTotalQtyAmount,
           address: finalAddress,
@@ -607,7 +687,12 @@ export default function CheckoutForm({
         submitting.current = false;
       } catch (error) {
         console.log(error);
-        toast.error("Failed to place order");
+        const message = axios.isAxiosError(error)
+          ? error.response?.data?.error
+          : undefined;
+        toast.error(
+          typeof message === "string" ? message : "Failed to place order",
+        );
         setLoading(false);
         submitting.current = false;
       }
@@ -619,6 +704,20 @@ export default function CheckoutForm({
 
   return (
     <form onSubmit={handleSubmit} id="payment-form" noValidate>
+      {pendingOrderId && (
+        <p
+          role="status"
+          className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
+        >
+          This order needs payment confirmation.{" "}
+          <Link
+            href={`/orders/${pendingOrderId}`}
+            className="font-medium underline"
+          >
+            View order status
+          </Link>
+        </p>
+      )}
       <Link
         href="/cart"
         className="text-slate-500 flex items-center gap-1 mt-2 mb-4"
@@ -913,7 +1012,7 @@ export default function CheckoutForm({
             value="VNPAY"
             checked={paymentMethod === "VNPAY"}
             onChange={(e) => onPaymentMethodChange(e.target.value)}
-            disabled={isLoading}
+            disabled={isLoading || availablePaymentMethods?.VNPAY === false}
             className="w-4 h-4 text-blue-600 focus:ring-blue-500"
           />
           <span className="font-medium text-slate-700">Pay with VNPay</span>
@@ -926,7 +1025,7 @@ export default function CheckoutForm({
             value="MOMO"
             checked={paymentMethod === "MOMO"}
             onChange={(e) => onPaymentMethodChange(e.target.value)}
-            disabled={isLoading}
+            disabled={isLoading || availablePaymentMethods?.MOMO === false}
             className="w-4 h-4 text-blue-600 focus:ring-blue-500"
           />
           <span className="font-medium text-slate-700">Pay with MoMo</span>
@@ -939,7 +1038,7 @@ export default function CheckoutForm({
             value="ZALOPAY"
             checked={paymentMethod === "ZALOPAY"}
             onChange={(e) => onPaymentMethodChange(e.target.value)}
-            disabled={isLoading}
+            disabled={isLoading || availablePaymentMethods?.ZALOPAY === false}
             className="w-4 h-4 text-blue-600 focus:ring-blue-500"
           />
           <span className="font-medium text-slate-700">Pay with ZaloPay</span>
@@ -952,7 +1051,7 @@ export default function CheckoutForm({
             value="STRIPE"
             checked={paymentMethod === "STRIPE"}
             onChange={(e) => onPaymentMethodChange(e.target.value)}
-            disabled={isLoading}
+            disabled={isLoading || availablePaymentMethods?.STRIPE === false}
             className="w-4 h-4 text-blue-600 focus:ring-blue-500"
           />
           <span className="font-medium text-slate-700">

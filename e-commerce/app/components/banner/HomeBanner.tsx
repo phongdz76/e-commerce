@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 
@@ -15,7 +17,7 @@ const HomeBanner = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [touchStartX, setTouchStartX] = useState(0);
   const [touchEndX, setTouchEndX] = useState(0);
-  
+
   const bannerRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(true);
 
@@ -24,16 +26,17 @@ const HomeBanner = () => {
       ([entry]) => {
         setIsVisible(entry.isIntersecting);
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
 
-    if (bannerRef.current) {
-      observer.observe(bannerRef.current);
+    const banner = bannerRef.current;
+    if (banner) {
+      observer.observe(banner);
     }
 
     return () => {
-      if (bannerRef.current) {
-        observer.unobserve(bannerRef.current);
+      if (banner) {
+        observer.unobserve(banner);
       }
     };
   }, []);
@@ -95,7 +98,7 @@ const HomeBanner = () => {
 
   const handleButtonClick = (link?: string) => {
     if (link) {
-      window.location.href = link;
+      window.location.assign(link);
     }
   };
 
@@ -131,7 +134,7 @@ const HomeBanner = () => {
   }, [isPaused, isVisible, currentSlide, slides.length]);
 
   return (
-    <div 
+    <div
       ref={bannerRef}
       className="group w-full aspect-[16/9] md:aspect-[4/1] relative overflow-hidden rounded-[10px] shadow-[0_8px_20px_rgba(0,0,0,0.2)] my-[10px] mx-auto"
       onMouseEnter={() => setIsPaused(true)}
@@ -192,8 +195,11 @@ const HomeBanner = () => {
           >
             <div
               style={{
-                height: index === currentSlide ? '100%' : '0%',
-                transition: index === currentSlide && !isPaused && isVisible ? 'height 5000ms linear' : 'none'
+                height: index === currentSlide ? "100%" : "0%",
+                transition:
+                  index === currentSlide && !isPaused && isVisible
+                    ? "height 5000ms linear"
+                    : "none",
               }}
               className="absolute bottom-0 left-0 w-full bg-white"
             />

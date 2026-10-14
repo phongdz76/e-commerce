@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FiChevronLeft, FiChevronRight, FiGrid, FiPackage, FiSearch, FiX } from "react-icons/fi";
-import { products } from "@/utils/products";
+import type { CatalogProduct } from "@/utils/productFilters";
 import { catalogCategories, filterCatalog, getBrandLabel, getBrandOptions, normalizeProductText, PRODUCTS_PER_PAGE, type ProductFilters } from "@/utils/productFilters";
 import { formatPrice } from "@/utils/formatPrice";
 import ProductCard from "../components/products/ProductCard";
@@ -12,7 +12,7 @@ import Button from "../components/Button";
 import BrandFilter from "./BrandFilter";
 import SelectMenu from "../components/inputs/SelectMenu";
 
-interface ProductsClientProps { filters: ProductFilters; requestedPage: number }
+interface ProductsClientProps { products: CatalogProduct[]; filters: ProductFilters; requestedPage: number }
 
 const priceRanges = [
   { value: "", label: "Any price", min: "", max: "" },
@@ -22,7 +22,7 @@ const priceRanges = [
   { value: "over-5m", label: "Over 5,000,000 ₫", min: "5000001", max: "" },
 ];
 
-export default function ProductsClient({ filters, requestedPage }: ProductsClientProps) {
+export default function ProductsClient({ products, filters, requestedPage }: ProductsClientProps) {
   const router = useRouter();
   const selectedBrands = filters.brand.split(",").map(normalizeProductText).filter(Boolean);
   const hasDetailFilters = Boolean(filters.brand || filters.minPrice || filters.maxPrice || filters.stock);

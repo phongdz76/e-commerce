@@ -11,6 +11,11 @@ import { safeUser } from "@/types";
 import { API_PATHS } from "../../utils/apiPaths";
 import { PROVINCES_API } from "../../utils/externalApiPaths";
 import ImageUpload from "../components/inputs/ImageUpload";
+import {
+  getPasswordValidationError,
+  PASSWORD_MESSAGE,
+} from "@/libs/authValidation";
+import { signOut } from "next-auth/react";
 
 interface ProfileProps {
   currentUser: safeUser;
@@ -27,11 +32,8 @@ interface ProfileFormValues {
 }
 
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-const PASSWORD_REGEX =
-  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
 const PHONE_REGEX = /^\+?[0-9]{9,15}$/;
-const PASSWORD_HELPER_TEXT =
-  "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.";
+const PASSWORD_HELPER_TEXT = PASSWORD_MESSAGE;
 
 const inputClassName =
   "w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:opacity-70";
@@ -43,6 +45,10 @@ export default function Profile({ currentUser }: ProfileProps) {
   const router = useRouter();
   const requiresPasswordSetup = !currentUser.hasPassword;
   const [isLoading, setIsLoading] = useState(false);
+  const [isRequestingVerification, setIsRequestingVerification] =
+    useState(false);
+  const [isRevokingSessions, setIsRevokingSessions] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState(currentUser.pendingEmail);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [isCurrentPasswordFocused, setIsCurrentPasswordFocused] =
@@ -137,7 +143,7 @@ export default function Profile({ currentUser }: ProfileProps) {
       : currentUser?.address;
     const phoneNumber = data.phoneNumber.trim().replace(/\s+/g, "");
     const currentPassword = data.currentPassword;
-    const newPassword = data.newPassword.trim();
+    const newPassword = data.newPassword;
 
     if (username.length < 2 || username.length > 50) {
       toast.error("Username must be between 2 and 50 characters");
@@ -162,10 +168,9 @@ export default function Profile({ currentUser }: ProfileProps) {
     }
 
     if (newPassword) {
-      if (!PASSWORD_REGEX.test(newPassword)) {
-        toast.error(
-          "Password must include uppercase, lowercase, number and special character",
-        );
+      const passwordError = getPasswordValidationError(newPassword);
+      if (passwordError) {
+        toast.error(passwordError);
         return;
       }
 
@@ -173,6 +178,15 @@ export default function Profile({ currentUser }: ProfileProps) {
         toast.error("Current password is required to set a new password");
         return;
       }
+    }
+
+    if (
+      email !== currentUser.email?.toLowerCase() &&
+      !requiresPasswordSetup &&
+      !currentPassword
+    ) {
+      toast.error("Enter your current password to request an email change.");
+      return;
     }
 
     setIsLoading(true);
@@ -187,14 +201,29 @@ export default function Profile({ currentUser }: ProfileProps) {
         currentPassword: currentPassword || undefined,
         newPassword: newPassword || undefined,
       })
-      .then((response) => {
+      .then(async (response) => {
         const updatedUser = response?.data;
 
-        toast.success("Profile updated successfully");
+        if (updatedUser?.emailVerificationError) {
+          toast.error(updatedUser.emailVerificationError);
+        } else {
+          toast.success(
+            updatedUser?.verificationSent
+              ? "Check the new email for a verification link. Your sign-in email is unchanged until confirmation."
+              : "Profile updated successfully",
+          );
+        }
+        if (updatedUser?.sessionRevoked) {
+          toast.success("Password updated. Please sign in again.");
+          await signOut({ callbackUrl: "/login?callbackUrl=/profile" });
+          return;
+        }
+
+        setPendingEmail(updatedUser?.pendingEmail || null);
         setUseNewAddress(false);
         reset({
           username: updatedUser?.username || username,
-          email: updatedUser?.email || email,
+          email: updatedUser?.email || "",
           profileImageUrl: updatedUser?.profileImageUrl || "",
           address: updatedUser?.address || "",
           phoneNumber: updatedUser?.phoneNumber || "",
@@ -205,6 +234,16 @@ export default function Profile({ currentUser }: ProfileProps) {
         router.refresh();
       })
       .catch((error: unknown) => {
+        if (
+          axios.isAxiosError(error) &&
+          error.response?.data?.code === "AUTH_REAUTH_REQUIRED"
+        ) {
+          toast.error(
+            "Please sign in again before changing your account security settings.",
+          );
+          void signOut({ callbackUrl: "/login?callbackUrl=/profile" });
+          return;
+        }
         const message =
           typeof error === "object" &&
           error &&
@@ -231,11 +270,47 @@ export default function Profile({ currentUser }: ProfileProps) {
     setIsNewPasswordFocused(false);
   };
 
+  const handleRequestVerification = async () => {
+    setIsRequestingVerification(true);
+    try {
+      await axios.post(API_PATHS.AUTH.REQUEST_EMAIL_VERIFICATION);
+      toast.success("Check your email for the verification link.");
+    } catch (error: unknown) {
+      const message = axios.isAxiosError(error)
+        ? error.response?.data?.error
+        : undefined;
+      toast.error(
+        typeof message === "string"
+          ? message
+          : "Unable to send verification email.",
+      );
+    } finally {
+      setIsRequestingVerification(false);
+    }
+  };
+
+  const handleRevokeSessions = async () => {
+    setIsRevokingSessions(true);
+    try {
+      await axios.post(API_PATHS.AUTH.REVOKE_SESSIONS);
+      await signOut({ callbackUrl: "/login?callbackUrl=/profile" });
+    } catch (error: unknown) {
+      const message = axios.isAxiosError(error)
+        ? error.response?.data?.error
+        : undefined;
+      toast.error(
+        typeof message === "string"
+          ? message
+          : "Unable to sign out all sessions.",
+      );
+    } finally {
+      setIsRevokingSessions(false);
+    }
+  };
+
   return (
     <div className="w-full max-w-[760px] mx-auto rounded-2xl border border-slate-300 bg-slate-50 px-5 py-6 md:px-8 md:py-8">
-      <h1 className="mb-6 text-2xl font-bold text-center">
-        Your Profile
-      </h1>
+      <h1 className="mb-6 text-2xl font-bold text-center">Your Profile</h1>
       <form
         className="w-full flex flex-col gap-5"
         onSubmit={handleSubmit(onSubmit)}
@@ -309,12 +384,35 @@ export default function Profile({ currentUser }: ProfileProps) {
             disabled={isLoading}
             {...register("email")}
           />
+          <p className="text-sm text-slate-500">
+            A new email must be confirmed before it becomes your sign-in email.
+          </p>
+          {pendingEmail && (
+            <p role="status" className="text-sm text-amber-700">
+              Awaiting confirmation: {pendingEmail}
+            </p>
+          )}
+          {(pendingEmail ||
+            (currentUser.email && !currentUser.emailVerified)) && (
+            <button
+              type="button"
+              onClick={handleRequestVerification}
+              disabled={isLoading || isRequestingVerification}
+              className="self-start text-sm text-blue-600 hover:underline disabled:opacity-70"
+            >
+              {isRequestingVerification
+                ? "Sending..."
+                : pendingEmail
+                  ? "Resend verification link"
+                  : "Verify current email"}
+            </button>
+          )}
         </div>
 
         {requiresPasswordSetup ? (
           <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-blue-700 text-sm leading-6">
             This account uses Google Sign-In. You can set a password now to also
-            log in with email/password. Current password is not required.
+            log in with email/password. A recent sign-in is required.
           </div>
         ) : null}
 
@@ -544,6 +642,20 @@ export default function Profile({ currentUser }: ProfileProps) {
           </button>
         </div>
       </form>
+      <div className="mt-6 border-t border-slate-300 pt-5">
+        <p className="mb-3 text-sm text-slate-600">
+          Sign out on every device, including this one. You will need to sign in
+          again.
+        </p>
+        <button
+          type="button"
+          onClick={handleRevokeSessions}
+          disabled={isLoading || isRevokingSessions}
+          className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-700 disabled:opacity-70"
+        >
+          {isRevokingSessions ? "Signing out..." : "Sign out all sessions"}
+        </button>
+      </div>
     </div>
   );
 }
