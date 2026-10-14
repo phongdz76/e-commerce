@@ -9,6 +9,9 @@ import ItemContent from "./ItemContent";
 import { formatPrice } from "@/utils/formatPrice";
 import { useRouter } from "next/navigation";
 import { safeUser } from "@/types";
+import { useState } from "react";
+import axios from "axios";
+import { API_PATHS } from "@/utils/apiPaths";
 
 interface CartClientProps {
   currentUser: safeUser | null;
@@ -19,6 +22,21 @@ export function CartClient({ currentUser }: CartClientProps) {
   const { handleClearCart } = useCart().context;
   const { cartTotalQtyAmount } = useCart().context;
   const router = useRouter();
+  const { handleReplaceCart } = useCart().context;
+  const [refreshing, setRefreshing] = useState(false);
+  const [cartMessage, setCartMessage] = useState("");
+  async function refreshPrices() {
+    setRefreshing(true);
+    setCartMessage("");
+    try {
+      const response = await axios.post(API_PATHS.ORDER.CART_QUOTE, { items: cartProducts });
+      handleReplaceCart(response.data.items);
+      setCartMessage("Cart options and prices updated. Review the new subtotal before checkout.");
+    } catch (error) {
+      const message = axios.isAxiosError(error) ? error.response?.data?.error : null;
+      setCartMessage(typeof message === "string" ? message : "Unable to refresh your cart. Try again.");
+    } finally { setRefreshing(false); }
+  }
 
   if (!cartProducts || cartProducts.length === 0) {
     return (
@@ -39,6 +57,8 @@ export function CartClient({ currentUser }: CartClientProps) {
   return (
     <div>
       <Heading title="Shopping Cart" center />
+      {currentUser && <button type="button" disabled={refreshing} onClick={() => void refreshPrices()} className="mt-4 min-h-11 rounded-md border border-slate-300 px-4 text-sm font-semibold">{refreshing ? "Refreshing..." : "Refresh cart prices"}</button>}
+      {cartMessage && <p role="status" className="mt-3 text-sm text-slate-600">{cartMessage}</p>}
       <div className="hidden md:grid grid-cols-5 text-sm gap-4 pb-2 items-center mt-8">
         <div className="col-span-2 justify-self-start">PRODUCT</div>
         <div className="justify-self-center">PRICE</div>

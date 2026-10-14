@@ -11,9 +11,11 @@
     "test:auth": "node --test tests/auth-security.test.cjs",
     "test:cod-mongo": "node scripts/check-cod-queue.cjs",
     "test:stock-mongo": "node scripts/check-stock-concurrency.cjs",
+    "test:catalog-mongo": "node scripts/check-catalog-query.cjs",
     "typecheck": "tsc --noEmit --incremental false",
     "worker:payments": "node scripts/payment-worker.cjs",
     "seed:catalog": "node scripts/seed-catalog.cjs",
+    "seed:stock": "node scripts/seed-stock.cjs",
     "admin:promote": "node scripts/promote-admin.cjs",
     "postinstall": "prisma generate"
   },

@@ -1,6 +1,7 @@
 export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export const API_PATHS = {
+  CATALOG: { SUGGESTIONS: "/api/catalog/suggestions" },
   AUTH: {
     REGISTER: "/api/register",
     FORGOT_PASSWORD: "/api/forgot-password",
@@ -20,6 +21,7 @@ export const API_PATHS = {
     ZALOPAY_STATUS: "/api/zalopay/status",
   },
   ORDER: {
+    CART_QUOTE: "/api/cart/quote",
     GET_ALL: "/api/order",
     GET_BY_ID: (id: string) => `/api/order/${id}`,
     SHIPMENT: (id: string) => `/api/order/${id}/shipment`,

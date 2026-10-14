@@ -19,6 +19,12 @@ const STATUS_LABELS: Record<string, string> = {
   OPEN: "Needs review", REVIEWED: "Reviewed", REFUND_REQUIRED: "Refund required",
 };
 
+function getReasonLabel(reason: string) {
+  return reason === "DUPLICATE_PAYMENT" ? "Duplicate payment"
+    : reason === "LATE_SUCCESS" ? "Late payment confirmation"
+    : reason === "STOCK_RELEASED_PAYMENT" ? "Payment received after stock was released" : "Payment needs review";
+}
+
 export default function PaymentExceptionsClient() {
   const [exceptions, setExceptions] = useState<SafePaymentException[]>([]);
   const [status, setStatus] = useState("OPEN");
@@ -123,7 +129,7 @@ export default function PaymentExceptionsClient() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <Link href={"/admin/orders/" + row.orderId} className="text-sm font-semibold text-teal-700 hover:underline">Order {getAdminOrderReference(row.orderId)}</Link>
-                  <h2 className="mt-2 font-semibold text-slate-800">{row.reason === "DUPLICATE_PAYMENT" ? "Duplicate payment" : row.reason === "LATE_SUCCESS" ? "Late payment confirmation" : "Payment needs review"}</h2>
+                  <h2 className="mt-2 font-semibold text-slate-800">{getReasonLabel(row.reason)}</h2>
                   <p className="mt-1 text-xs text-slate-500">{formatAdminOrderDate(row.createdAt)} · Vietnam (UTC+7)</p>
                 </div>
                 <div className="text-right">
@@ -145,7 +151,7 @@ export default function PaymentExceptionsClient() {
       {selected ? (
         <AdminDialog title={"Review order " + getAdminOrderReference(selected.orderId)} onClose={() => setSelected(null)} isBusy={isSaving}>
           <div className="mb-4 rounded-md border border-slate-200 bg-slate-50 p-4 text-sm">
-            <p className="font-semibold">{selected.reason === "DUPLICATE_PAYMENT" ? "Duplicate payment" : selected.reason === "LATE_SUCCESS" ? "Late payment confirmation" : "Payment needs review"}</p>
+            <p className="font-semibold">{getReasonLabel(selected.reason)}</p>
             <p className="mt-2 text-lg font-bold">{formatAdminOrderAmount(selected.amount, selected.currency)}</p>
             <Link href={"/admin/orders/" + selected.orderId} className="mt-2 inline-flex min-h-10 items-center font-semibold text-teal-700 hover:underline">View order</Link>
           </div>

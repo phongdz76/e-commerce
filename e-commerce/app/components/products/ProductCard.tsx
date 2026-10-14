@@ -4,19 +4,20 @@ import { formatPrice } from "@/utils/formatPrice";
 import { Rating } from "@mui/material";
 import Link from "next/link";
 import Image from "next/image";
+import type { CatalogProduct } from "@/utils/productFilters";
 
 interface ProductCardProps {
-  data?: any;
+  data: CatalogProduct;
 }
 
 export default function ProductCard({ data }: ProductCardProps) {
   const productRating =
-    data.reviews.reduce((acc: number, item: any) => acc + item.rating, 0) /
+    data.reviews.reduce((acc, item) => acc + item.rating, 0) /
     Math.max(data.reviews.length, 1);
 
   return (
     <Link
-      href={data?.id ? `/product/${data.id}` : "#"}
+      href={`/product/${data.id}${data.matchedVariantId ? "?variant=" + data.matchedVariantId : ""}`}
       className="group block h-full no-underline"
     >
       <div
@@ -62,7 +63,7 @@ export default function ProductCard({ data }: ProductCardProps) {
             <Rating value={productRating} readOnly size="small" />
           </div>
           <div className="text-sm text-slate-500">{data.reviews.length} {data.reviews.length === 1 ? "review" : "reviews"}</div>
-          <div className="mt-1 text-base font-bold text-slate-700 md:text-lg">{formatPrice(data?.price)}</div>
+          <div className="mt-1 text-base font-bold text-slate-700 md:text-lg">From {formatPrice(data.price)}</div>
         </div>
       </div>
     </Link>

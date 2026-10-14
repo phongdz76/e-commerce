@@ -23,7 +23,7 @@ import MoMoPayment, { type MoMoPaymentDetails } from "./MoMoPayment";
 
 const PHONE_REGEX = /^\+?[0-9]{9,15}$/;
 type LocationLevel = "province" | "district" | "ward";
-type DeliveryField = LocationLevel | "fullName" | "houseNumber" | "phoneNumber";
+type DeliveryField = LocationLevel | "fullName" | "houseNumber" | "phoneNumber" | "deliveryCity";
 interface LocationOption {
   code: number;
   name: string;
@@ -116,6 +116,7 @@ export default function CheckoutForm({
     useState(!hasSavedDeliveryInfo);
 
   const [houseNumber, setHouseNumber] = useState("");
+  const [deliveryCity, setDeliveryCity] = useState("");
   const [provinces, setProvinces] = useState<LocationOption[]>([]);
   const [districts, setDistricts] = useState<LocationOption[]>([]);
   const [wards, setWards] = useState<LocationOption[]>([]);
@@ -354,11 +355,15 @@ export default function CheckoutForm({
     const finalAddress = isEditingDeliveryInfo
       ? getFinalAddress()
       : currentUser?.address || "";
+    const finalCity = isEditingDeliveryInfo ? province?.name || "" : deliveryCity.trim();
     const finalPhone = isEditingDeliveryInfo
       ? normalizedPhone
       : (currentUser?.phoneNumber || normalizedPhone).replace(/\s+/g, "");
 
     const errors: Partial<Record<DeliveryField, string>> = {};
+    if (!isEditingDeliveryInfo && (!finalCity || finalCity.length > 100)) {
+      errors.deliveryCity = "Enter the province or city for this delivery address (up to 100 characters).";
+    }
     if (!fullName.trim()) {
       errors.fullName = "Please enter the recipient's full name.";
     } else if (fullName.trim().length > 100) {
@@ -410,7 +415,7 @@ export default function CheckoutForm({
             shipping: {
               name: fullName.trim(),
               phone: finalPhone,
-              address: { line1: finalAddress, country: "VN" },
+              address: { line1: finalAddress, city: finalCity, country: "VN" },
             },
           },
         })
@@ -479,6 +484,7 @@ export default function CheckoutForm({
           address: finalAddress,
           phone: finalPhone,
           fullName: fullName.trim(),
+          city: finalCity,
         });
 
         if (response.data.alreadyPaid) {
@@ -533,6 +539,7 @@ export default function CheckoutForm({
           address: finalAddress,
           phone: finalPhone,
           fullName: fullName.trim(),
+          city: finalCity,
         });
 
         if (response.data.alreadyPaid) {
@@ -582,6 +589,7 @@ export default function CheckoutForm({
         address: finalAddress,
         phone: finalPhone,
         fullName: fullName.trim(),
+        city: finalCity,
       };
       const fingerprint = JSON.stringify(payload);
       let requestId = crypto.randomUUID();
@@ -663,6 +671,7 @@ export default function CheckoutForm({
           address: finalAddress,
           phone: finalPhone,
           fullName: fullName.trim(),
+          city: finalCity,
         });
 
         if (currentUser && shouldSaveDeliveryInfo) {
@@ -782,6 +791,11 @@ export default function CheckoutForm({
             </div>
             {renderFieldError("phoneNumber")}
             {renderFieldError("houseNumber")}
+            <label htmlFor="deliveryCity" className="mt-4 block space-y-2 text-sm font-medium">
+              <span>Province / City for this delivery</span>
+              <input id="deliveryCity" value={deliveryCity} onChange={(event) => { setDeliveryCity(event.target.value); clearFieldError("deliveryCity"); }} required maxLength={100} autoComplete="address-level1" aria-invalid={Boolean(fieldErrors.deliveryCity)} aria-describedby="deliveryCity-error" className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-4 py-3" />
+            </label>
+            {renderFieldError("deliveryCity")}
           </div>
         ) : (
           <>

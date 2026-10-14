@@ -4,9 +4,11 @@ import FooterList from "./FooterList";
 import Image from "next/image";
 import { MdFacebook } from "react-icons/md";
 import { FaInstagram, FaYoutube } from "react-icons/fa";
-import { catalogCategories } from "@/utils/productFilters";
+import { getCatalogGroups } from "@/libs/storefrontCatalog";
 
-const Footer = () => {
+const Footer = async () => {
+  let categories;
+  try { categories = (await getCatalogGroups()).categories; } catch { categories = null; }
   return (
     <footer
       className="bg-slate-700
@@ -55,7 +57,8 @@ const Footer = () => {
 
           <FooterList>
             <div className="font-bold text-lg">Shop Categories</div>
-            {catalogCategories.map((category) => (
+            {categories === null && <p className="text-slate-300">Categories are temporarily unavailable.</p>}
+            {categories?.map((category) => (
               <Link key={category.value} href={`/products?category=${encodeURIComponent(category.value)}`} className="hover:text-teal-400 transition-colors">
                 {category.label}
               </Link>

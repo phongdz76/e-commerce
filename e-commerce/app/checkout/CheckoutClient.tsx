@@ -78,8 +78,34 @@ export default function CheckoutClient({
   const handleStripeReady = useCallback((context: StripePaymentContext) => {
     setStripeContext(context);
   }, []);
+  const switchingMethod = useRef(false);
 
-  const handlePaymentMethodChange = (value: string) => {
+  const handlePaymentMethodChange = async (value: string) => {
+    if (value === selectedPaymentMethod.current) return;
+    if (isCreatingIntent.current || switchingMethod.current) {
+      toast.error("Payment is being prepared. Wait before changing the payment method.");
+      return;
+    }
+    if (selectedPaymentMethod.current === "STRIPE" && recentOrderId && clientSecret && !paymentSuccess) {
+      switchingMethod.current = true;
+      setLoading(true);
+      try {
+        const reservationResponse = await fetch(API_PATHS.ORDER.STOCK(recentOrderId));
+        if (!reservationResponse.ok) throw new Error("Unable to verify the current card order.");
+        const reservation = await reservationResponse.json();
+        const response = await fetch(API_PATHS.ORDER.CANCEL(recentOrderId), { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ version: reservation.version, confirmed: true, reason: "Customer changed the payment method before confirming card payment." }) });
+        if (!response.ok) throw new Error("Card payment may already be in progress. Check Your Orders before changing the payment method.");
+        handleSetPaymentIntent(null);
+        setClientSecret("");
+        setProcessedCartString(null);
+        setRecentOrderId(null);
+        localStorage.removeItem("checkoutRequest");
+      } catch (failure) {
+        toast.error(failure instanceof Error ? failure.message : "Unable to change payment method safely.");
+        return;
+      } finally { switchingMethod.current = false; setLoading(false); }
+    }
     selectedPaymentMethod.current = value;
     setPaymentMethod(value);
   };

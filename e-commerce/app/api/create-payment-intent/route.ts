@@ -22,19 +22,38 @@ export async function POST(request: Request) {
     let reference;
     if (body.payment_intent_id) {
       order = await prisma.order.findFirst({ where: { userId: user.id, paymentIntentId: body.payment_intent_id, paymentMethod: "STRIPE" } });
-      if (!order || fingerprint(order.products) !== fingerprint(cart.items)) return NextResponse.json({ error: "The saved payment does not match this cart. Check Your Orders before starting another payment.", code: "INVALID_PAYMENT_REFERENCE" }, { status: 409 });
+      if (!order || fingerprint(order.products) !== fingerprint(cart.items)) return NextResponse.json({ error: "The saved payment does not match this cart. Check Your Orders before starting another payment.", code: "INVALID_PAYMENT_REFERENCE" }, { status: 400 });
       const intent = await stripe.paymentIntents.retrieve(order.paymentIntentId!);
       if (intent.status === "succeeded") {
         const paid = await syncStripeOrder(order);
         return NextResponse.json({ alreadyPaid: true, order: receipt(paid), paymentIntent: { id: intent.id, status: intent.status } });
       }
-      if (!order.stockReservation || order.stockReservation.state !== "HELD" || intent.status === "canceled") throw new CheckoutRequestError("This order no longer holds stock. Check Your Orders before buying again.", 409, "STOCK_REVIEW_REQUIRED");
-      if (["processing", "requires_capture", "requires_action"].includes(intent.status)) return NextResponse.json({ error: "Payment is already in progress. Check Your Orders." }, { status: 409 });
+      if (intent.status === "canceled") {
+        await syncStripeOrder(order);
+        throw new CheckoutRequestError("This payment was cancelled. Review Your Orders before buying again.", 400, "INVALID_PAYMENT_REFERENCE");
+      }
+      if (!order.stockReservation || order.stockReservation.state !== "HELD") throw new CheckoutRequestError("This order no longer holds stock. Check Your Orders before buying again.", 409, "STOCK_REVIEW_REQUIRED");
+      if (["processing", "requires_capture", "requires_action"].includes(intent.status)) {
+        await syncStripeOrder(order);
+        return NextResponse.json({ error: "Payment is already in progress. Check Your Orders." }, { status: 409 });
+      }
       reference = intent.id;
     } else {
+      const candidates = await prisma.order.findMany({ where: { userId: user.id, paymentMethod: "STRIPE", status: { in: ["draft", "pending", "processing", "failed"] }, amount: cart.amount }, orderBy: { createDate: "desc" }, take: 20 });
+      for (const candidate of candidates) {
+        if (candidate.stockReservation?.state !== "HELD" || !candidate.paymentIntentId?.startsWith("pi_") || fingerprint(candidate.products) !== fingerprint(cart.items)) continue;
+        const pending = await stripe.paymentIntents.retrieve(candidate.paymentIntentId);
+        if (["processing", "requires_capture", "requires_action"].includes(pending.status)) {
+          await syncStripeOrder(candidate);
+          throw new CheckoutRequestError("Payment is already in progress. Check Your Orders.", 409, "PAYMENT_REVIEW_REQUIRED");
+        }
+        if (["requires_payment_method", "requires_confirmation"].includes(pending.status)) { order = candidate; reference = candidate.activePaymentAttemptId || candidate.paymentIntentId; break; }
+      }
+      if (!order) {
       const prepared = await prepareCheckoutRequest(body.checkout_request_id, user.id, "STRIPE", cart, null);
       order = prepared.order;
       reference = prepared.attempt.id;
+      }
     }
     let intent;
     if (order.paymentIntentId?.startsWith("pi_")) {

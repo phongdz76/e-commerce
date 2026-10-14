@@ -49,11 +49,11 @@ export default function OrderStock({ orderId }: { orderId: string }) {
       <h3 className="font-semibold">Stock reservation</h3>
       {loading ? <p role="status" className="text-slate-500">Loading reservation...</p> : data && <p>{labels[data.state] || "Stock needs review"}</p>}
       {data?.state === "HELD" && data.expiresAt && <p className="text-slate-500">Awaiting preparation until {formatAdminOrderDate(data.expiresAt)} (Vietnam). Unconfirmed COD orders may be cancelled after this hold expires.</p>}
-      {data?.state === "HELD" && !data.expiresAt && <p className="text-slate-500">Stock remains reserved while payment is being verified.</p>}
+      {data?.state === "HELD" && !data.expiresAt && <p className="text-slate-500">Stock stays reserved until dispatch or a verified cancellation. Unconfirmed online payments continue to hold stock.</p>}
       {data?.state === "RELEASED" && <p className="text-slate-500">If money was received after the release, the store must review this order before shipping.</p>}
       {error && <p role="alert" className="text-rose-700">{error}</p>}
       <button type="button" disabled={loading || saving} onClick={() => setReload((value) => value + 1)} className="min-h-11 font-semibold text-teal-700">Reload reservation</button>
-      {data?.canCancel && !open && <button type="button" disabled={loading || saving || Boolean(error)} onClick={() => setOpen(true)} className="ml-3 min-h-11 font-semibold text-rose-700">Cancel unpaid COD order</button>}
+      {data?.canCancel && !open && <button type="button" disabled={loading || saving || Boolean(error)} onClick={() => setOpen(true)} className="ml-3 min-h-11 font-semibold text-rose-700">Cancel unpaid order</button>}
       {open && data?.canCancel && <form onSubmit={cancel} className="space-y-3 border-t border-slate-100 pt-3">
         <label className="block space-y-1"><span>Cancellation reason</span><textarea required minLength={10} maxLength={500} value={reason} disabled={loading || saving || Boolean(error)} onChange={(event) => setReason(event.target.value)} className="min-h-20 w-full rounded-md border border-slate-300 p-3" /></label>
         <label className="flex items-start gap-2"><input type="checkbox" required checked={confirmed} disabled={loading || saving || Boolean(error)} onChange={(event) => setConfirmed(event.target.checked)} className="mt-1 h-4 w-4 shrink-0" /><span>I want to cancel this unpaid order and release its reserved stock.</span></label>

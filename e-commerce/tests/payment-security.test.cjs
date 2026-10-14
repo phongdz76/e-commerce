@@ -29,7 +29,7 @@ function load(file, mocks = {}) {
   vm.runInThisContext(`(function(require,module,exports){${compiled}\n})`, {
     filename,
   })(
-    (name) => (name in mocks ? mocks[name] : name.startsWith("@/") ? load(name.slice(2) + ".ts", mocks) : require(name)),
+    (name) => (name in mocks ? mocks[name] : name.startsWith("@/") ? (mocks[name] = load(name.slice(2) + ".ts", mocks)) : require(name)),
     loadedModule,
     loadedModule.exports,
   );

@@ -30,7 +30,7 @@ function load(file, mocks = {}) {
   vm.runInThisContext(`(function(require,module,exports){${js}\n})`, {
     filename,
   })(
-    (name) => (name in mocks ? mocks[name] : name.startsWith("@/") ? load(name.slice(2) + ".ts", mocks) : require(name)),
+    (name) => (name in mocks ? mocks[name] : name.startsWith("@/") ? (mocks[name] = load(name.slice(2) + ".ts", mocks)) : require(name)),
     loadedModule,
     loadedModule.exports,
   );
@@ -639,7 +639,7 @@ test("ZaloPay form preserves cart until verified, prevents duplicate submits and
   }).default;
   try {
     h.reset();
-    const tree = Form({
+    const formProps = {
       paymentMethod: "ZALOPAY",
       onPaymentMethodChange() {},
       stripeContext: { stripe: null, elements: null },
@@ -650,7 +650,11 @@ test("ZaloPay form preserves cart until verified, prevents duplicate submits and
         address: payload.address,
         phoneNumber: payload.phone,
       },
-    });
+    };
+    let tree = Form(formProps);
+    findElement(tree, e => e.props?.id === "deliveryCity").props.onChange({ target: { value: "Ho Chi Minh City" } });
+    h.reset();
+    tree = Form(formProps);
     const submit = findElement(tree, (e) => e.type === "form").props.onSubmit;
     const first = submit({ preventDefault() {} });
     await submit({ preventDefault() {} });
@@ -658,6 +662,7 @@ test("ZaloPay form preserves cart until verified, prevents duplicate submits and
     assert.equal(calls[0].url, "/api/zalopay/create-payment-url");
     assert.equal(calls[0].body.address, payload.address);
     assert.equal(calls[0].body.phone, payload.phone);
+    assert.equal(calls[0].body.city, "Ho Chi Minh City");
     assert.ok(calls[0].body.checkout_request_id);
     assert.equal(clearCount, 0);
     assert.equal(successCount, 0);
@@ -726,7 +731,7 @@ test("inline Stripe checkout retains the cart until the server confirms receipt 
         "./MoMoPayment": { __esModule: true, default: () => null },
       }).default;
       h.reset();
-      const tree = Form({
+      const formProps = {
         paymentMethod: "STRIPE",
         onPaymentMethodChange() {},
         stripeContext: {
@@ -744,7 +749,11 @@ test("inline Stripe checkout retains the cart until the server confirms receipt 
           address: payload.address,
           phoneNumber: payload.phone,
         },
-      });
+      };
+      let tree = Form(formProps);
+      findElement(tree, e => e.props?.id === "deliveryCity").props.onChange({ target: { value: "Ho Chi Minh City" } });
+      h.reset();
+      tree = Form(formProps);
       findElement(tree, (element) => element.type === "form").props.onSubmit({
         preventDefault() {},
       });

@@ -20,6 +20,7 @@ type CartContextType = {
   handleQtyDecreaser: (product: CartProductProps) => void;
   handleQtyIncreaser: (product: CartProductProps) => void;
   handleClearCart: () => void;
+  handleReplaceCart: (items: CartProductProps[]) => void;
   handleSetPaymentIntent: (val: string | null) => void;
   paymentIntent: string | null;
 };
@@ -96,7 +97,7 @@ export const CartContextProvider = (props: Props) => {
 
       if (prev) {
         const existing = prev.find((item) => getCartItemKey(item) === getCartItemKey(product));
-        updatedCart = existing ? prev.map((item) => getCartItemKey(item) === getCartItemKey(product) ? { ...item, quantity: Math.min(20, item.quantity + product.quantity) } : item) : [...prev, product];
+        updatedCart = existing ? prev.map((item) => getCartItemKey(item) === getCartItemKey(product) ? { ...product, quantity: Math.min(20, item.quantity + product.quantity) } : item) : [...prev, product];
       } else {
         updatedCart = [product];
       }
@@ -181,6 +182,11 @@ export const CartContextProvider = (props: Props) => {
     localStorage.removeItem("zaloPayCheckout");
   }, []);
 
+  const handleReplaceCart = useCallback((items: CartProductProps[]) => {
+    setCartProducts(items);
+    localStorage.setItem("CartItems", JSON.stringify(items));
+  }, []);
+
   const handleSetPaymentIntent = useCallback((val: string | null) => {
     setPaymentIntent(val);
     localStorage.setItem("savedPaymentIntent", JSON.stringify(val));
@@ -196,6 +202,7 @@ export const CartContextProvider = (props: Props) => {
     handleQtyDecreaser,
     handleQtyIncreaser,
     handleClearCart,
+    handleReplaceCart,
     handleSetPaymentIntent,
   };
   return <CartContext.Provider value={value} {...props}></CartContext.Provider>;

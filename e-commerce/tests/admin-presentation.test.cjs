@@ -125,22 +125,22 @@ test("storefront names, prices, options and availability come from the current d
   const original = [{ id: "a".repeat(24), name: "Original", price: 1000, reviews: [], images: [], inStock: true }];
   let name = "Updated name";
   const queries = [];
-  const getStorefrontProducts = load("libs/storefrontProductNames.ts", {
+  const getStorefrontProduct = load("libs/storefrontProductNames.ts", {
     "@/utils/products": { products: original },
-    "@/libs/prismadb": { __esModule: true, default: { product: { findMany: async (options) => {
+    "@/libs/prismadb": { __esModule: true, default: { product: { findFirst: async (options) => {
       queries.push(options);
-      return [{ id: original[0].id, name, description: "Database description", category: { name: "Phone" }, brand: { name: "Brand" },
+      return { id: original[0].id, name, description: "Database description", category: { name: "Phone", slug: "phone" }, brand: { name: "Brand", slug: "brand" },
         variants: [{ id: "b".repeat(24), sku: "DB-SKU", name: "Black", price: 2000, inStock: true,
-          image: { color: "Black", colorCode: "#000000", image: "/products/phone.webp" }, inventory: { onHand: 3, reserved: 2, version: 1, updatedAt: new Date() } }] }];
+          image: { color: "Black", colorCode: "#000000", image: "/products/phone.webp" }, inventory: { onHand: 3, reserved: 2, version: 1, updatedAt: new Date() } }] };
     } } } },
-  }).getStorefrontProducts;
-  assert.equal((await getStorefrontProducts())[0].name, "Updated name");
+  }).getStorefrontProduct;
+  assert.equal((await getStorefrontProduct(original[0].id)).name, "Updated name");
   name = "Another name";
-  const products = await getStorefrontProducts();
-  assert.equal(products[0].name, name);
-  assert.equal(products[0].price, 2000);
-  assert.equal(products[0].variants[0].available, 1);
-  assert.equal(products[0].variants[0].sku, "DB-SKU");
+  const product = await getStorefrontProduct(original[0].id);
+  assert.equal(product.name, name);
+  assert.equal(product.price, 2000);
+  assert.equal(product.variants[0].available, 1);
+  assert.equal(product.variants[0].sku, "DB-SKU");
   assert.equal(queries[0].where.status, "ACTIVE");
   assert.equal(original[0].name, "Original");
 });

@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     const reason = params.get("reason") || "ALL";
     if (
       !["OPEN", "REVIEWED", "REFUND_REQUIRED"].includes(status) ||
-      !["ALL", "DUPLICATE_PAYMENT", "LATE_SUCCESS"].includes(reason) ||
+      !["ALL", "DUPLICATE_PAYMENT", "LATE_SUCCESS", "STOCK_RELEASED_PAYMENT"].includes(reason) ||
       !Number.isSafeInteger(page) ||
       page < 1 ||
       page > 1000

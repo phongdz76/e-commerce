@@ -54,8 +54,23 @@ export default function OrderSummaryCard({
         </div>
         <DeliveryStatusBadge status={order.deliveryStatus} />
       </div>
-      <Link href={(showDeliveryAddress ? "/admin/shipments/" : "/admin/orders/") + order.id} className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-teal-700 hover:underline">
-        {showDeliveryAddress ? "Manage shipment" : "View order"} <FiArrowRight aria-hidden="true" />
+      <Link
+        href={(showDeliveryAddress ? "/admin/shipments/" : "/admin/orders/") + order.id}
+        className={`w-full inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-semibold transition-all duration-200 border shadow-2xs group ${
+          showDeliveryAddress
+            ? "bg-teal-600 hover:bg-teal-50 text-white hover:text-teal-700 border-teal-600 hover:border-teal-300"
+            : "bg-slate-50 hover:bg-teal-50 text-slate-700 hover:text-teal-700 border-slate-200/70 hover:border-teal-200"
+        }`}
+      >
+        <span>{showDeliveryAddress ? "Manage shipment" : "View order"}</span>
+        <FiArrowRight
+          className={`transition-all text-xs group-hover:translate-x-0.5 ${
+            showDeliveryAddress
+              ? "text-white group-hover:text-teal-600"
+              : "text-slate-400 group-hover:text-teal-600"
+          }`}
+          aria-hidden="true"
+        />
       </Link>
     </article>
   );

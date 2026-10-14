@@ -9,11 +9,13 @@ import Button from "@/app/components/Button";
 import ProductImage from "@/app/components/products/ProductImage";
 import { useCart } from "@/app/hooks/useCart";
 import { MdCheckCircle } from "react-icons/md";
+import { FiChevronDown } from "react-icons/fi";
 import Link from "next/link";
-import { catalogCategories, getBrandLabel, type CatalogProduct } from "@/utils/productFilters";
+import type { CatalogProduct } from "@/utils/productFilters";
 
 interface ProductDetailsProps {
   product: CatalogProduct;
+  initialVariantId?: string;
 }
 
 export interface CartProductProps {
@@ -45,9 +47,9 @@ const Horizontal = () => (
   </div>
 );
 
-export default function ProductDetails({ product }: ProductDetailsProps) {
+export default function ProductDetails({ product, initialVariantId }: ProductDetailsProps) {
   const { handleAddProductToCart, cartProducts } = useCart().context;
-  const firstVariant = product.variants?.find((variant) => variant.available > 0) || product.variants?.[0];
+  const firstVariant = product.variants?.find(variant => variant.id === initialVariantId) || product.variants?.find((variant) => variant.available > 0) || product.variants?.[0];
   const [cartProduct, setCartProduct] = useState<CartProductProps>({
     id: product.id,
     variantId: firstVariant?.id,
@@ -131,8 +133,8 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
         <section aria-labelledby="product-information" className="my-2">
           <h2 id="product-information" className="mb-3 text-lg font-semibold">Product details</h2>
           <dl className="divide-y divide-slate-200 rounded-md border border-slate-200">
-            <div className="grid grid-cols-[100px_minmax(0,1fr)] gap-3 px-4 py-3"><dt className="text-slate-500">Brand</dt><dd>{getBrandLabel(product.brand)}</dd></div>
-            <div className="grid grid-cols-[100px_minmax(0,1fr)] gap-3 px-4 py-3"><dt className="text-slate-500">Category</dt><dd><Link href={`/products?category=${encodeURIComponent(product.category)}`} className="hover:text-teal-700 hover:underline">{catalogCategories.find((category) => category.value === product.category)?.label ?? product.category}</Link></dd></div>
+            <div className="grid grid-cols-[100px_minmax(0,1fr)] gap-3 px-4 py-3"><dt className="text-slate-500">Brand</dt><dd>{product.brand}</dd></div>
+            <div className="grid grid-cols-[100px_minmax(0,1fr)] gap-3 px-4 py-3"><dt className="text-slate-500">Category</dt><dd><Link href={`/products?category=${encodeURIComponent(product.categorySlug || product.category)}`} className="hover:text-teal-700 hover:underline">{product.categoryLabel || product.category}</Link></dd></div>
             <div className="grid grid-cols-[100px_minmax(0,1fr)] gap-3 px-4 py-3"><dt className="text-slate-500">Colors</dt><dd className="break-words">{product.images.map((image) => image.color).join(", ")}</dd></div>
           </dl>
         </section>
@@ -144,16 +146,49 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
           )}
         </div>
         <Horizontal />
-        {product.variants && <label className="space-y-2 text-sm">
-          <span className="block font-semibold">Product option</span>
-          <select aria-label="Product option" value={cartProduct.variantId} onChange={(event) => {
-            const variant = product.variants!.find((row) => row.id === event.target.value)!;
-            setCartProduct((previous) => ({ ...previous, variantId: variant.id, sku: variant.sku, selectedImg: variant.image, price: variant.price, quantity: 1 }));
-          }} className="min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2">
-            {product.variants.map((variant) => <option key={variant.id} value={variant.id}>{variant.name} · {formatPrice(variant.price)} · {variant.available > 0 ? variant.available + " available" : "Unavailable"}</option>)}
-          </select>
-          <p className="text-slate-500">Stock is reserved when you submit your order. Availability can change before checkout.</p>
-        </label>}
+        {product.variants && (
+          <div className="space-y-2 text-sm">
+            <label htmlFor="product-option-select" className="block font-semibold text-slate-800">
+              Product option
+            </label>
+            <div className="relative max-w-[360px]">
+              <select
+                id="product-option-select"
+                aria-label="Product option"
+                value={cartProduct.variantId}
+                onChange={(event) => {
+                  const variant = product.variants!.find((row) => row.id === event.target.value)!;
+                  setCartProduct((previous) => ({
+                    ...previous,
+                    variantId: variant.id,
+                    sku: variant.sku,
+                    selectedImg: variant.image,
+                    price: variant.price,
+                    quantity: 1,
+                  }));
+                  (event.target as HTMLElement).blur();
+                }}
+                className="min-h-11 w-full appearance-none rounded-xl border border-slate-300 bg-white pl-3.5 pr-10 py-2.5 text-sm font-medium text-slate-800 shadow-2xs hover:border-slate-400 focus:border-slate-400 focus:outline-none transition-colors cursor-pointer"
+              >
+                {product.variants.map((variant) => (
+                  <option
+                    key={variant.id}
+                    value={variant.id}
+                    disabled={variant.available <= 0}
+                  >
+                    {variant.name} · {formatPrice(variant.price)}{variant.available <= 0 ? " (Out of stock)" : ""}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
+                <FiChevronDown className="h-4 w-4" aria-hidden="true" />
+              </div>
+            </div>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Stock is reserved when you submit your order. Availability can change before checkout.
+            </p>
+          </div>
+        )}
         {isProductInCart ? (
           <>
             <p className="mb-2 text-slate-500 flex items-center gap-1 ">

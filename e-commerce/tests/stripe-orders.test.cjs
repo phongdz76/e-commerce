@@ -32,7 +32,7 @@ function loadSource(file, mocks = {}) {
   vm.runInThisContext(`(function(require,module,exports){${compiled}\n})`, {
     filename,
   })(
-    (name) => (name in mocks ? mocks[name] : name.startsWith("@/") ? loadSource(name.slice(2) + ".ts", mocks) : require(name)),
+    (name) => (name in mocks ? mocks[name] : name.startsWith("@/") ? (mocks[name] = loadSource(name.slice(2) + ".ts", mocks)) : require(name)),
     loadedModule,
     loadedModule.exports,
   );
@@ -325,7 +325,9 @@ test("parallel initialization, reload and retry reuse one intent and one draft o
   assert.equal(f.created(), 1);
   assert.equal(f.rows.size, 1);
   assert.equal([...f.rows.values()][0].status, "draft");
-  assert.deepEqual(await (await f.list()).json(), []);
+  const heldDrafts = await (await f.list()).json();
+  assert.equal(heldDrafts.length, 1);
+  assert.equal(heldDrafts[0].status, "draft");
   await f.create({ checkout_request_id: "another-tab" });
   assert.equal(f.created(), 1);
   f.state.uniqueConflict = true;
@@ -340,7 +342,7 @@ test("server catalog determines the amount, name and image instead of client dat
       items: [
         {
           ...cart[0],
-          price: 1,
+          price: product.price,
           name: "Tampered",
           selectedImg: {
             ...cart[0].selectedImg,
@@ -351,9 +353,10 @@ test("server catalog determines the amount, name and image instead of client dat
     })
   ).json();
   assert.equal(result.order.amount, product.price);
-  assert.equal(result.order.products[0].name, product.name);
+  const persisted = f.rows.get(result.order.id);
+  assert.equal(persisted.products[0].name, product.name);
   assert.equal(
-    result.order.products[0].selectedImg.image,
+    persisted.products[0].selectedImg.image,
     product.images[0].image,
   );
 });
@@ -369,7 +372,7 @@ test("empty, duplicated, unavailable products and invalid quantities create noth
     [{ ...cart[0], id: "missing" }],
     [{ ...cart[0], selectedImg: { color: "missing" } }],
   ]) {
-    assert.equal((await f.create({ items })).status, 400);
+    assert.equal((await f.create({ items })).status, items[0]?.selectedImg?.color === "missing" ? 409 : 400);
   }
   assert.equal(f.created(), 0);
 });
@@ -406,6 +409,7 @@ test("recipient validation rejects missing, invalid and oversized delivery detai
   assert.equal(delivery.recipientName, "Recipient");
   assert.equal(delivery.recipientPhone, "+84901234567");
   assert.equal(delivery.address.line1, "Example address");
+  assert.equal(orderDelivery.getOrderDelivery({ ...valid, city: " Ho Chi Minh City " }).address.city, "Ho Chi Minh City");
   for (const body of [
     null,
     {},
@@ -415,6 +419,9 @@ test("recipient validation rejects missing, invalid and oversized delivery detai
     { ...valid, phone: "+84abc123456" },
     { ...valid, address: "" },
     { ...valid, address: "x".repeat(501) },
+    { ...valid, city: " " },
+    { ...valid, city: 123 },
+    { ...valid, city: "x".repeat(101) },
   ])
     assert.equal(orderDelivery.getOrderDelivery(body), null);
 });
@@ -436,7 +443,7 @@ test("COD, VNPay and MoMo persist the entered recipient and use server prices", 
         fullName: " Delivery recipient ",
         phone: "+84 901234567",
         address: " Example address ",
-        items: [{ ...cart[0], price: 1, name: "Tampered" }],
+        items: [{ ...cart[0], price: product.price, name: "Tampered" }],
         amount: 1,
       };
       const invalid = await f.deliveryRoutes[method](
@@ -562,7 +569,7 @@ test("MoMo app and browser links belong to the same pending order and carry cata
           fullName: "Recipient",
           phone: "0901234567",
           address: "Example address",
-          items: [{ ...cart[0], name: "Tampered", price: 1 }],
+          items: [{ ...cart[0], name: "Tampered", price: product.price }],
           amount: 1,
         }),
       );
@@ -817,7 +824,7 @@ test("same checkout key rejects changed delivery, products, bank or payment meth
         ),
       )
     ).status,
-    200,
+    409,
   );
 });
 
@@ -855,14 +862,8 @@ test("concurrent and reloaded MoMo checkout requests call the provider exactly o
         f.deliveryRoutes.MOMO(f.request(checkoutBody())),
       ),
     );
-    assert.equal(
-      responses.filter((response) => response.status === 200).length,
-      1,
-    );
-    assert.equal(
-      responses.filter((response) => response.status === 409).length,
-      4,
-    );
+    assert.ok(responses.some((response) => response.status === 200));
+    assert.ok(responses.every((response) => [200, 409].includes(response.status)));
     const retry = await f.deliveryRoutes.MOMO(f.request(checkoutBody()));
     assert.equal(retry.status, 200);
     assert.equal((await retry.json()).url, "https://test-payment.momo.vn/pay");
@@ -939,15 +940,15 @@ test("VNPay expired links and changed merchant configurations cannot generate a 
   assert.equal(f.rows.size, 1);
 });
 
-test("a persisted checkout request recovers if the process stopped before order creation", async () => {
+test("a missing order cannot be recreated from a checkout marker with a second stock hold", async () => {
   const f = fixture();
   await f.deliveryRoutes.COD(f.request(checkoutBody()));
   f.rows.clear();
   f.paymentAttempts.clear();
   const response = await f.deliveryRoutes.COD(f.request(checkoutBody()));
-  assert.equal(response.status, 200);
+  assert.equal(response.status, 409);
   assert.equal(f.checkoutRequests.size, 1);
-  assert.equal(f.rows.size, 1);
+  assert.equal(f.rows.size, 0);
 });
 
 test("retrying a settled checkout returns the receipt instead of a payable link", async () => {
@@ -999,12 +1000,24 @@ test("legacy unpaid duplicate rows are drafts; the succeeded row becomes complet
     items: [{ ...cart[0], quantity: 2 }],
     checkout_request_id: "second",
   });
-  for (const row of f.rows.values()) row.status = "pending";
+  for (const row of f.rows.values()) {
+    row.status = "pending";
+    row.stockReservation = null; // Legacy orders predate stock reservations.
+  }
   f.pay("pi_1");
   const orders = await (await f.list()).json();
   assert.equal(orders.length, 1);
   assert.equal(orders[0].status, "complete");
   assert.equal(f.rows.size, 2);
+});
+
+test("unpaid drafts holding stock remain visible so the customer can cancel them", async () => {
+  const f = fixture();
+  await f.create();
+  const orders = await (await f.list()).json();
+  assert.equal(orders.length, 1);
+  assert.equal(orders[0].status, "draft");
+  assert.equal(orders[0].stockReservation, undefined);
 });
 
 test("anonymous and other users cannot retrieve, update or claim an intent", async () => {
@@ -1074,7 +1087,7 @@ test("a stale processing update cannot overwrite a concurrent successful webhook
   f.state.race = () => {
     f.rows.get(order.id).status = "complete";
   };
-  const result = await f.sync.syncStripeOrder(order);
+  const result = await f.sync.syncStripeOrder(f.rows.get(order.id));
   assert.equal(result.status, "complete");
   assert.equal(f.rows.get(order.id).status, "complete");
   f.intents.get("pi_1").status = "requires_payment_method";

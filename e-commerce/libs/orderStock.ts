@@ -19,7 +19,7 @@ export async function withStockTransaction<T>(operation: (tx: Prisma.Transaction
 }
 
 async function moveStock(tx: Prisma.TransactionClient, orderId: string, actorId: string,
-  lines: OrderStockReservation["lines"], action: "STOCK_RESERVED" | "STOCK_RELEASED" | "STOCK_DISPATCHED", version: number, reason: string) {
+  lines: OrderStockReservation["lines"], action: "STOCK_RESERVED" | "STOCK_RELEASED" | "STOCK_DISPATCHED", version: number, reason: string, system = false) {
   for (const line of [...lines].sort((a, b) => a.variantId.localeCompare(b.variantId))) {
     const variant = await tx.productVariant.findUnique({ where: { id: line.variantId }, include: { product: true } });
     const balance = readInventoryBalance(variant?.inventory);
@@ -36,7 +36,7 @@ async function moveStock(tx: Prisma.TransactionClient, orderId: string, actorId:
     await tx.auditLog.create({ data: { id: movementId(orderId, variant.id, action, version), actorId, action,
       entityType: "PRODUCT_VARIANT", entityId: variant.id, status: "SUCCEEDED",
       details: { action, sku: variant.sku, productName: variant.product.name, variantName: variant.name,
-        orderId, reason, before: { onHand: balance.onHand, reserved: balance.reserved }, after } } });
+        orderId, reason, source: system ? "SYSTEM" : "ACCOUNT", before: { onHand: balance.onHand, reserved: balance.reserved }, after } } });
   }
 }
 
@@ -62,11 +62,11 @@ export async function consumeOrderStock(tx: Prisma.TransactionClient, order: Pic
   if (changed.count !== 1) throw Object.assign(new Error("Reservation changed"), { code: "P2034" });
 }
 
-export async function releaseOrderStock(tx: Prisma.TransactionClient, order: Pick<Order, "id" | "userId" | "stockReservation">, actorId: string, reason: string) {
+export async function releaseOrderStock(tx: Prisma.TransactionClient, order: Pick<Order, "id" | "userId" | "stockReservation">, actorId: string, reason: string, system = false) {
   const reservation = order.stockReservation;
   if (!reservation || reservation.state === "RELEASED") return;
   if (reservation.state !== "HELD") throw new CheckoutRequestError("Dispatched stock cannot be released as an unpaid reservation.", 409, "STOCK_REVIEW_REQUIRED");
-  await moveStock(tx, order.id, actorId, reservation.lines, "STOCK_RELEASED", reservation.version + 1, reason);
+  await moveStock(tx, order.id, actorId, reservation.lines, "STOCK_RELEASED", reservation.version + 1, reason, system);
   const changed = await tx.order.updateMany({ where: { id: order.id, stockReservation: { is: { state: "HELD", version: reservation.version } } },
     data: { stockReservation: { set: { ...reservation, state: "RELEASED", version: reservation.version + 1, updatedAt: new Date(), expiresAt: null } } } });
   if (changed.count !== 1) throw Object.assign(new Error("Reservation changed"), { code: "P2034" });
@@ -111,16 +111,18 @@ export async function reviewPaidReleasedStock(orderId: string) {
     amount: order.amount, currency: order.currency } });
 }
 
-export async function cancelUnpaidCodStock(orderId: string, actorId: string, version: number, reason: string) {
+export async function cancelUnpaidCodStock(orderId: string, actorId: string, version: number, reason: string, options: { ownerId?: string; requireExpired?: boolean; system?: boolean } = {}) {
   return withStockTransaction(async (tx) => {
     const order = await tx.order.findUnique({ where: { id: orderId } });
     if (!order) throw new CheckoutRequestError("Order not found", 404, "ORDER_NOT_FOUND");
+    if (options.ownerId && order.userId !== options.ownerId) throw new CheckoutRequestError("Order not found", 404, "ORDER_NOT_FOUND");
     if (order.status === "cancelled" && order.stockReservation?.state === "RELEASED") return;
     if (order.paymentMethod !== "COD" || order.status !== "pending" || order.deliveryStatus !== "pending" ||
-        order.stockReservation?.state !== "HELD" || order.stockReservation.version !== version) {
+        order.stockReservation?.state !== "HELD" || order.stockReservation.version !== version ||
+        (options.requireExpired && (!order.stockReservation.expiresAt || order.stockReservation.expiresAt.getTime() > Date.now()))) {
       throw new CheckoutRequestError("This order has changed or packing has started. Reload before cancelling.", 409, "ORDER_CANCEL_LOCKED");
     }
-    await releaseOrderStock(tx, order, actorId, reason);
+    await releaseOrderStock(tx, order, actorId, reason, options.system);
     const changed = await tx.order.updateMany({ where: { id: orderId, status: "pending", deliveryStatus: "pending", paymentMethod: "COD" }, data: { status: "cancelled", deliveryStatus: "cancelled" } });
     if (changed.count !== 1) throw Object.assign(new Error("Order changed"), { code: "P2034" });
     await tx.paymentAttempt.updateMany({ where: { orderId, state: "COD_PENDING" }, data: { state: "ABANDONED", nextCheckAt: null } });
@@ -133,7 +135,7 @@ export async function expireUnconfirmedCodStock(limit = 50) {
   let expired = 0;
   for (const order of candidates) {
     try {
-      await cancelUnpaidCodStock(order.id, order.userId, order.stockReservation!.version, "Unconfirmed COD hold expired before packing started.");
+      await cancelUnpaidCodStock(order.id, order.userId, order.stockReservation!.version, "Unconfirmed COD hold expired before packing started.", { ownerId: order.userId, requireExpired: true, system: true });
       expired++;
     } catch (error) { if (!(error instanceof CheckoutRequestError)) throw error; }
   }

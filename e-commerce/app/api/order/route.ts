@@ -42,7 +42,7 @@ export async function GET() {
       }),
     );
     const safeOrders = reconciled
-      .filter((order) => order.status !== "draft")
+      .filter((order) => order.status !== "draft" || order.stockReservation?.state === "HELD")
       .map((order) => ({
         id: order.id,
         amount: order.amount,

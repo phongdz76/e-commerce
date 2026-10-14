@@ -5,6 +5,7 @@ import prisma from "@/libs/prismadb";
 import { ADMIN_ORDER_SELECT, toAdminOrderDetail } from "@/libs/adminOrders";
 import { startAdminAudit, finishAdminAudit } from "@/libs/adminAudit";
 import { consumeOrderStock, withStockTransaction } from "@/libs/orderStock";
+import { CheckoutRequestError } from "@/libs/checkoutErrors";
 import {
   SHIPMENT_TRANSITIONS,
   getShipmentInput,
@@ -280,7 +281,13 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       };
     }
     const saveShipment = async (db: Prisma.TransactionClient) => {
-    if (input.deliveryStatus === "shipped" && order.stockReservation) await consumeOrderStock(db, order, currentUser.id);
+    if (order.stockReservation) {
+      const latest = await db.order.findUnique({ where: { id: order.id }, select: ORDER_SELECT });
+      if (!latest || (latest.shippingInfo?.version || 0) !== input.version || latest.status !== order.status || latest.deliveryStatus !== order.deliveryStatus) {
+        throw new CheckoutRequestError("Shipment changed. Refresh before trying again.", 409, "SHIPMENT_CHANGED");
+      }
+      if (input.deliveryStatus === "shipped") await consumeOrderStock(db, latest, currentUser.id);
+    }
     const result = await db.order.updateMany({
       where,
       data: {
@@ -296,7 +303,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
         },
       },
     });
-    if (result.count !== 1) throw new Error("Shipment changed while saving");
+    if (result.count !== 1) throw new CheckoutRequestError("Shipment changed. Refresh before trying again.", 409, "SHIPMENT_CHANGED");
     return result;
     };
     const result = order.stockReservation ? await withStockTransaction(saveShipment) : await saveShipment(prisma);
@@ -310,10 +317,11 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     saved = true;
     await finishAdminAudit(audit.id, "SUCCEEDED");
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (error) {
     if (auditId) {
-      await finishAdminAudit(auditId, "UNKNOWN");
+      await finishAdminAudit(auditId, error instanceof CheckoutRequestError ? "FAILED" : "UNKNOWN");
     }
+    if (error instanceof CheckoutRequestError) return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
     return NextResponse.json(
       {
         error: saved

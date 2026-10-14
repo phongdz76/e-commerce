@@ -1,6 +1,10 @@
-import { products } from "./products";
+import type { products } from "./products";
 
 export type CatalogProduct = (typeof products)[number] & {
+  categorySlug?: string;
+  categoryLabel?: string;
+  brandSlug?: string;
+  matchedVariantId?: string;
   variants?: { id: string; sku: string; name: string; price: number; available: number; image: { color: string; colorCode: string; image: string } }[];
 };
 export const PRODUCTS_PER_PAGE = 12;
@@ -50,6 +54,7 @@ export interface ProductFilters {
   maxPrice: string;
   stock: boolean;
   sort: string;
+  attributes?: Record<string, string>;
 }
 
 export function filterCatalog(catalog: CatalogProduct[], filters: ProductFilters) {

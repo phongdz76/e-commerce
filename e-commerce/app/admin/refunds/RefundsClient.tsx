@@ -23,7 +23,8 @@ interface RefundQueueResponse {
 
 function getReasonLabel(reason: string) {
   return reason === "DUPLICATE_PAYMENT" ? "Duplicate payment"
-    : reason === "LATE_SUCCESS" ? "Late payment confirmation" : "Payment needs review";
+    : reason === "LATE_SUCCESS" ? "Late payment confirmation"
+    : reason === "STOCK_RELEASED_PAYMENT" ? "Payment received after stock was released" : "Payment needs review";
 }
 
 export default function RefundsClient() {
@@ -96,6 +97,7 @@ export default function RefundsClient() {
             <option value="ALL">All reasons</option>
             <option value="DUPLICATE_PAYMENT">Duplicate payment</option>
             <option value="LATE_SUCCESS">Late payment confirmation</option>
+            <option value="STOCK_RELEASED_PAYMENT">Payment received after stock was released</option>
           </select>
         </div>
         {!isLoading && !error && data ? <p className="text-sm font-semibold">{data.total.toLocaleString("en-US")} issues requiring follow-up</p> : null}

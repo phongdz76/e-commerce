@@ -21,6 +21,7 @@ const ACTION_LABELS: Record<string, string> = {
   STOCK_RESERVED: "Reserved order stock",
   STOCK_RELEASED: "Released order stock",
   STOCK_DISPATCHED: "Dispatched order stock",
+  ORDER_CANCELLED: "Cancelled unpaid order",
 };
 
 function getObject(value: unknown): Record<string, unknown> {
@@ -126,7 +127,7 @@ export function formatAdminActivity(
       : "";
   return {
     id: log.id,
-    actor,
+    actor: details.source === "SYSTEM" ? "System" : actor,
     activity: Object.hasOwn(ACTION_LABELS, log.action) ? ACTION_LABELS[log.action] : "Administrative activity",
     target,
     result,

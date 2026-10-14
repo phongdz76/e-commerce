@@ -36,7 +36,7 @@ function serializeMovement(log: { id: string; details: unknown; createdAt: Date 
       typeof details.reason !== "string" || details.reason.length > 500) throw new Error("Invalid inventory movement");
   return { id: log.id, action: details.action as InventoryMovement["action"], before, after: after.onHand,
     change: after.onHand - (before ?? 0), reserved: after.reserved, reservedBefore: Number(getActivityDetails(details.before).reserved ?? 0), reason: details.reason,
-    actor, createdAt: log.createdAt.toISOString() };
+    actor: details.source === "SYSTEM" ? "System" : actor, createdAt: log.createdAt.toISOString() };
 }
 
 export async function readAdminInventory(request: Request, variantId?: string) {

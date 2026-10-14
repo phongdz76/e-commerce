@@ -41,6 +41,7 @@ export async function syncStripeOrder<T extends StripeOrder>(order: T) {
     throw new Error("Payment has not been received in full");
   }
   const status = getStripeOrderStatus(intent);
+  if (order.status === "cancelled" && status !== "complete") return order;
   // An older event must never move a confirmed payment back to Pending.
   if (
     ["complete", "paid", "done"].includes(order.status) &&
