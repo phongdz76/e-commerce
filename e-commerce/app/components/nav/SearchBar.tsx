@@ -230,7 +230,7 @@ export default function SearchBar({ onNavigate }: { onNavigate?: () => void }) {
                 <span className="min-w-0">
                   <span className="block truncate">{product.name}</span>
                   <span className="block text-sm text-slate-500">
-                    From {formatPrice(product.price)}
+                    {formatPrice(product.price)}
                     {!product.inStock ? " · Unavailable" : ""}
                   </span>
                 </span>
