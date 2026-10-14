@@ -19,7 +19,6 @@ import { safeUser } from "@/types";
 import axios from "axios";
 import { API_PATHS } from "../../utils/apiPaths";
 import { PROVINCES_API } from "../../utils/externalApiPaths";
-import MoMoPayment, { type MoMoPaymentDetails } from "./MoMoPayment";
 
 const PHONE_REGEX = /^\+?[0-9]{9,15}$/;
 type LocationLevel = "province" | "district" | "ward";
@@ -136,9 +135,6 @@ export default function CheckoutForm({
 
   const [phoneNumber, setPhoneNumber] = useState(
     currentUser?.phoneNumber || "",
-  );
-  const [momoPayment, setMoMoPayment] = useState<MoMoPaymentDetails | null>(
-    null,
   );
   const [zaloPayOrderId, setZaloPayOrderId] = useState<string | null>(null);
   const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
@@ -531,6 +527,7 @@ export default function CheckoutForm({
         submitting.current = false;
       }
     } else if (paymentMethod === "MOMO") {
+      let redirecting = false;
       try {
         const response = await axios.post(API_PATHS.PAYMENT.MOMO_CREATE_URL, {
           checkout_request_id: getCheckoutRequestId(),
@@ -563,8 +560,8 @@ export default function CheckoutForm({
         }
 
         if (response.data.url && response.data.orderId) {
-          setMoMoPayment(response.data);
-          window.scrollTo({ top: 0, behavior: "smooth" });
+          window.location.assign(response.data.url);
+          redirecting = true;
         } else {
           toast.error("Failed to create MoMo payment URL");
         }
@@ -580,8 +577,10 @@ export default function CheckoutForm({
           typeof message === "string" ? message : "Error connecting to MoMo",
         );
       } finally {
-        setLoading(false);
-        submitting.current = false;
+        if (!redirecting) {
+          setLoading(false);
+          submitting.current = false;
+        }
       }
     } else if (paymentMethod === "ZALOPAY") {
       const payload = {
@@ -707,10 +706,6 @@ export default function CheckoutForm({
       }
     }
   };
-  if (momoPayment) {
-    return <MoMoPayment payment={momoPayment} />;
-  }
-
   return (
     <form onSubmit={handleSubmit} id="payment-form" noValidate>
       {pendingOrderId && (

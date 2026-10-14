@@ -5,7 +5,10 @@ const path = require("node:path");
 const vm = require("node:vm");
 const { createHmac } = require("node:crypto");
 const ts = require("typescript");
-const { installStockDatabase, matches: stockMatches } = require("./fixtures/stock-db.cjs");
+const {
+  installStockDatabase,
+  matches: stockMatches,
+} = require("./fixtures/stock-db.cjs");
 
 // No real credentials, database, network calls or payments.
 Object.assign(process.env, {
@@ -30,7 +33,12 @@ function load(file, mocks = {}) {
   vm.runInThisContext(`(function(require,module,exports){${js}\n})`, {
     filename,
   })(
-    (name) => (name in mocks ? mocks[name] : name.startsWith("@/") ? (mocks[name] = load(name.slice(2) + ".ts", mocks)) : require(name)),
+    (name) =>
+      name in mocks
+        ? mocks[name]
+        : name.startsWith("@/")
+          ? (mocks[name] = load(name.slice(2) + ".ts", mocks))
+          : require(name),
     loadedModule,
     loadedModule.exports,
   );
@@ -43,7 +51,12 @@ const zalo = load("libs/zalopay.ts");
 const product = products.find((p) => p.inStock);
 const payload = {
   items: [
-    { id: product.id, quantity: 1, selectedImg: product.images[0], price: product.price },
+    {
+      id: product.id,
+      quantity: 1,
+      selectedImg: product.images[0],
+      price: product.price,
+    },
   ],
   amount: 1,
   address: "12 Example Street",
@@ -69,7 +82,11 @@ function fixture() {
     Object.entries(where).every(([key, value]) =>
       value && typeof value === "object" && value.notIn
         ? !value.notIn.includes(row[key])
-        : value && typeof value === "object" && ("is" in value || "isSet" in value) ? stockMatches(row, { [key]: value }) : row[key] === value,
+        : value &&
+            typeof value === "object" &&
+            ("is" in value || "isSet" in value)
+          ? stockMatches(row, { [key]: value })
+          : row[key] === value,
     );
   const prisma = {
     order: {
@@ -133,10 +150,26 @@ function fixture() {
   const checkoutRequests = new Map();
   const attempts = new Map();
   const model = (records) => ({
-    findUnique: async ({ where }) => structuredClone(records.get(where.id) || null),
-    create: async ({ data }) => { if (records.has(data.id)) throw Object.assign(new Error("Duplicate"), { code: "P2002" }); const row = { state: "CREATED", ...structuredClone(data) }; records.set(row.id, row); return structuredClone(row); },
-    updateMany: async ({ where, data }) => { let count = 0; for (const row of records.values()) if (stockMatches(row, where)) { Object.assign(row, structuredClone(data)); count++; } return { count }; },
-    findMany: async ({ where }) => [...records.values()].filter((row) => stockMatches(row, where)),
+    findUnique: async ({ where }) =>
+      structuredClone(records.get(where.id) || null),
+    create: async ({ data }) => {
+      if (records.has(data.id))
+        throw Object.assign(new Error("Duplicate"), { code: "P2002" });
+      const row = { state: "CREATED", ...structuredClone(data) };
+      records.set(row.id, row);
+      return structuredClone(row);
+    },
+    updateMany: async ({ where, data }) => {
+      let count = 0;
+      for (const row of records.values())
+        if (stockMatches(row, where)) {
+          Object.assign(row, structuredClone(data));
+          count++;
+        }
+      return { count };
+    },
+    findMany: async ({ where }) =>
+      [...records.values()].filter((row) => stockMatches(row, where)),
   });
   prisma.checkoutRequest = model(checkoutRequests);
   prisma.paymentAttempt = model(attempts);
@@ -584,104 +617,152 @@ test("checkout renders COD/ZaloPay without initializing Stripe and verifies the 
     global.fetch = previousFetch;
   }
 });
-test("ZaloPay form preserves cart until verified, prevents duplicate submits and retains delivery info", async () => {
-  const h = hooks();
-  const calls = [];
-  let clearCount = 0;
-  let successCount = 0;
-  const navigations = [];
-  const memory = new Map();
-  const oldStorage = global.localStorage;
-  const oldWindow = global.window;
-  global.localStorage = {
-    getItem: (key) => memory.get(key) ?? null,
-    setItem: (key, value) => memory.set(key, value),
-    removeItem: (key) => memory.delete(key),
-  };
-  global.window = { location: { assign: (value) => navigations.push(value) } };
-  let resolvePayment;
-  const waiting = new Promise((resolve) => {
-    resolvePayment = resolve;
-  });
-  const Form = load("app/checkout/CheckoutForm.tsx", {
-    react: h.react,
-    "../hooks/useCart": {
-      useCart: () => ({
-        context: {
-          cartProducts: payload.items,
-          cartTotalQtyAmount: product.price,
-          handleClearCart: () => clearCount++,
-          handleSetPaymentIntent() {},
+for (const [paymentMethod, outcome] of [
+  ["ZALOPAY", "redirect"],
+  ["MOMO", "redirect"],
+  ["MOMO", "missing-url"],
+  ["MOMO", "navigation-failure"],
+  ["MOMO", "already-paid"],
+]) {
+  test(`${paymentMethod} checkout ${outcome}: direct redirect, verified receipt or retry without losing cart`, async () => {
+    const h = hooks();
+    const calls = [];
+    let clearCount = 0;
+    let successCount = 0;
+    const navigations = [];
+    const memory = new Map();
+    const oldStorage = global.localStorage;
+    const oldWindow = global.window;
+    global.localStorage = {
+      getItem: (key) => memory.get(key) ?? null,
+      setItem: (key, value) => memory.set(key, value),
+      removeItem: (key) => memory.delete(key),
+    };
+    global.window = {
+      location: {
+        assign: (value) => {
+          if (outcome === "navigation-failure")
+            throw new Error("Navigation blocked");
+          navigations.push(value);
         },
-      }),
-    },
-    "@/utils/formatPrice": { formatPrice: String },
-    axios: {
-      __esModule: true,
-      default: {
-        post: async (url, body) => {
-          calls.push({ url, body });
-          return waiting;
-        },
-        patch: async () => ({}),
-      },
-    },
-    "react-hot-toast": {
-      __esModule: true,
-      default: { error() {}, success() {} },
-    },
-    "../components/Headinng": { __esModule: true, default: () => null },
-    "../components/Button": { __esModule: true, default: () => null },
-    "next/link": { __esModule: true, default: () => null },
-    "../../utils/apiPaths": load("utils/apiPaths.ts"),
-    "../../utils/externalApiPaths": load("utils/externalApiPaths.ts"),
-    "./MoMoPayment": { __esModule: true, default: () => null },
-  }).default;
-  try {
-    h.reset();
-    const formProps = {
-      paymentMethod: "ZALOPAY",
-      onPaymentMethodChange() {},
-      stripeContext: { stripe: null, elements: null },
-      cardPayment: null,
-      handleSetPaymentSuccess: () => successCount++,
-      currentUser: {
-        name: payload.fullName,
-        address: payload.address,
-        phoneNumber: payload.phone,
       },
     };
-    let tree = Form(formProps);
-    findElement(tree, e => e.props?.id === "deliveryCity").props.onChange({ target: { value: "Ho Chi Minh City" } });
-    h.reset();
-    tree = Form(formProps);
-    const submit = findElement(tree, (e) => e.type === "form").props.onSubmit;
-    const first = submit({ preventDefault() {} });
-    await submit({ preventDefault() {} });
-    assert.equal(calls.length, 1);
-    assert.equal(calls[0].url, "/api/zalopay/create-payment-url");
-    assert.equal(calls[0].body.address, payload.address);
-    assert.equal(calls[0].body.phone, payload.phone);
-    assert.equal(calls[0].body.city, "Ho Chi Minh City");
-    assert.ok(calls[0].body.checkout_request_id);
-    assert.equal(clearCount, 0);
-    assert.equal(successCount, 0);
-    resolvePayment({
-      data: {
-        orderId: "000000000000000000000001",
-        url: "https://qcgateway.zalopay.vn/openinapp?order=fixture",
-        amount: product.price,
-      },
+    let resolvePayment;
+    const waiting = new Promise((resolve) => {
+      resolvePayment = resolve;
     });
-    await first;
-    assert.equal(navigations.length, 1);
-    assert.equal(clearCount, 0);
-    assert.equal(successCount, 0);
-  } finally {
-    global.localStorage = oldStorage;
-    global.window = oldWindow;
-  }
-});
+    const Form = load("app/checkout/CheckoutForm.tsx", {
+      react: h.react,
+      "../hooks/useCart": {
+        useCart: () => ({
+          context: {
+            cartProducts: payload.items,
+            cartTotalQtyAmount: product.price,
+            handleClearCart: () => clearCount++,
+            handleSetPaymentIntent() {},
+          },
+        }),
+      },
+      "@/utils/formatPrice": { formatPrice: String },
+      axios: {
+        __esModule: true,
+        default: {
+          post: async (url, body) => {
+            calls.push({ url, body });
+            return waiting;
+          },
+          patch: async () => ({}),
+          isAxiosError: () => false,
+        },
+      },
+      "react-hot-toast": {
+        __esModule: true,
+        default: { error() {}, success() {} },
+      },
+      "../components/Headinng": { __esModule: true, default: () => null },
+      "../components/Button": { __esModule: true, default: () => null },
+      "next/link": { __esModule: true, default: () => null },
+      "../../utils/apiPaths": load("utils/apiPaths.ts"),
+      "../../utils/externalApiPaths": load("utils/externalApiPaths.ts"),
+      "./MoMoPayment": { __esModule: true, default: () => null },
+    }).default;
+    try {
+      h.reset();
+      const formProps = {
+        paymentMethod,
+        onPaymentMethodChange() {},
+        stripeContext: { stripe: null, elements: null },
+        cardPayment: null,
+        handleSetPaymentSuccess: () => successCount++,
+        currentUser: {
+          name: payload.fullName,
+          address: payload.address,
+          phoneNumber: payload.phone,
+        },
+      };
+      let tree = Form(formProps);
+      findElement(tree, (e) => e.props?.id === "deliveryCity").props.onChange({
+        target: { value: "Ho Chi Minh City" },
+      });
+      h.reset();
+      tree = Form(formProps);
+      const submit = findElement(tree, (e) => e.type === "form").props.onSubmit;
+      const first = submit({ preventDefault() {} });
+      await submit({ preventDefault() {} });
+      assert.equal(calls.length, 1);
+      assert.equal(
+        calls[0].url,
+        paymentMethod === "MOMO"
+          ? "/api/momo/create-payment-url"
+          : "/api/zalopay/create-payment-url",
+      );
+      assert.equal(calls[0].body.address, payload.address);
+      assert.equal(calls[0].body.phone, payload.phone);
+      assert.equal(calls[0].body.city, "Ho Chi Minh City");
+      assert.ok(calls[0].body.checkout_request_id);
+      assert.equal(clearCount, 0);
+      assert.equal(successCount, 0);
+      resolvePayment({
+        data: {
+          orderId: "000000000000000000000001",
+          url:
+            outcome === "missing-url"
+              ? undefined
+              : paymentMethod === "MOMO"
+                ? "https://test-payment.momo.vn/gateway/pay?t=fixture"
+                : "https://qcgateway.zalopay.vn/openinapp?order=fixture",
+          alreadyPaid: outcome === "already-paid",
+          amount: product.price,
+        },
+      });
+      await first;
+      assert.equal(navigations.length, outcome === "redirect" ? 1 : 0);
+      if (outcome === "redirect")
+        assert.equal(
+          navigations[0],
+          paymentMethod === "MOMO"
+            ? "https://test-payment.momo.vn/gateway/pay?t=fixture"
+            : "https://qcgateway.zalopay.vn/openinapp?order=fixture",
+        );
+      assert.equal(clearCount, outcome === "already-paid" ? 1 : 0);
+      assert.equal(successCount, outcome === "already-paid" ? 1 : 0);
+      if (paymentMethod === "MOMO" && outcome !== "already-paid") {
+        await submit({ preventDefault() {} });
+        assert.equal(calls.length, outcome === "redirect" ? 1 : 2);
+        if (calls.length === 2)
+          assert.equal(
+            calls[1].body.checkout_request_id,
+            calls[0].body.checkout_request_id,
+          );
+        h.reset();
+        assert.ok(findElement(Form(formProps), (e) => e.type === "form"));
+      }
+    } finally {
+      global.localStorage = oldStorage;
+      global.window = oldWindow;
+    }
+  });
+}
 
 test("inline Stripe checkout retains the cart until the server confirms receipt of payment", async () => {
   const previousWindow = global.window;
@@ -751,7 +832,9 @@ test("inline Stripe checkout retains the cart until the server confirms receipt 
         },
       };
       let tree = Form(formProps);
-      findElement(tree, e => e.props?.id === "deliveryCity").props.onChange({ target: { value: "Ho Chi Minh City" } });
+      findElement(tree, (e) => e.props?.id === "deliveryCity").props.onChange({
+        target: { value: "Ho Chi Minh City" },
+      });
       h.reset();
       tree = Form(formProps);
       findElement(tree, (element) => element.type === "form").props.onSubmit({
