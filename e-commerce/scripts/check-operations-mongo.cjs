@@ -241,6 +241,74 @@ async function main() {
     checks.push(
       "MoMo terminal query closure releases stock without guessed expiry; pending result keeps stock",
     );
+    const expiredMomo = await checkout.prepareCheckoutRequest(
+      randomUUID(),
+      actor.id,
+      "MOMO",
+      cart,
+      delivery,
+    );
+    await prisma.paymentAttempt.update({
+      where: { id: expiredMomo.attempt.id },
+      data: { state: "READY", startedAt: new Date() },
+    });
+    const momo = load("libs/momo.ts");
+    const query = sourceLoader({
+      "@/libs/prismadb": { __esModule: true, default: prisma },
+      "@/libs/momo": {
+        ...momo,
+        getMomoConfig: () => ({
+          partnerCode: "PRIVATE_QA",
+          accessKey: "qa-only",
+          secretKey: "qa-only",
+        }),
+      },
+    })("libs/queryOnlinePayment.ts");
+    const originalFetch = global.fetch;
+    try {
+      global.fetch = async (_url, options) => {
+        const request = JSON.parse(options.body);
+        return Response.json({
+          partnerCode: request.partnerCode,
+          orderId: request.orderId,
+          requestId: request.requestId,
+          resultCode: 1005,
+        });
+      };
+      const confirmed = await query.queryMomoOrder(
+        expiredMomo.order,
+        expiredMomo.attempt,
+      );
+      assert.equal(confirmed.verifiedFailure, true);
+    } finally {
+      global.fetch = originalFetch;
+    }
+    const verifiedMomo = await prisma.paymentAttempt.findUnique({
+      where: { id: expiredMomo.attempt.id },
+    });
+    assert.equal(verifiedMomo.state, "FAILED");
+    assert.ok(verifiedMomo.failureVerifiedAt);
+    await stock.releaseVerifiedFailedStock(
+      expiredMomo.order.id,
+      expiredMomo.attempt.id,
+    );
+    await stock.releaseVerifiedFailedStock(
+      expiredMomo.order.id,
+      expiredMomo.attempt.id,
+    );
+    assert.equal(
+      (await prisma.order.findUnique({ where: { id: expiredMomo.order.id } }))
+        .stockReservation.state,
+      "RELEASED",
+    );
+    assert.equal(
+      (await prisma.productVariant.findUnique({ where: { id: variant.id } }))
+        .inventory.reserved,
+      0,
+    );
+    checks.push(
+      "MoMo expired query omitting amount verifies closure in MongoDB and releases once; no provider network request",
+    );
     const prepared = await checkout.prepareCheckoutRequest(
       randomUUID(),
       actor.id,

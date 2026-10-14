@@ -148,7 +148,19 @@ export async function queryMomoOrder(order: Order, attempt: PaymentAttempt) {
   ) {
     throw new Error("MoMo query does not match this request");
   }
+  const status = getMomoPaymentStatus(String(result.resultCode));
+  // The sandbox can omit amount on an explicitly closed/expired transaction.
+  // Accept only those closures after the HTTPS request/merchant/order binding above.
+  // Success, pending, generic errors and any supplied amount still require a full match.
+  const closedWithoutAmount =
+    result.amount === undefined &&
+    [1003, 1005, 1006, 1017].includes(result.resultCode) &&
+    order.paymentMethod === "MOMO" &&
+    order.currency.toLowerCase() === "vnd" &&
+    Number.isSafeInteger(order.amount) &&
+    order.amount > 0;
   if (
+    !closedWithoutAmount &&
     !isMomoOrderMatch(
       { ...order, paymentIntentId: attempt.id },
       {
@@ -159,7 +171,6 @@ export async function queryMomoOrder(order: Order, attempt: PaymentAttempt) {
   ) {
     throw new Error("MoMo query amount does not match this order");
   }
-  const status = getMomoPaymentStatus(String(result.resultCode));
   if (
     typeof result.transId === "number" &&
     !Number.isSafeInteger(result.transId)

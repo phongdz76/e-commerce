@@ -29,7 +29,12 @@ function load(file, mocks = {}) {
   vm.runInThisContext(`(function(require,module,exports){${compiled}\n})`, {
     filename,
   })(
-    (name) => (name in mocks ? mocks[name] : name.startsWith("@/") ? (mocks[name] = load(name.slice(2) + ".ts", mocks)) : require(name)),
+    (name) =>
+      name in mocks
+        ? mocks[name]
+        : name.startsWith("@/")
+          ? (mocks[name] = load(name.slice(2) + ".ts", mocks))
+          : require(name),
     loadedModule,
     loadedModule.exports,
   );
@@ -86,7 +91,8 @@ function fixture(method) {
   }
   const prisma = {
     paymentAttempt: {
-      count: async ({ where = {} }) => [...attempts.values()].filter((row) => matches(row, where)).length,
+      count: async ({ where = {} }) =>
+        [...attempts.values()].filter((row) => matches(row, where)).length,
       create: async ({ data }) => {
         if (attempts.has(data.id))
           throw Object.assign(new Error("Duplicate"), { code: "P2002" });
@@ -197,12 +203,28 @@ function fixture(method) {
   };
   const operationalJobs = new Map();
   prisma.operationalJob = {
-    create: async ({ data }) => { if (operationalJobs.has(data.id)) throw Object.assign(new Error('Duplicate'), { code: 'P2002' }); const row = { runCount: 0, ...data }; operationalJobs.set(row.id, row); return structuredClone(row); },
-    updateMany: async ({ where, data }) => { const row = operationalJobs.get(where.id); if (!row || !matches(row, where)) return { count: 0 }; for (const [key, value] of Object.entries(data)) row[key] = value && typeof value === 'object' && 'increment' in value ? row[key] + value.increment : value; return { count: 1 }; },
+    create: async ({ data }) => {
+      if (operationalJobs.has(data.id))
+        throw Object.assign(new Error("Duplicate"), { code: "P2002" });
+      const row = { runCount: 0, ...data };
+      operationalJobs.set(row.id, row);
+      return structuredClone(row);
+    },
+    updateMany: async ({ where, data }) => {
+      const row = operationalJobs.get(where.id);
+      if (!row || !matches(row, where)) return { count: 0 };
+      for (const [key, value] of Object.entries(data))
+        row[key] =
+          value && typeof value === "object" && "increment" in value
+            ? row[key] + value.increment
+            : value;
+      return { count: 1 };
+    },
   };
   prisma.operationalIncident = { create: async ({ data }) => data };
   prisma.paymentException = {
-    count: async ({ where = {} }) => [...exceptions.values()].filter((row) => matches(row, where)).length,
+    count: async ({ where = {} }) =>
+      [...exceptions.values()].filter((row) => matches(row, where)).length,
     upsert: async ({ where, create }) => {
       if (state.exceptionError) throw new Error("private-exception-db-error");
       if (!exceptions.has(where.id))
@@ -786,6 +808,71 @@ test("MoMo query validates HTTPS response correlation and full amount", async ()
   }
 });
 
+test("MoMo explicitly closed query without amount records verified failure", async () => {
+  for (const resultCode of [1003, 1005, 1006, 1017]) {
+    const f = fixture("MOMO");
+    const attempt = await f.reconciliation.ensurePaymentAttempt(f.order);
+    await withQueryProvider(
+      async () => {
+        const result = await f.queries.queryMomoOrder(f.order, attempt);
+        assert.equal(result.status, "failed");
+        assert.equal(result.verifiedFailure, true);
+        assert.equal(f.attempts.get(attempt.id).state, "FAILED");
+        assert.ok(f.attempts.get(attempt.id).failureVerifiedAt);
+      },
+      async (_url, request) =>
+        Response.json({
+          partnerCode: request.partnerCode,
+          orderId: request.orderId,
+          requestId: request.requestId,
+          resultCode,
+        }),
+    );
+  }
+});
+
+test("MoMo missing amount cannot settle success/pending/errors or bypass response binding", async () => {
+  for (const mode of [
+    "paid",
+    "pending",
+    "error",
+    "unknown-error",
+    "partner",
+    "request",
+    "order",
+    "amount",
+    "currency",
+  ]) {
+    const f = fixture("MOMO");
+    if (mode === "currency") f.order.currency = "usd";
+    const attempt = await f.reconciliation.ensurePaymentAttempt(f.order);
+    await withQueryProvider(
+      async () => {
+        await assert.rejects(f.queries.queryMomoOrder(f.order, attempt));
+        assert.equal(f.order.status, "pending");
+        assert.equal(f.attempts.get(attempt.id).failureVerifiedAt, undefined);
+      },
+      async (_url, request) =>
+        Response.json({
+          partnerCode: mode === "partner" ? "foreign" : request.partnerCode,
+          orderId: mode === "order" ? "foreign" : request.orderId,
+          requestId: mode === "request" ? "foreign" : request.requestId,
+          resultCode:
+            mode === "paid"
+              ? 0
+              : mode === "pending"
+                ? 7000
+                : mode === "error"
+                  ? 13
+                  : mode === "unknown-error"
+                    ? 99
+                    : 1005,
+          ...(mode === "amount" ? { amount: 1 } : {}),
+        }),
+    );
+  }
+});
+
 test("simultaneous reconciliation workers acquire one database lease and one query", async () => {
   const f = fixture("MOMO");
   let calls = 0;
@@ -980,7 +1067,12 @@ test("payment queue and manual reconciliation enforce ADMIN permissions", async 
   const queued = await (await f.queue(req)).json();
   assert.equal(queued.attempts.length, 1);
   assert.equal("privateSecret" in queued.attempts[0], false);
-  for (const field of ["lastError", "resultCode", "checkCount", "nextCheckAt"]) {
+  for (const field of [
+    "lastError",
+    "resultCode",
+    "checkCount",
+    "nextCheckAt",
+  ]) {
     assert.equal(field in queued.attempts[0], false);
   }
   assert.equal(queued.configuration, undefined);
