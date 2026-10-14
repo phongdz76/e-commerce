@@ -72,7 +72,7 @@ export default function ProductCard({ data }: ProductCardProps) {
             {data.reviews.length === 1 ? "review" : "reviews"}
           </div>
           <div className="mt-1 text-base font-bold text-slate-700 md:text-lg">
-            From {formatPrice(data.price)}
+            {formatPrice(data.price)}
           </div>
         </div>
       </div>
