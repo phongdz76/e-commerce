@@ -5,15 +5,17 @@ const load = sourceLoader();
 const query = load('utils/catalogQuery.ts');
 
 test('catalog queries reject duplicate, oversized, fractional, reversed and unsafe parameters', () => {
-  for (const value of ['q=a&q=b', 'q=' + 'a'.repeat(81), 'page=0', 'page=1.5', 'page=10001', 'sort=constructor', 'minPrice=-1', 'maxPrice=1.5', 'minPrice=200&maxPrice=100', 'maxPrice=2000000001', 'stock=true', 'spec=RAM:8GB&spec=RAM:16GB', 'spec=__proto__:yes', 'spec=RAM:']) {
+  for (const value of ['q=a&q=b', 'q=%00', 'q=' + 'a'.repeat(81), 'page=0', 'page=1.5', 'page=10001', 'sort=constructor', 'minPrice=-1', 'maxPrice=1.5', 'minPrice=200&maxPrice=100', 'maxPrice=2147483648', 'stock=true', 'spec=RAM:8GB&spec=RAM:16GB', 'spec=__proto__:yes', 'spec=RAM:']) {
     assert.throws(() => query.parseCatalogQuery(new URLSearchParams(value)), query.CatalogQueryError, value);
   }
+  assert.equal(query.parseCatalogQuery(new URLSearchParams('maxPrice=2147483647')).filters.maxPrice, '2147483647');
 });
 
 test('URL filters round trip multiple brands and specifications without losing selection', () => {
   const parsed = query.parseCatalogQuery(new URLSearchParams('q=Điện+thoại&brand=apple,apple,new-brand&minPrice=0&stock=1&spec=RAM:8GB&spec=Storage:128GB&page=2'));
   assert.equal(parsed.filters.brand, 'apple,new-brand');
   assert.equal(parsed.filters.attributes.RAM, '8GB');
+  assert.equal(Object.getPrototypeOf(parsed.filters.attributes), Object.prototype); // Serializable across the RSC boundary.
   assert.deepEqual(query.parseCatalogQuery(new URL(query.getCatalogUrl(parsed.filters, parsed.page), 'http://localhost').searchParams), parsed);
 });
 
@@ -51,7 +53,7 @@ test('public suggestion route needs no login, is bounded and excludes internal b
   const response = await f.endpoint(new Request('http://localhost/api/catalog/suggestions?q=DB'));
   assert.equal(response.status, 200);
   const data = await response.json();
-  assert.deepEqual(Object.keys(data.products[0]).sort(), ['id', 'image', 'inStock', 'name', 'price']);
+  assert.deepEqual(Object.keys(data.products[0]).sort(), ['id', 'image', 'inStock', 'name', 'price', 'variantId']);
   assert.equal(response.headers.get('cache-control'), 'no-store');
   const pipeline = f.state.queries[0].pipeline;
   assert.equal(pipeline.at(-1).$facet.products.find(stage => stage.$limit).$limit, 4);

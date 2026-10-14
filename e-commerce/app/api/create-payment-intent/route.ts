@@ -59,6 +59,9 @@ export async function POST(request: Request) {
     if (order.paymentIntentId?.startsWith("pi_")) {
       intent = await stripe.paymentIntents.retrieve(order.paymentIntentId);
     } else {
+      if (Date.now() - order.createDate.getTime() > 23 * 60 * 60 * 1000 || order.createDate.getTime() > Date.now()) {
+        throw new CheckoutRequestError("The original card request needs manual review before it can be recovered. Check Your Orders; its stock hold has been kept.", 409, "HOLD_RECOVERY_WINDOW");
+      }
       intent = await stripe.paymentIntents.create({ amount: order.amount, currency: "vnd", automatic_payment_methods: { enabled: true },
         metadata: { userId: user.id, orderId: order.id } }, { idempotencyKey: "stock-checkout-" + order.id });
       const attached = await prisma.order.updateMany({ where: { id: order.id, userId: user.id, paymentIntentId: order.paymentIntentId,

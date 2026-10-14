@@ -205,7 +205,12 @@ export async function reconcilePayment(
   const savedAttempt = await prisma.paymentAttempt.findUnique({
     where: { id: attempt.id },
   });
-  if (queryConfirmed && verifiedFailure && savedAttempt?.state === "FAILED" && order.stockReservation) {
+  if (
+    queryConfirmed &&
+    verifiedFailure &&
+    savedAttempt?.state === "FAILED" &&
+    order.stockReservation
+  ) {
     await releaseVerifiedFailedStock(order.id, attempt.id);
   }
   return {
@@ -250,10 +255,30 @@ export async function reconcilePendingPayments() {
     where: {
       paymentMethod: { in: ONLINE_PAYMENT_METHODS },
       status: { in: ["draft", "pending", "processing"] },
-      OR: [
-        { paymentAttemptTracked: false },
-        { paymentAttemptTracked: null },
-        { paymentAttemptTracked: { isSet: false } },
+      AND: [
+        {
+          OR: [
+            { paymentAttemptTracked: false },
+            { paymentAttemptTracked: null },
+            { paymentAttemptTracked: { isSet: false } },
+          ],
+        },
+        {
+          OR: [
+            {
+              AND: [
+                { activePaymentAttemptId: { not: null } },
+                { activePaymentAttemptId: { not: "" } },
+              ],
+            },
+            {
+              AND: [
+                { paymentIntentId: { not: null } },
+                { paymentIntentId: { not: "" } },
+              ],
+            },
+          ],
+        },
       ],
     },
     orderBy: { createDate: "asc" },
@@ -288,10 +313,29 @@ export async function reconcilePendingPayments() {
       state: { in: ["CREATED", "CREATING", "READY", "UNKNOWN", "PROCESSING"] },
       paymentMethod: { in: ONLINE_PAYMENT_METHODS },
       checkCount: { lt: AUTOMATIC_PAYMENT_CHECK_LIMIT },
-      OR: [
-        { nextCheckAt: null },
-        { nextCheckAt: { isSet: false } },
-        { nextCheckAt: { lte: new Date() } },
+      AND: [
+        {
+          OR: [
+            { nextCheckAt: null },
+            { nextCheckAt: { isSet: false } },
+            { nextCheckAt: { lte: new Date() } },
+          ],
+        },
+        {
+          OR: [
+            { leaseExpiresAt: null },
+            { leaseExpiresAt: { isSet: false } },
+            { leaseExpiresAt: { lte: new Date() } },
+          ],
+        },
+        // A never-submitted draft belongs in the holds queue; it must not starve submitted payments.
+        {
+          OR: [
+            { state: { not: "CREATED" } },
+            { startedAt: { not: null } },
+            { paymentUrl: { not: null } },
+          ],
+        },
       ],
     },
     orderBy: { nextCheckAt: "asc" },

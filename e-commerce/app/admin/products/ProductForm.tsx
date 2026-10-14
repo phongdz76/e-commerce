@@ -23,6 +23,8 @@ import { getAdminErrorMessage } from "@/utils/adminError";
 import { getCatalogSlug } from "@/utils/catalogSlug";
 import { formatPrice } from "@/utils/formatPrice";
 import OrderProductImage from "@/app/admin/orders/OrderProductImage";
+import VariantContentFields, { VariantSpecificationFields } from "./VariantContentFields";
+import { normalizeProductAttributes, parseSpecificationLines, parseProductGallery, parseProductContentText } from "@/utils/productContent";
 import type {
   AdminCatalogProduct,
   AdminCatalogVariant,
@@ -43,29 +45,12 @@ function newVariant(): VariantForm {
     price: 0,
     image: { color: "", colorCode: "#334155", image: "" },
     specifications: "",
+    gallery: [],
+    warrantyText: "",
+    packageContents: "",
     isActive: true,
     inStock: true,
   };
-}
-
-function getAttributes(value: string) {
-  const attributes: Record<string, string> = {};
-  for (const line of value.split("\n").filter((l) => l.trim())) {
-    const separator = line.indexOf(":");
-    const name = line.slice(0, separator).trim();
-    if (
-      separator <= 0 ||
-      !name ||
-      Object.hasOwn(attributes, name) ||
-      ["__proto__", "constructor", "prototype"].includes(name)
-    ) {
-      throw new Error(
-        "Attributes must be formatted as 'Name: value' per line with unique names.",
-      );
-    }
-    attributes[name] = line.slice(separator + 1).trim();
-  }
-  return attributes;
 }
 
 export default function ProductForm({
@@ -111,6 +96,9 @@ export default function ProductForm({
   const [formError, setFormError] = useState("");
   const [hasConflict, setHasConflict] = useState(false);
   const [variantErrors, setVariantErrors] = useState<Record<number, string>>({});
+  const selectedCategory = categories.find(category => category.id === categoryId);
+  const definitions = selectedCategory?.specifications || (categoryId === product?.categoryId ? product?.categorySpecifications : []) || [];
+  const categoryVersion = selectedCategory?.updatedAt || (categoryId === product?.categoryId ? product?.categoryVersion : undefined);
   const snapshot = JSON.stringify({ name, slug, description, status, categoryId, brandId, variants });
   const [original] = useState(snapshot);
   const isDirty = snapshot !== original;
@@ -283,14 +271,21 @@ export default function ProductForm({
         description: description.trim(),
         status,
         categoryId,
+        categoryVersion,
         brandId,
         variants: preparedVariants.map(({ specifications, ...variant }, index) => {
           try {
             const catalogVariant = { ...variant };
             delete catalogVariant.inventory;
-            return { ...catalogVariant, attributes: getAttributes(specifications) };
+            return {
+              ...catalogVariant,
+              attributes: normalizeProductAttributes(parseSpecificationLines(specifications), definitions),
+              gallery: parseProductGallery(variant.gallery || []),
+              warrantyText: parseProductContentText(variant.warrantyText || ""),
+              packageContents: parseProductContentText(variant.packageContents || ""),
+            };
           } catch (error: unknown) {
-            setVariantErrors({ [index]: "Use one Name: value per line, with unique specification names." });
+            setVariantErrors({ [index]: error instanceof Error ? error.message : "Check the SKU specifications and extra content." });
             const specifications = document.getElementById("variant-spec-" + index);
             handleRevealField(specifications);
             throw error;
@@ -652,6 +647,7 @@ export default function ProductForm({
                   </div>
                 </div>
 
+                <VariantSpecificationFields definitions={definitions} text={variant.specifications} onChange={specifications => handleVariantChange(index, { specifications })} />
                 {/* Specs and stock */}
                 <div className="grid gap-3 sm:grid-cols-3 items-start">
                   <details className="sm:col-span-2 rounded-md border border-slate-200 p-3" open={Boolean(variantErrors[index]) || undefined}>
@@ -705,6 +701,7 @@ export default function ProductForm({
                     </label>
                   </div>
                 </div>
+                <VariantContentFields gallery={variant.gallery || []} warrantyText={variant.warrantyText || ""} packageContents={variant.packageContents || ""} onChange={changes => handleVariantChange(index, changes)} />
                 </div>
               </details>
             ))}

@@ -1,0 +1,36 @@
+name: SGTech operations
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "3-58/5 * * * *"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: sgtech-production-operations
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    if: vars.SGTECH_OPERATIONS_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: e-commerce
+    env:
+      PAYMENT_WORKER_APP_URL: ${{ vars.SGTECH_APP_URL }}
+      PAYMENT_WORKER_MAX_BATCHES: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: e-commerce/package-lock.json
+      - run: npm ci
+      - run: npm run worker:payments -- --once
+      - run: node scripts/check-operations-health.cjs

@@ -4,6 +4,7 @@ export function getAdminErrorMessage(error: unknown, fallback: string) {
   const status = axios.isAxiosError(error) ? error.response?.status : undefined;
   const code = axios.isAxiosError(error) ? error.response?.data?.code : undefined;
   const shipmentMessages: Record<string, string> = {
+    SPECIFICATION_TEMPLATE_CHANGED: "The category specification template changed. Your input has been kept. Reload the editor to review the latest fields before saving.",
     INVENTORY_CONFLICT: "Stock has changed or this request was already used. Your input has been kept. Reload the latest stock before adjusting.",
     INVENTORY_OUTCOME_UNKNOWN: "The stock adjustment could not be confirmed. Your input has been kept. Reload to review stock and history before trying again.",
     COD_INPUT: "Check the amount, reference and receipt time, then confirm that you verified the receipt.",

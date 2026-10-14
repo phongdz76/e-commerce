@@ -1,6 +1,7 @@
 import type { AuditLog } from "@prisma/client";
 import { getPaymentStateLabel } from "@/utils/adminPayment";
 import { formatAdminOrderAmount, getAdminDeliveryLabel } from "@/utils/adminOrders";
+import { readProductAttributes, readProductGallery, readSpecificationDefinitions } from "@/utils/productContent";
 
 type Activity = Pick<AuditLog, "id" | "action" | "entityType" | "status" | "details" | "createdAt">;
 
@@ -84,6 +85,10 @@ export function formatAdminActivity(
     if (typeof details.reason === "string") changes.push({ label: "Adjustment reason", before: "Not recorded", after: details.reason.slice(0, 500) });
   }
   const previousVariants = Array.isArray(before.variants) ? before.variants.map(getObject) : [];
+  if (log.action === "CATEGORY_UPDATED" && Object.hasOwn(after, "specifications") && JSON.stringify(before.specifications) !== JSON.stringify(after.specifications)) {
+    const describe = (value: unknown) => readSpecificationDefinitions(value).map(field => field.label + (field.unit ? ` (${field.unit})` : "")).join(", ").slice(0, 500) || "No configured fields";
+    changes.push({ label: "Specification template", before: describe(before.specifications), after: describe(after.specifications) });
+  }
   const updatedVariants = Array.isArray(after.variants) ? after.variants.map(getObject) : [];
   for (const variant of updatedVariants.slice(0, 20)) {
     const previous = previousVariants.find((row) => row.sku === variant.sku);
@@ -100,6 +105,14 @@ export function formatAdminActivity(
         changes.push({ label: sku + " · " + label, before: getValue(previous?.[field], field), after: getValue(variant[field], field) });
       }
     }
+    for (const [field, label] of [["warrantyText", "Warranty"], ["packageContents", "Box contents"]]) {
+      if (typeof variant[field] === "string" && previous?.[field] !== variant[field]) changes.push({ label: sku + " · " + label, before: getValue(previous?.[field], field), after: getValue(variant[field], field) });
+    }
+    if (Object.hasOwn(variant, "attributes") && JSON.stringify(previous?.attributes) !== JSON.stringify(variant.attributes)) {
+      const describe = (value: unknown) => Object.entries(readProductAttributes(value)).map(([key, value]) => `${key}: ${value}`).join(", ").slice(0, 500) || "No recorded specifications";
+      changes.push({ label: sku + " · Specifications", before: describe(previous?.attributes), after: describe(variant.attributes) });
+    }
+    if (Object.hasOwn(variant, "gallery") && JSON.stringify(previous?.gallery) !== JSON.stringify(variant.gallery)) changes.push({ label: sku + " · Photo library", before: `${readProductGallery(previous?.gallery).length} extra photos`, after: `${readProductGallery(variant.gallery).length} extra photos` });
   }
   if (log.action === "PAYMENT_EXCEPTION_REVIEWED") {
     changes.push({ label: "Review outcome", before: "Needs review", after: getValue(details.status, "status") });

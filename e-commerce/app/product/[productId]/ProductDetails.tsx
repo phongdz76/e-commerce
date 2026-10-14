@@ -136,6 +136,7 @@ export default function ProductDetails({ product, initialVariantId }: ProductDet
             <div className="grid grid-cols-[100px_minmax(0,1fr)] gap-3 px-4 py-3"><dt className="text-slate-500">Brand</dt><dd>{product.brand}</dd></div>
             <div className="grid grid-cols-[100px_minmax(0,1fr)] gap-3 px-4 py-3"><dt className="text-slate-500">Category</dt><dd><Link href={`/products?category=${encodeURIComponent(product.categorySlug || product.category)}`} className="hover:text-teal-700 hover:underline">{product.categoryLabel || product.category}</Link></dd></div>
             <div className="grid grid-cols-[100px_minmax(0,1fr)] gap-3 px-4 py-3"><dt className="text-slate-500">Colors</dt><dd className="break-words">{product.images.map((image) => image.color).join(", ")}</dd></div>
+            {selectedVariant && <div className="grid grid-cols-[100px_minmax(0,1fr)] gap-3 px-4 py-3"><dt className="text-slate-500">SKU</dt><dd className="break-all">{selectedVariant.sku}</dd></div>}
           </dl>
         </section>
         <div>
@@ -157,7 +158,8 @@ export default function ProductDetails({ product, initialVariantId }: ProductDet
                 aria-label="Product option"
                 value={cartProduct.variantId}
                 onChange={(event) => {
-                  const variant = product.variants!.find((row) => row.id === event.target.value)!;
+                  const variant = product.variants?.find((row) => row.id === event.target.value);
+                  if (!variant) return;
                   setCartProduct((previous) => ({
                     ...previous,
                     variantId: variant.id,
@@ -174,7 +176,6 @@ export default function ProductDetails({ product, initialVariantId }: ProductDet
                   <option
                     key={variant.id}
                     value={variant.id}
-                    disabled={variant.available <= 0}
                   >
                     {variant.name} · {formatPrice(variant.price)}{variant.available <= 0 ? " (Out of stock)" : ""}
                   </option>
@@ -228,6 +229,19 @@ export default function ProductDetails({ product, initialVariantId }: ProductDet
           <Link href="/help/returns" className="text-teal-700 hover:underline">Returns &amp; exchanges</Link>
           <Link href="/help/contact" className="text-teal-700 hover:underline">Ask about warranty</Link>
         </nav>
+      </div>
+      <div className="min-w-0 space-y-6 md:col-span-2">
+        <section aria-labelledby="sku-specifications" className="rounded-xl border border-slate-200 bg-white p-5">
+          <h2 id="sku-specifications" className="text-lg font-semibold text-slate-800">Technical specifications</h2>
+          {selectedVariant && <p className="mt-1 break-words text-sm text-slate-500">{selectedVariant.name} · {selectedVariant.sku}</p>}
+          {selectedVariant?.specifications?.length ? <dl className="mt-4 divide-y divide-slate-100">
+            {selectedVariant.specifications.map(row => <div key={row.key} className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-4 py-3 text-sm"><dt className="break-words text-slate-500">{row.label}</dt><dd className="whitespace-pre-line break-words font-medium text-slate-800">{row.value}</dd></div>)}
+          </dl> : <p className="mt-3 text-sm text-slate-500">Specifications have not been provided for this option. Contact the store for details.</p>}
+        </section>
+        <div className="grid min-w-0 gap-6 sm:grid-cols-2">
+          <section aria-labelledby="sku-warranty" className="min-w-0 rounded-xl border border-slate-200 bg-white p-5"><h2 id="sku-warranty" className="text-lg font-semibold text-slate-800">Warranty</h2><p className="mt-3 whitespace-pre-line break-words text-sm leading-6 text-slate-600">{selectedVariant?.warrantyText || "Warranty information has not been provided for this option. Ask the store about coverage and conditions."}</p></section>
+          <section aria-labelledby="sku-package" className="min-w-0 rounded-xl border border-slate-200 bg-white p-5"><h2 id="sku-package" className="text-lg font-semibold text-slate-800">In the box</h2><p className="mt-3 whitespace-pre-line break-words text-sm leading-6 text-slate-600">{selectedVariant?.packageContents || "Box contents have not been provided for this option. Confirm included accessories with the store."}</p></section>
+        </div>
       </div>
     </div>
   );

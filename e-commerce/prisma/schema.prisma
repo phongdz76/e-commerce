@@ -73,6 +73,27 @@ model AuditLog {
   @@index([entityType, entityId])
 }
 
+model OperationalJob {
+  id              String    @id @map("_id")
+  status          String    @default("IDLE")
+  leaseToken      String?
+  leaseExpiresAt  DateTime?
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  lastSucceededAt DateTime?
+  runCount        Int       @default(0)
+  metrics         Json?
+  incidentId      String?
+}
+
+model OperationalIncident {
+  id        String   @id @map("_id")
+  category  String
+  route     String?
+  digest    String?
+  createdAt DateTime @default(now())
+}
+
 enum ProductStatus {
   DRAFT
   ACTIVE
@@ -80,13 +101,14 @@ enum ProductStatus {
 }
 
 model Category {
-  id        String    @id @default(auto()) @map("_id") @db.ObjectId
-  name      String
-  slug      String    @unique
-  isVisible Boolean   @default(true)
-  products  Product[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  name           String
+  slug           String    @unique
+  isVisible      Boolean   @default(true)
+  specifications Json?
+  products       Product[]
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 model Brand {
@@ -118,20 +140,23 @@ model Product {
 }
 
 model ProductVariant {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  productId  String   @db.ObjectId
-  sku        String   @unique
-  name       String
-  price      Int
-  currency   String   @default("vnd")
-  image      Image
-  attributes Json?
-  isActive   Boolean  @default(true)
-  inStock    Boolean  @default(false)
-  inventory  VariantInventory?
-  product    Product  @relation(fields: [productId], references: [id])
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id              String            @id @default(auto()) @map("_id") @db.ObjectId
+  productId       String            @db.ObjectId
+  sku             String            @unique
+  name            String
+  price           Int
+  currency        String            @default("vnd")
+  image           Image
+  attributes      Json?
+  gallery         Json?
+  warrantyText    String?
+  packageContents String?
+  isActive        Boolean           @default(true)
+  inStock         Boolean           @default(false)
+  inventory       VariantInventory?
+  product         Product           @relation(fields: [productId], references: [id])
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   @@index([productId, isActive])
 }
@@ -174,15 +199,15 @@ model PaymentAttempt {
 }
 
 model Order {
-  id                     String             @id @default(auto()) @map("_id") @db.ObjectId
-  userId                 String             @db.ObjectId
+  id                     String                 @id @default(auto()) @map("_id") @db.ObjectId
+  userId                 String                 @db.ObjectId
   amount                 Float
   currency               String
   status                 String
   deliveryStatus         String?
-  createDate             DateTime           @default(now())
-  paymentIntentId        String?            @unique
-  paymentMethod          String             @default("VNPAY")
+  createDate             DateTime               @default(now())
+  paymentIntentId        String?                @unique
+  paymentMethod          String                 @default("VNPAY")
   paymentUrl             String?
   paymentExpiresAt       DateTime?
   paymentAttemptTracked  Boolean?
@@ -236,7 +261,7 @@ type CodSettlement {
 }
 
 type CartProductProps {
-  id          String @db.ObjectId
+  id          String  @db.ObjectId
   variantId   String? @db.ObjectId
   sku         String?
   name        String

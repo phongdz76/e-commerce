@@ -149,6 +149,16 @@ test("unconfirmed online payments keep stock; expiry alone is insufficient evide
   assert.equal(f.variant.inventory.onHand, 1);
 });
 
+test("MoMo terminal failure queries release without an invented local expiry; unknown outcomes keep stock", async () => {
+  for (const resultCode of ['1005', '1003', '7000', 'unknown']) {
+    const f = fixture(); const { order, attempt } = await f.create('MOMO');
+    Object.assign(f.orders.get(order.id), { status: 'failed', paymentExpiresAt: null });
+    Object.assign(f.attempts.get(attempt.id), { state: 'FAILED', resultCode, failureVerifiedAt: new Date() });
+    await f.stock.releaseVerifiedFailedStock(order.id, attempt.id);
+    assert.equal(f.variant.inventory.reserved, ['1005', '1003'].includes(resultCode) ? 0 : 1);
+  }
+});
+
 test("late money after release is recorded for review and cannot dispatch someone else's reserved stock", async () => {
   const f = fixture(); const { order } = await f.create(); await f.cancel(order.id);
   f.orders.get(order.id).status = "paid";

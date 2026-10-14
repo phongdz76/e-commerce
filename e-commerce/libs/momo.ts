@@ -1,8 +1,11 @@
 import { createHmac } from "crypto";
 import type { Order } from "@prisma/client";
 import { verifyPaymentSignature } from "@/libs/paymentSignature";
+import { assertSandboxEndpoint } from "@/utils/sandboxPayment";
 
 export function getMomoConfig() {
+  assertSandboxEndpoint(process.env.MOMO_API_ENDPOINT || "https://test-payment.momo.vn/v2/gateway/api/create", "test-payment.momo.vn");
+  assertSandboxEndpoint(process.env.MOMO_QUERY_ENDPOINT || "https://test-payment.momo.vn/v2/gateway/api/query", "test-payment.momo.vn");
   const partnerCode = process.env.MOMO_PARTNER_CODE?.trim();
   const accessKey = process.env.MOMO_ACCESS_KEY?.trim();
   const secretKey = process.env.MOMO_SECRET_KEY?.trim();

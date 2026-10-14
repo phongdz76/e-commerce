@@ -8,7 +8,11 @@ import { getCatalogGroups } from "@/libs/storefrontCatalog";
 
 const Footer = async () => {
   let categories;
-  try { categories = (await getCatalogGroups()).categories; } catch { categories = null; }
+  try {
+    categories = (await getCatalogGroups()).categories;
+  } catch {
+    categories = null;
+  }
   return (
     <footer
       className="bg-slate-700
@@ -27,14 +31,14 @@ const Footer = async () => {
               <span className="text-2xl font-bold text-white">Location</span>
             </div>
             <p className="text-slate-300 flex items-center gap-2">
-               <span>387 Bình Thành, Quận Bình Tân, TP. Hồ Chí Minh</span>
+              <span>387 Bình Thành, Quận Bình Tân, TP. Hồ Chí Minh</span>
             </p>
           </div>
           <iframe
             src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3919.1239976004895!2d106.58435777451757!3d10.801813958726004!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x31752b83ee842e07%3A0x2acdb55560c394d0!2zMzg3LCA1NyBCw6xuaCBUaMOgbmgsIEtodSBQaOG7kSA1LCBCw6xuaCBUw6JuLCBI4buTIENow60gTWluaCwgVmnhu4d0IE5hbQ!5e0!3m2!1svi!2s!4v1780799335446!5m2!1svi!2s"
             width="100%"
             height="300"
-            style={{ border: 0, borderRadius: '0.5rem' }}
+            style={{ border: 0, borderRadius: "0.5rem" }}
             allowFullScreen={true}
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
@@ -57,9 +61,17 @@ const Footer = async () => {
 
           <FooterList>
             <div className="font-bold text-lg">Shop Categories</div>
-            {categories === null && <p className="text-slate-300">Categories are temporarily unavailable.</p>}
+            {categories === null && (
+              <p className="text-slate-300">
+                Categories are temporarily unavailable.
+              </p>
+            )}
             {categories?.map((category) => (
-              <Link key={category.value} href={`/products?category=${encodeURIComponent(category.value)}`} className="hover:text-teal-400 transition-colors">
+              <Link
+                key={category.value}
+                href={`/products?category=${encodeURIComponent(category.value)}`}
+                className="hover:text-teal-400 transition-colors"
+              >
                 {category.label}
               </Link>
             ))}
@@ -67,16 +79,28 @@ const Footer = async () => {
 
           <FooterList>
             <div className="font-bold text-lg">Customer Service</div>
-            <Link href="/help/contact" className="hover:text-teal-400 transition-colors">
+            <Link
+              href="/help/contact"
+              className="hover:text-teal-400 transition-colors"
+            >
               Contact Us
             </Link>
-            <Link href="/help/returns" className="hover:text-teal-400 transition-colors">
+            <Link
+              href="/help/returns"
+              className="hover:text-teal-400 transition-colors"
+            >
               Returns & Exchanges
             </Link>
-            <Link href="/help/shipping" className="hover:text-teal-400 transition-colors">
+            <Link
+              href="/help/shipping"
+              className="hover:text-teal-400 transition-colors"
+            >
               Shipping & Delivery
             </Link>
-            <Link href="/help/faq" className="hover:text-teal-400 transition-colors">
+            <Link
+              href="/help/faq"
+              className="hover:text-teal-400 transition-colors"
+            >
               FAQs
             </Link>
           </FooterList>

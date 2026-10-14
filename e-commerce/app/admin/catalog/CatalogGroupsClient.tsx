@@ -12,6 +12,9 @@ import AdminPagination from "@/app/admin/components/AdminPagination";
 import { getAdminErrorMessage } from "@/utils/adminError";
 import { getCatalogSlug } from "@/utils/catalogSlug";
 import AdminPageHeader from "@/app/admin/components/AdminPageHeader";
+import SpecificationTemplateEditor from "./SpecificationTemplateEditor";
+import type { SpecificationDefinition } from "@/types/productContent";
+import { parseSpecificationDefinitions } from "@/utils/productContent";
 
 interface CatalogGroupsClientProps {
   kind: "categories" | "brands";
@@ -38,6 +41,7 @@ export default function CatalogGroupsClient({
   const [slug, setSlug] = useState("");
   const [hasCustomSlug, setHasCustomSlug] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
+  const [specifications, setSpecifications] = useState<SpecificationDefinition[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const saving = useRef(false);
@@ -92,6 +96,7 @@ export default function CatalogGroupsClient({
     setSlug("");
     setHasCustomSlug(false);
     setIsVisible(true);
+    setSpecifications([]);
   };
 
   const handleEdit = (group: SafeCatalogGroup) => {
@@ -101,6 +106,7 @@ export default function CatalogGroupsClient({
     setSlug(group.slug);
     setHasCustomSlug(true);
     setIsVisible(group.isVisible);
+    setSpecifications(group.specifications || []);
     document.getElementById("catalog-group-name")?.focus();
   };
 
@@ -113,7 +119,7 @@ export default function CatalogGroupsClient({
     setSaveError("");
     setIsSaving(true);
     try {
-      const data = { name, slug, isVisible };
+      const data = { name, slug, isVisible, ...(kind === "categories" ? { specifications: parseSpecificationDefinitions(specifications.map(field => ({ ...field, choices: field.choices.map(choice => choice.trim()).filter(Boolean) }))) } : {}) };
       if (selected) {
         const path =
           kind === "categories"
@@ -127,7 +133,7 @@ export default function CatalogGroupsClient({
       handleReset();
       setRefresh((previous) => previous + 1);
     } catch (error: unknown) {
-      const message = getAdminErrorMessage(error, "Unable to save. Use a name of 2–80 characters and a unique URL slug with lowercase letters, numbers and hyphens.");
+      const message = error instanceof Error && !axios.isAxiosError(error) ? error.message : getAdminErrorMessage(error, "Unable to save. Check the catalog fields and unique URL slug.");
       setSaveError(message);
       toast.error(message);
     } finally {
@@ -249,6 +255,7 @@ export default function CatalogGroupsClient({
             <span>Visible catalog group</span>
           </label>
 
+          {kind === "categories" && <SpecificationTemplateEditor value={specifications} onChange={setSpecifications} disabled={isSaving} />}
           {saveError ? <p role="alert" className="text-sm leading-6 text-rose-700">{saveError}</p> : null}
           <div className="flex flex-wrap items-center gap-2.5 pt-2">
             <button

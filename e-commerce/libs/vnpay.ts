@@ -1,8 +1,11 @@
 import { createHmac } from "crypto";
 import type { Order } from "@prisma/client";
 import { verifyPaymentSignature } from "@/libs/paymentSignature";
+import { assertSandboxEndpoint } from "@/utils/sandboxPayment";
 
 export function getVnpayConfig() {
+  assertSandboxEndpoint(process.env.VNP_URL || "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html", "sandbox.vnpayment.vn");
+  assertSandboxEndpoint(process.env.VNP_QUERY_URL || "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction", "sandbox.vnpayment.vn");
   const tmnCode = process.env.VNP_TMNCODE?.trim();
   const secretKey = process.env.VNP_HASHSECRET?.trim();
   if (!tmnCode || !secretKey || tmnCode === "TEST" || secretKey === "TEST") {

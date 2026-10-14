@@ -5,6 +5,8 @@ import prisma from "@/libs/prismadb";
 import { startAdminAudit, finishAdminAudit } from "@/libs/adminAudit";
 import { isCatalogImageUrl } from "@/utils/catalogImage";
 import { readInventoryBalance } from "@/utils/adminInventory";
+import { ProductContentError, normalizeProductAttributes, parseProductGallery, parseProductContentText, readProductAttributes, readProductGallery, readProductContentText, readSpecificationDefinitions } from "@/utils/productContent";
+import type { ProductGalleryImage } from "@/types/productContent";
 
 const catalogInclude = {
   category: true,
@@ -25,6 +27,8 @@ function serializeProduct(product: CatalogProduct) {
     categoryId: product.categoryId,
     brandId: product.brandId,
     categoryName: product.category.name,
+    categoryVersion: product.category.updatedAt?.toISOString(),
+    categorySpecifications: readSpecificationDefinitions(product.category.specifications),
     brandName: product.brand.name,
     updatedAt: product.updatedAt.toISOString(),
     variants: product.variants.map((variant) => ({
@@ -33,7 +37,10 @@ function serializeProduct(product: CatalogProduct) {
       name: variant.name,
       price: variant.price,
       image: variant.image,
-      attributes: variant.attributes || {},
+      attributes: readProductAttributes(variant.attributes),
+      gallery: readProductGallery(variant.gallery),
+      warrantyText: readProductContentText(variant.warrantyText),
+      packageContents: readProductContentText(variant.packageContents),
       isActive: variant.isActive,
       inStock: variant.inStock,
       inventory: readInventoryBalance(variant.inventory),
@@ -74,6 +81,9 @@ function getProductInput(body: unknown) {
     price: number;
     image: { color: string; colorCode: string; image: string };
     attributes: Prisma.InputJsonObject;
+    gallery?: ProductGalleryImage[];
+    warrantyText?: string;
+    packageContents?: string;
     isActive: boolean;
     inStock: boolean;
   }[] = [];
@@ -86,6 +96,9 @@ function getProductInput(body: unknown) {
     const row = value as Record<string, unknown>;
     const image = row.image as Record<string, unknown> | undefined;
     const attributes = row.attributes;
+    const gallery = row.gallery === undefined ? undefined : parseProductGallery(row.gallery);
+    const warrantyText = row.warrantyText === undefined ? undefined : parseProductContentText(row.warrantyText);
+    const packageContents = row.packageContents === undefined ? undefined : parseProductContentText(row.packageContents);
     if (
       (row.id !== undefined &&
         (typeof row.id !== "string" ||
@@ -142,6 +155,9 @@ function getProductInput(body: unknown) {
         image: image.image as string,
       },
       attributes: attributes as Prisma.InputJsonObject,
+      ...(gallery === undefined ? {} : { gallery }),
+      ...(warrantyText === undefined ? {} : { warrantyText }),
+      ...(packageContents === undefined ? {} : { packageContents }),
     });
   }
   if (
@@ -171,8 +187,24 @@ function getVariantData(
     currency: "vnd",
     image: variant.image,
     attributes: variant.attributes,
+    ...(variant.gallery === undefined ? {} : { gallery: variant.gallery.map(image => ({ url: image.url, alt: image.alt })) }),
+    ...(variant.warrantyText === undefined ? {} : { warrantyText: variant.warrantyText }),
+    ...(variant.packageContents === undefined ? {} : { packageContents: variant.packageContents }),
     isActive: variant.isActive,
     inStock: variant.inStock,
+  };
+}
+
+function variantAudit(variant: {
+  sku: string; price: number; isActive: boolean; inStock: boolean;
+  attributes: unknown; gallery?: unknown; warrantyText?: unknown; packageContents?: unknown;
+}) {
+  return {
+    sku: variant.sku, price: variant.price, isActive: variant.isActive, inStock: variant.inStock,
+    attributes: readProductAttributes(variant.attributes),
+    gallery: readProductGallery(variant.gallery).map(image => ({ ...image })),
+    warrantyText: readProductContentText(variant.warrantyText),
+    packageContents: readProductContentText(variant.packageContents),
   };
 }
 
@@ -291,7 +323,12 @@ export async function saveAdminProduct(request: Request, productId?: string) {
         { status: 400 },
       );
     }
-    const { variants, ...data } = input;
+    const definitions = readSpecificationDefinitions(category.specifications);
+    if ((definitions.length || body.categoryVersion !== undefined) && (typeof body.categoryVersion !== "string" || body.categoryVersion !== category.updatedAt.toISOString())) {
+      return NextResponse.json({ error: "The category specification template changed. Reload the editor before saving.", code: "SPECIFICATION_TEMPLATE_CHANGED" }, { status: 409 });
+    }
+    const { variants: inputVariants, ...data } = input;
+    const variants = inputVariants.map(variant => ({ ...variant, attributes: normalizeProductAttributes(variant.attributes, definitions) }));
     if (productId) {
       const product = await prisma.product.findUnique({
         where: { id: productId },
@@ -333,21 +370,11 @@ export async function saveAdminProduct(request: Request, productId?: string) {
           before: {
             name: product.name,
             status: product.status,
-            variants: product.variants.map((variant) => ({
-              sku: variant.sku,
-              price: variant.price,
-              isActive: variant.isActive,
-              inStock: variant.inStock,
-            })),
+            variants: product.variants.map(variantAudit),
           },
           after: {
             ...data,
-            variants: variants.map((variant) => ({
-              sku: variant.sku,
-              price: variant.price,
-              isActive: variant.isActive,
-              inStock: variant.inStock,
-            })),
+            variants: variants.map(variant => variantAudit({ ...product.variants.find(existing => existing.id === variant.id), ...variant })),
           },
         },
       );
@@ -367,7 +394,7 @@ export async function saveAdminProduct(request: Request, productId?: string) {
               .filter((variant) => variant.id)
               .map(({ id, ...variant }) => ({
                 where: { id: id!, productId },
-                data: { ...variant, currency: "vnd" },
+                data: getVariantData(variant),
               })),
           },
         },
@@ -386,7 +413,7 @@ export async function saveAdminProduct(request: Request, productId?: string) {
       "PRODUCT_CREATED",
       "PRODUCT",
       data.slug,
-      { after: { ...data, skus: variants.map((variant) => variant.sku) } },
+      { after: { ...data, skus: variants.map((variant) => variant.sku), variants: variants.map(variantAudit) } },
     );
     auditId = audit.id;
     const product = await prisma.product.create({
@@ -403,6 +430,7 @@ export async function saveAdminProduct(request: Request, productId?: string) {
       { status: 201 },
     );
   } catch (error) {
+    if (error instanceof ProductContentError) return NextResponse.json({ error: error.message }, { status: 400 });
     const code =
       error && typeof error === "object" && "code" in error ? error.code : null;
     if (auditId) {

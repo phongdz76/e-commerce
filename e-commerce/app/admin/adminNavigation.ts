@@ -22,6 +22,7 @@ export const ADMIN_NAVIGATION = [
   { title: "Accounts & Activity", items: [
     { label: "User accounts", href: "/admin/users", icon: FiUsers },
     { label: "Activity log", href: "/admin/audit", icon: FiActivity },
+    { label: "Operations", href: "/admin/operations", icon: FiActivity },
   ] },
 ];
 

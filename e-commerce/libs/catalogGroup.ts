@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/actions/getCurrentUser";
 import prisma from "@/libs/prismadb";
 import { startAdminAudit, finishAdminAudit } from "@/libs/adminAudit";
+import { ProductContentError, parseSpecificationDefinitions, readSpecificationDefinitions } from "@/utils/productContent";
 
 export type CatalogGroupKind = "categories" | "brands";
 
@@ -15,7 +16,7 @@ const groupSelect = {
   _count: { select: { products: true } },
 } as const;
 
-function getGroupInput(body: unknown) {
+function getGroupInput(body: unknown, kind: CatalogGroupKind) {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return null;
   }
@@ -37,7 +38,9 @@ function getGroupInput(body: unknown) {
   ) {
     return null;
   }
-  return { name, slug, isVisible: input.isVisible };
+  if (kind === "brands" && input.specifications !== undefined) throw new ProductContentError("Specification templates belong to categories.");
+  const specifications = input.specifications === undefined ? undefined : parseSpecificationDefinitions(input.specifications);
+  return { name, slug, isVisible: input.isVisible, ...(specifications === undefined ? {} : { specifications: specifications.map(definition => ({ ...definition })) }) };
 }
 
 export async function listCatalogGroups(
@@ -73,7 +76,7 @@ export async function listCatalogGroups(
             orderBy: [{ createdAt: "desc" as const }, { id: "desc" as const }],
             skip: (page - 1) * 10,
             take: 10,
-            select: groupSelect,
+            select: { ...groupSelect, specifications: true },
           })
         : prisma.brand.findMany({
             where: whereClause,
@@ -101,6 +104,7 @@ export async function listCatalogGroups(
         productCount: row._count.products,
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
+        ...(kind === "categories" ? { specifications: readSpecificationDefinitions("specifications" in row ? row.specifications : null) } : {}),
       })),
     });
   } catch {
@@ -134,7 +138,7 @@ export async function saveCatalogGroup(
     } catch {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
-    const data = getGroupInput(body);
+    const data = getGroupInput(body, kind);
     if (!data) {
       return NextResponse.json(
         {
@@ -177,7 +181,7 @@ export async function saveCatalogGroup(
         entityType,
         groupId,
         {
-          before: { name: row.name, slug: row.slug, isVisible: row.isVisible },
+          before: { name: row.name, slug: row.slug, isVisible: row.isVisible, ...(kind === "categories" ? { specifications: readSpecificationDefinitions("specifications" in row ? row.specifications : null).map(definition => ({ ...definition })) } : {}) },
           after: data,
         },
       );
@@ -232,8 +236,10 @@ export async function saveCatalogGroup(
       success: true, id: row.id, name: row.name, slug: row.slug,
       isVisible: row.isVisible, productCount: 0,
       createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
+      ...(kind === "categories" ? { specifications: readSpecificationDefinitions("specifications" in row ? row.specifications : null) } : {}),
     }, { status: 201 });
   } catch (error) {
+    if (error instanceof ProductContentError) return NextResponse.json({ error: error.message }, { status: 400 });
     const duplicate =
       error &&
       typeof error === "object" &&

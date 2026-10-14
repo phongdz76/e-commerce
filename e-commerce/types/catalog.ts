@@ -1,7 +1,18 @@
-import type { BrandOption, CatalogProduct, ProductFilters } from "@/utils/productFilters";
+import type {
+  BrandOption,
+  CatalogProduct,
+  ProductFilters,
+} from "@/utils/productFilters";
 
-export interface CatalogGroup { id: string; value: string; label: string }
-export interface CatalogAttributeFacet { name: string; values: { value: string; count: number }[] }
+export interface CatalogGroup {
+  id: string;
+  value: string;
+  label: string;
+}
+export interface CatalogAttributeFacet {
+  name: string;
+  values: { value: string; count: number }[];
+}
 export interface CatalogPage {
   products: CatalogProduct[];
   filters: ProductFilters;
@@ -14,4 +25,11 @@ export interface CatalogPage {
   attributes: CatalogAttributeFacet[];
   attributesLimited: boolean;
 }
-export interface CatalogSuggestion { id: string; name: string; price: number; image: string; inStock: boolean }
+export interface CatalogSuggestion {
+  id: string;
+  variantId: string;
+  name: string;
+  price: number;
+  image: string;
+  inStock: boolean;
+}

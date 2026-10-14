@@ -1,0 +1,88 @@
+/* Catalog content CRUD against a disposable database; never changes the application database. */
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { randomUUID } = require('node:crypto');
+const { PrismaClient } = require('@prisma/client');
+const sourceLoader = require('../tests/fixtures/load-source.cjs');
+const appDirectory = path.resolve(__dirname, '..');
+require('@next/env').loadEnvConfig(appDirectory);
+
+async function main() {
+  const database = 'sgtech_ct_qa_' + Date.now() + '_' + randomUUID().slice(0, 8);
+  const connection = new URL(process.env.DATABASE_URL);
+  const originalDatabase = connection.pathname;
+  connection.pathname = '/' + database;
+  assert.notEqual(connection.pathname, originalDatabase);
+  assert.match(database, /^sgtech_ct_qa_\d+_[a-f0-9-]+$/);
+  const prisma = new PrismaClient({ datasources: { db: { url: connection.toString() } } });
+  const actor = { id: 'e'.repeat(24), role: 'ADMIN' };
+  const load = sourceLoader({ '@/libs/prismadb': { __esModule: true, default: prisma }, '@/actions/getCurrentUser': { getCurrentUser: async () => actor }, 'next/server': { NextResponse: { json: Response.json } } });
+  const groups = load('libs/catalogGroup.ts');
+  const admin = load('libs/adminCatalog.ts');
+  const storefront = load('libs/storefrontProductNames.ts');
+  const checks = [];
+  const request = body => new Request('http://localhost/api/admin/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  try {
+    for (const collection of ['Category', 'Brand', 'Product', 'ProductVariant', 'AuditLog']) await prisma.$runCommandRaw({ create: collection });
+    const specifications = [{ key: 'RAM', label: 'Memory', format: 'NUMBER', unit: 'GB', choices: [] }, { key: 'Panel', label: 'Display panel', format: 'SELECT', unit: '', choices: ['OLED', 'LCD'] }];
+    const categoryResponse = await groups.saveCatalogGroup(request({ name: 'QA category', slug: 'qa-category', isVisible: true, specifications }), 'categories');
+    assert.equal(categoryResponse.status, 201);
+    const category = await categoryResponse.json();
+    const brandResponse = await groups.saveCatalogGroup(request({ name: 'QA brand', slug: 'qa-brand', isVisible: true }), 'brands');
+    assert.equal(brandResponse.status, 201);
+    const brand = await brandResponse.json();
+    assert.deepEqual(category.specifications, specifications);
+    checks.push('category template create/list and brand separation');
+    const image = { color: 'Black', colorCode: '#000000', image: '/products/iphone14-white.webp' };
+    const variant = { sku: 'QA-8GB', name: 'Black 8GB', price: 100000, image, attributes: { ram: '8GB', panel: 'oled' }, gallery: [{ url: '/products/apple-watch-se-black.webp', alt: 'Local QA angle' }, { url: '/products/iphone14-white.webp', alt: 'Duplicate primary photo' }], warrantyText: 'QA coverage for 8GB\nConditions supplied by store', packageContents: 'QA phone\nQA cable', isActive: true, inStock: true };
+    const body = { name: 'Local QA product', slug: 'local-qa-product', description: 'Local QA product used only in an isolated database.', status: 'ACTIVE', categoryId: category.id, brandId: brand.id, categoryVersion: category.updatedAt, variants: [variant, { ...variant, sku: 'QA-16GB', name: 'Black 16GB', attributes: { RAM: '16GB' }, gallery: [], warrantyText: '', packageContents: '' }] };
+    const created = await admin.saveAdminProduct(request(body));
+    assert.equal(created.status, 201);
+    const id = (await created.json()).id;
+    let editor = await (await admin.readAdminCatalog(new Request('http://localhost/api/admin/products'), id)).json();
+    assert.equal(editor.variants.find(v => v.sku === 'QA-8GB').attributes.RAM, '8 GB');
+    const first = editor.variants.find(v => v.sku === 'QA-8GB');
+    await prisma.productVariant.update({ where: { id: first.id }, data: { inventory: { onHand: 50, reserved: 1, version: 7, updatedAt: new Date() } } });
+    editor = await (await admin.readAdminCatalog(new Request('http://localhost/api/admin/products'), id)).json();
+    const publicProduct = await storefront.getStorefrontProduct(id);
+    assert.equal(publicProduct.variants.find(v => v.sku === 'QA-8GB').available, 49);
+    assert.equal(publicProduct.variants.find(v => v.sku === 'QA-16GB').available, 0);
+    assert.equal(publicProduct.variants[0].inventory, undefined);
+    checks.push('multi-SKU content persisted and public DTO is sanitized; same-color SKUs stay distinct');
+    const updateBody = { ...body, updatedAt: editor.updatedAt, variants: editor.variants.map(v => ({ ...v, inventory: { onHand: 999999 }, attributes: v.attributes })) };
+    updateBody.variants[0].warrantyText = 'Edited QA coverage';
+    assert.equal((await admin.saveAdminProduct(request(updateBody), id)).status, 200);
+    const stored = await prisma.productVariant.findUnique({ where: { id: first.id } });
+    assert.equal(stored.inventory.onHand, 50); assert.equal(stored.inventory.reserved, 1); assert.equal(stored.inventory.version, 7);
+    assert.equal((await admin.saveAdminProduct(request(updateBody), id)).status, 409);
+    checks.push('content update leaves real inventory untouched; stale product edit conflicts');
+    editor = await (await admin.readAdminCatalog(new Request('http://localhost/api/admin/products'), id)).json();
+    const legacy = { ...body, updatedAt: editor.updatedAt, variants: editor.variants.map(variant => Object.fromEntries(Object.entries(variant).filter(([key]) => !['gallery', 'warrantyText', 'packageContents', 'inventory'].includes(key)))) };
+    assert.equal((await admin.saveAdminProduct(request(legacy), id)).status, 200);
+    assert.deepEqual((await prisma.productVariant.findUnique({ where: { id: first.id } })).gallery, variant.gallery);
+    checks.push('legacy clients omitting new content preserve stored content');
+    const invalid = { ...legacy, variants: legacy.variants.map(v => ({ ...v, gallery: [{ url: 'https://evil.example/photo.jpg', alt: '' }] })) };
+    assert.equal((await admin.saveAdminProduct(request(invalid), id)).status, 400);
+    assert.equal((await admin.saveAdminProduct(request({ ...body, categoryVersion: 'old' }), id)).status, 409);
+    const updatedCategory = { name: category.name, slug: category.slug, isVisible: true, updatedAt: category.updatedAt, specifications: specifications.map(field => ({ ...field, label: 'Renamed ' + field.label })) };
+    assert.equal((await groups.saveCatalogGroup(request(updatedCategory), 'categories', category.id)).status, 200);
+    assert.equal((await admin.saveAdminProduct(request(legacy), id)).status, 409);
+    assert.equal((await storefront.getStorefrontProduct(id)).variants.find(v => v.sku === 'QA-8GB').specifications[0].label, 'Renamed Memory');
+    checks.push('unsafe gallery rejected; template version conflicts and dynamic labels use stored data');
+    const audits = await prisma.auditLog.findMany();
+    assert.ok(audits.some(a => a.action === 'PRODUCT_UPDATED' && a.status === 'SUCCEEDED' && a.details.after.variants[0].gallery));
+    assert.ok(audits.every(a => !JSON.stringify(a.details).includes('999999')));
+    checks.push('successful mutations recorded with content and no forged stock');
+    fs.mkdirSync(path.join(appDirectory, '.artifacts'), { recursive: true });
+    fs.writeFileSync(path.join(appDirectory, '.artifacts/product-content-fixture.json'), JSON.stringify({ publicProduct, editor, categories: [category], brands: [brand] }, null, 2));
+    fs.writeFileSync(path.join(appDirectory, '.artifacts/product-content-mongo-results.json'), JSON.stringify({ checks, disposableDatabase: true, applicationDatabaseWrites: 0 }, null, 2));
+    console.log('Product content MongoDB passed: ' + checks.length + ' check groups.');
+  } finally {
+    assert.equal(connection.pathname, '/' + database);
+    assert.match(database, /^sgtech_ct_qa_\d+_[a-f0-9-]+$/);
+    await prisma.$runCommandRaw({ dropDatabase: 1 });
+    await prisma.$disconnect();
+  }
+}
+main().catch(error => { console.error('Product content QA failed:', error.code || error.name); const detail = error.code === 'P2010' ? error.meta?.message : ['AssertionError', 'PrismaClientValidationError'].includes(error.name) ? error.message : null; if (detail) console.error(String(detail).replace(/mongodb(?:\+srv)?:\/\/[^\s'"`]+/g, '[REDACTED]')); process.exitCode = 1; });

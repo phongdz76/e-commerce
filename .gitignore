@@ -5,10 +5,13 @@
 test/
 tests/
 
-# Keep app regression tests in version control; other test artifacts stay local.
+# Keep app regression tests and shared fixtures; other test artifacts stay local.
 !e-commerce/tests/
 e-commerce/tests/*
 !e-commerce/tests/*.test.cjs
+!e-commerce/tests/fixtures/
+e-commerce/tests/fixtures/*
+!e-commerce/tests/fixtures/*.cjs
 
 # Next.js generates these agent files at the app root.
 # Keep Markdown instructions in skills or local docs instead.

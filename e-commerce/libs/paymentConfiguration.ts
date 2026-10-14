@@ -22,8 +22,9 @@ export function getPaymentConfiguration() {
         getZaloPayUrls();
       }),
       STRIPE: Boolean(
-        process.env.STRIPE_SECRET_KEY?.trim() &&
-          process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim(),
+        process.env.STRIPE_SECRET_KEY?.trim().startsWith("sk_test_") &&
+          process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim().startsWith("pk_test_") &&
+          process.env.STRIPE_WEBHOOK_SECRET?.trim(),
       ),
     },
     reconciliationConfigured: Boolean(process.env.CRON_SECRET?.trim()),

@@ -76,6 +76,7 @@ function fixture(method) {
         if ("lt" in value) return row[key] < value.lt;
         if ("lte" in value) return row[key] <= value.lte;
         if ("gte" in value) return row[key] >= value.gte;
+        if ("gt" in value) return row[key] > value.gt;
         if ("isSet" in value) return Object.hasOwn(row, key) === value.isSet;
         if ("not" in value) return row[key] !== value.not;
       }
@@ -194,6 +195,12 @@ function fixture(method) {
       syncZaloPayOrder: async (savedOrder) => savedOrder,
     },
   };
+  const operationalJobs = new Map();
+  prisma.operationalJob = {
+    create: async ({ data }) => { if (operationalJobs.has(data.id)) throw Object.assign(new Error('Duplicate'), { code: 'P2002' }); const row = { runCount: 0, ...data }; operationalJobs.set(row.id, row); return structuredClone(row); },
+    updateMany: async ({ where, data }) => { const row = operationalJobs.get(where.id); if (!row || !matches(row, where)) return { count: 0 }; for (const [key, value] of Object.entries(data)) row[key] = value && typeof value === 'object' && 'increment' in value ? row[key] + value.increment : value; return { count: 1 }; },
+  };
+  prisma.operationalIncident = { create: async ({ data }) => data };
   prisma.paymentException = {
     count: async ({ where = {} }) => [...exceptions.values()].filter((row) => matches(row, where)).length,
     upsert: async ({ where, create }) => {

@@ -31,6 +31,33 @@ export async function checkAuthRateLimit(
   maxAttempts: number,
   windowMs: number,
 ) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await checkAuthRateLimitAttempt(
+        scope,
+        subject,
+        maxAttempts,
+        windowMs,
+      );
+    } catch (error) {
+      // P2034 confirms an aborted MongoDB write conflict, so retrying cannot double-count
+      // a committed increment. Unknown connection/write outcomes remain fail-closed.
+      const code =
+        error && typeof error === "object" && "code" in error
+          ? error.code
+          : null;
+      if (code !== "P2034" || attempt >= 5) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 5 * 2 ** attempt));
+    }
+  }
+}
+
+async function checkAuthRateLimitAttempt(
+  scope: string,
+  subject: string,
+  maxAttempts: number,
+  windowMs: number,
+) {
   const now = new Date();
   const id = createHash("sha256").update(`${scope}|${subject}`).digest("hex");
   const expiresAt = new Date(now.getTime() + windowMs);

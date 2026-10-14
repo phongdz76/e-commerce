@@ -58,12 +58,22 @@ export default function ProductCard({ data }: ProductCardProps) {
               className="object-contain p-3"
             />
           </div>
-          <div title={data?.name} className="mt-1 line-clamp-2 min-h-12 text-base leading-6 text-slate-700">{data?.name}</div>
+          <div
+            title={data?.name}
+            className="mt-1 line-clamp-2 min-h-12 text-base leading-6 text-slate-700"
+          >
+            {data?.name}
+          </div>
           <div>
             <Rating value={productRating} readOnly size="small" />
           </div>
-          <div className="text-sm text-slate-500">{data.reviews.length} {data.reviews.length === 1 ? "review" : "reviews"}</div>
-          <div className="mt-1 text-base font-bold text-slate-700 md:text-lg">From {formatPrice(data.price)}</div>
+          <div className="text-sm text-slate-500">
+            {data.reviews.length}{" "}
+            {data.reviews.length === 1 ? "review" : "reviews"}
+          </div>
+          <div className="mt-1 text-base font-bold text-slate-700 md:text-lg">
+            From {formatPrice(data.price)}
+          </div>
         </div>
       </div>
     </Link>

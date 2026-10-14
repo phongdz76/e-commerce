@@ -1,11 +1,12 @@
 import type { products } from "./products";
+import type { ProductGalleryImage, ProductSpecificationRow } from "@/types/productContent";
 
 export type CatalogProduct = (typeof products)[number] & {
   categorySlug?: string;
   categoryLabel?: string;
   brandSlug?: string;
   matchedVariantId?: string;
-  variants?: { id: string; sku: string; name: string; price: number; available: number; image: { color: string; colorCode: string; image: string } }[];
+  variants?: { id: string; sku: string; name: string; price: number; available: number; image: { color: string; colorCode: string; image: string }; gallery?: ProductGalleryImage[]; specifications?: ProductSpecificationRow[]; warrantyText?: string; packageContents?: string }[];
 };
 export const PRODUCTS_PER_PAGE = 12;
 

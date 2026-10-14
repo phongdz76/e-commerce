@@ -335,6 +335,21 @@ test("parallel initialization, reload and retry reuse one intent and one draft o
   assert.equal(f.rows.size, 1);
 });
 
+test("retrying an older interrupted card checkout cannot replay an expired idempotency key", async () => {
+  const f = fixture();
+  const originalCreate = f.stripe.paymentIntents.create;
+  f.stripe.paymentIntents.create = async () => { throw new Error('Private creation outcome unknown'); };
+  assert.equal((await f.create()).status, 503);
+  const order = [...f.rows.values()][0];
+  order.createDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  f.stripe.paymentIntents.create = originalCreate;
+  const response = await f.create();
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).code, 'HOLD_RECOVERY_WINDOW');
+  assert.equal(f.created(), 0);
+  assert.equal(order.stockReservation.state, 'HELD');
+});
+
 test("server catalog determines the amount, name and image instead of client data", async () => {
   const f = fixture();
   const result = await (

@@ -16,6 +16,7 @@ export interface SafeCatalogGroup {
   productCount: number;
   createdAt: string;
   updatedAt: string;
+  specifications?: import("./productContent").SpecificationDefinition[];
 }
 
 export interface MonthlyRevenueItem {
@@ -164,6 +165,9 @@ export interface AdminCatalogVariant {
   price: number;
   image: { color: string; colorCode: string; image: string };
   attributes: Record<string, string>;
+  gallery?: import("./productContent").ProductGalleryImage[];
+  warrantyText?: string;
+  packageContents?: string;
   isActive: boolean;
   inStock: boolean;
   inventory?: import("./adminInventory").InventoryBalance | null;
@@ -178,6 +182,8 @@ export interface AdminCatalogProduct {
   categoryId: string;
   brandId: string;
   categoryName: string;
+  categoryVersion?: string;
+  categorySpecifications?: import("./productContent").SpecificationDefinition[];
   brandName: string;
   updatedAt: string;
   variants: AdminCatalogVariant[];

@@ -31,6 +31,9 @@ export const API_PATHS = {
     RETRY_PAYMENT: (id: string) => `/api/order/${id}/retry-payment`,
   },
   ADMIN: {
+    OPERATIONS: "/api/admin/operations",
+    ONLINE_HOLDS: "/api/admin/operations/holds",
+    RECOVER_CARD_HOLD: (id: string) => `/api/admin/operations/holds/${id}/recover-card`,
     INVENTORY: "/api/admin/inventory",
     INVENTORY_VARIANT: (id: string) => `/api/admin/inventory/${id}`,
     COD_QUEUE: "/api/admin/cod",

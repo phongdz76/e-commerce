@@ -62,6 +62,9 @@ async function main() {
     assert.equal((await query('q=dien+thoai')).total, expected.length - 1);
     assert.equal((await query('q=%2E%2A')).total, 0);
     assert.equal((await query('q=QA-MIX-EXPENSIVE')).products[0].id, mixed.product.id);
+    assert.equal((await query('q=QA-MIX-EXPENSIVE')).products[0].price, 200000);
+    assert.equal((await query('q=QA-MIX-EXPENSIVE&maxPrice=95000')).total, 0);
+    assert.equal((await query('q=QA-MIX-CHEAP&stock=1')).total, 0);
     checks.push('Vietnamese accent-insensitive literal search and SKU search');
     const inStock = await query('stock=1&maxPrice=95000'); assert.equal(inStock.total, 0);
     const premium = await query('stock=1&minPrice=190000'); assert.equal(premium.total, 1); assert.equal(premium.products[0].price, 200000);
@@ -81,6 +84,10 @@ async function main() {
     assert.equal((await query('category=qa-new-category')).products[0].id, newCategoryProduct.product.id);
     assert.equal((await query('category=unknown')).total, 0);
     checks.push('dynamic groups, legacy aliases, stable slugs after rename and unknown group does not remove filtering');
+    const highest = await make('Largest valid VND price', { categoryId: custom.id, variant: { price: 2147483647 } });
+    const priceBoundary = await query('minPrice=2147483647&maxPrice=2147483647');
+    assert.equal(priceBoundary.total, 1); assert.equal(priceBoundary.products[0].id, highest.product.id); assert.equal(priceBoundary.products[0].price, 2147483647);
+    checks.push('price limit agrees with the catalog editor and Prisma Int boundary');
     const suggestions = await catalog.getCatalogSuggestions('dien'); assert.ok(suggestions.length <= 4); assert.equal(suggestions[0].inventory, undefined);
     assert.equal(first.products[0].inventory, undefined); assert.equal(first.products[0].reserved, undefined); assert.equal(first.products[0].variants, undefined);
     checks.push('bounded public suggestions and page DTOs do not expose internal balances or full catalog');

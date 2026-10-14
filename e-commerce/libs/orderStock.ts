@@ -4,6 +4,7 @@ import prisma from "@/libs/prismadb";
 import type { CartProductProps } from "@/app/product/[productId]/ProductDetails";
 import { CheckoutRequestError } from "@/libs/checkoutErrors";
 import { readInventoryBalance, MAX_STOCK_QUANTITY } from "@/utils/adminInventory";
+import { getMomoPaymentStatus } from "@/libs/momo";
 
 const stockError = () => new CheckoutRequestError("This option was just sold or reserved by another customer. Review your cart before trying again.", 409, "STOCK_UNAVAILABLE");
 const movementId = (orderId: string, variantId: string, action: string, version: number) => createHash("sha256").update(JSON.stringify([orderId, variantId, action, version])).digest("hex").slice(0, 24);
@@ -78,10 +79,12 @@ export async function releaseVerifiedFailedStock(orderId: string, reference: str
     if (!order?.stockReservation || order.stockReservation.state !== "HELD" || order.status !== "failed" ||
         (order.activePaymentAttemptId || order.paymentIntentId) !== reference || order.deliveryStatus !== "pending") return;
     if (["VNPAY", "MOMO"].includes(order.paymentMethod)) {
-      if (!order.paymentExpiresAt || order.paymentExpiresAt.getTime() > Date.now()) return;
+      // MoMo captureWallet supplies no local expiry contract. A verified terminal provider query
+      // is the closure evidence; merely reaching a locally chosen timeout never releases stock.
+      if (order.paymentMethod === "VNPAY" && (!order.paymentExpiresAt || order.paymentExpiresAt.getTime() > Date.now())) return;
       const attempts = await tx.paymentAttempt.findMany({ where: { orderId: order.id } });
       if (!attempts.length || attempts.some((attempt) => !(["ABANDONED", "RESERVED", "CREATED"].includes(attempt.state) && !attempt.startedAt && !attempt.paymentUrl) &&
-          !(attempt.state === "FAILED" && attempt.failureVerifiedAt))) return;
+          !(attempt.state === "FAILED" && attempt.failureVerifiedAt && (order.paymentMethod !== "MOMO" || getMomoPaymentStatus(attempt.resultCode || "") === "failed")))) return;
     }
     await releaseOrderStock(tx, order, order.userId, "Provider confirmed the payment closed without receiving money.");
   });

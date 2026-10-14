@@ -21,7 +21,7 @@ function loadSource(file, mocks = {}) {
   vm.runInThisContext(`(function(require,module,exports){${compiled}\n})`, {
     filename,
   })(
-    (name) => (name in mocks ? mocks[name] : require(name)),
+    (name) => (name in mocks ? mocks[name] : name.startsWith("@/") ? loadSource(name.slice(2) + ".ts", mocks) : require(name)),
     loadedModule,
     loadedModule.exports,
   );
