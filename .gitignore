@@ -9,6 +9,8 @@ tests/
 !e-commerce/tests/
 e-commerce/tests/*
 !e-commerce/tests/*.test.cjs
+!e-commerce/tests/fixtures/
+!e-commerce/tests/fixtures/stock-db.cjs
 
 # Next.js generates these agent files at the app root.
 # Keep Markdown instructions in skills or local docs instead.
