@@ -623,6 +623,7 @@ for (const [paymentMethod, outcome] of [
   ["MOMO", "missing-url"],
   ["MOMO", "navigation-failure"],
   ["MOMO", "already-paid"],
+  ["MOMO", "return-back"],
 ]) {
   test(`${paymentMethod} checkout ${outcome}: direct redirect, verified receipt or retry without losing cart`, async () => {
     const h = hooks();
@@ -633,12 +634,17 @@ for (const [paymentMethod, outcome] of [
     const memory = new Map();
     const oldStorage = global.localStorage;
     const oldWindow = global.window;
+    const oldFetch = global.fetch;
+    const listeners = new Map();
+    const cleanups = [];
     global.localStorage = {
       getItem: (key) => memory.get(key) ?? null,
       setItem: (key, value) => memory.set(key, value),
       removeItem: (key) => memory.delete(key),
     };
     global.window = {
+      addEventListener: (name, callback) => listeners.set(name, callback),
+      removeEventListener: (name) => listeners.delete(name),
       location: {
         assign: (value) => {
           if (outcome === "navigation-failure")
@@ -647,6 +653,7 @@ for (const [paymentMethod, outcome] of [
         },
       },
     };
+    if (outcome === "return-back") global.fetch = async () => Response.json([]);
     let resolvePayment;
     const waiting = new Promise((resolve) => {
       resolvePayment = resolve;
@@ -706,6 +713,10 @@ for (const [paymentMethod, outcome] of [
       });
       h.reset();
       tree = Form(formProps);
+      if (outcome === "return-back") {
+        for (const effect of h.effects) cleanups.push(effect());
+        await new Promise((resolve) => setImmediate(resolve));
+      }
       const submit = findElement(tree, (e) => e.type === "form").props.onSubmit;
       const first = submit({ preventDefault() {} });
       await submit({ preventDefault() {} });
@@ -736,8 +747,11 @@ for (const [paymentMethod, outcome] of [
         },
       });
       await first;
-      assert.equal(navigations.length, outcome === "redirect" ? 1 : 0);
-      if (outcome === "redirect")
+      assert.equal(
+        navigations.length,
+        ["redirect", "return-back"].includes(outcome) ? 1 : 0,
+      );
+      if (["redirect", "return-back"].includes(outcome))
         assert.equal(
           navigations[0],
           paymentMethod === "MOMO"
@@ -747,6 +761,14 @@ for (const [paymentMethod, outcome] of [
       assert.equal(clearCount, outcome === "already-paid" ? 1 : 0);
       assert.equal(successCount, outcome === "already-paid" ? 1 : 0);
       if (paymentMethod === "MOMO" && outcome !== "already-paid") {
+        if (outcome === "return-back") {
+          await submit({ preventDefault() {} });
+          assert.equal(calls.length, 1);
+          listeners.get("pageshow")({ persisted: false });
+          await submit({ preventDefault() {} });
+          assert.equal(calls.length, 1);
+          listeners.get("pageshow")({ persisted: true });
+        }
         await submit({ preventDefault() {} });
         assert.equal(calls.length, outcome === "redirect" ? 1 : 2);
         if (calls.length === 2)
@@ -758,8 +780,11 @@ for (const [paymentMethod, outcome] of [
         assert.ok(findElement(Form(formProps), (e) => e.type === "form"));
       }
     } finally {
+      for (const cleanup of cleanups)
+        if (typeof cleanup === "function") cleanup();
       global.localStorage = oldStorage;
       global.window = oldWindow;
+      global.fetch = oldFetch;
     }
   });
 }

@@ -143,6 +143,17 @@ export default function CheckoutForm({
   );
   const formattedPrice = formatPrice(cartTotalQtyAmount);
 
+  useEffect(() => {
+    if (paymentMethod !== "MOMO") return;
+    const resumeCheckout = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      submitting.current = false;
+      setLoading(false);
+    };
+    window.addEventListener("pageshow", resumeCheckout);
+    return () => window.removeEventListener("pageshow", resumeCheckout);
+  }, [paymentMethod]);
+
   const getCheckoutRequestId = () => {
     const fingerprint = JSON.stringify([
       currentUser?.id,
