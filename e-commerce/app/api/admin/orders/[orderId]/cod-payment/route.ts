@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { getCurrentUser } from "@/actions/getCurrentUser";
 import prisma from "@/libs/prismadb";
+import { updateOrderPayment } from "@/libs/updateOrderPayment";
 import { startAdminAudit, finishAdminAudit } from "@/libs/adminAudit";
 import {
   ADMIN_COD_SELECT,
@@ -148,7 +149,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
         ? { codPaymentInfo: { is: { version: input.version } } }
         : { OR: [{ codPaymentInfo: { is: null } }, { codPaymentInfo: { isSet: false } }] }),
     };
-    const result = await prisma.order.updateMany({
+    const result = await updateOrderPayment({
       where,
       data: {
         ...(input.action === "COLLECTION" ? { status: "paid" } : {}),

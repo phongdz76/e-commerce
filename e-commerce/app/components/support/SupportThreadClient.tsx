@@ -7,8 +7,9 @@ import { API_PATHS } from "@/utils/apiPaths";
 import { SUPPORT_IMAGE_LIMIT } from "@/utils/support";
 import { formatAdminOrderDate } from "@/utils/adminOrders";
 import type { SupportContext, SupportThread } from "@/types/support";
+import { supportTicketHref } from "@/utils/supportTickets";
 
-export default function SupportThreadClient({ conversationId, adminId, initialContext = null }: { conversationId?: string; adminId?: string; initialContext?: SupportContext | null }) {
+export default function SupportThreadClient({ conversationId, adminId, initialContext = null, enabled = true }: { conversationId?: string; adminId?: string; initialContext?: SupportContext | null; enabled?: boolean }) {
   const admin = !!adminId;
   const endpoint = admin ? API_PATHS.ADMIN.SUPPORT_THREAD(conversationId!) : API_PATHS.SUPPORT.THREAD;
   const [data, setData] = useState<SupportThread | null>(null);
@@ -47,13 +48,14 @@ export default function SupportThreadClient({ conversationId, adminId, initialCo
     } finally { if (active.current && generation.current === request) setLoading(false); }
   }, [endpoint, before]);
   useEffect(() => {
+    if (!enabled) return;
     active.current = true;
     void Promise.resolve().then(load);
     const timer = window.setInterval(() => { if (!document.hidden && !before && !busy.current) void load(); }, 10000);
     const focus = () => { if (!document.hidden && !busy.current) void load(); };
     document.addEventListener("visibilitychange", focus);
     return () => { cancelPending(); clearInterval(timer); document.removeEventListener("visibilitychange", focus); };
-  }, [load, before, cancelPending]);
+  }, [load, before, cancelPending, enabled]);
   const lastMessageId = data?.messages.at(-1)?.id;
   useEffect(() => {
     const log = messageLog.current;
@@ -104,12 +106,14 @@ export default function SupportThreadClient({ conversationId, adminId, initialCo
   const assigned = data?.conversation?.assignedTo?.id === adminId;
   const canSend = !loading && !closed && (!admin || assigned);
   return <section aria-label="Support conversation" className="min-w-0 space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
+    {admin && <Link href={"/admin/support-requests?conversationId=" + conversationId} className="inline-flex min-h-11 items-center text-sm font-semibold text-teal-700">Requests for this customer</Link>}
+    {!admin && <div className="flex flex-wrap gap-4 text-sm font-semibold text-teal-700"><Link href={supportTicketHref(initialContext)} className="inline-flex min-h-11 items-center">Create support request</Link><Link href="/support/requests" className="inline-flex min-h-11 items-center">Your support requests</Link></div>}
     <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-semibold">{admin ? data?.conversation?.customer?.name || "Customer conversation" : "Your conversation with SGTech"}</h2><p className="mt-1 text-sm text-slate-500">{closed ? "Conversation closed. The saved history is still available." : admin ? data?.conversation?.assignedTo ? "Accepted by " + data.conversation.assignedTo.name : "Waiting for an administrator to accept." : data?.conversation?.assigned ? "A team member has accepted this conversation." : "Messages are saved. A team member will reply when available."}</p>{!!data?.conversation?.unread && <p className="mt-1 text-sm font-semibold text-teal-700">{data.conversation.unread} unread message{data.conversation.unread === 1 ? "" : "s"}</p>}</div><button type="button" disabled={loading || sending} onClick={refresh} className="min-h-11 text-sm font-semibold text-teal-700 disabled:opacity-50">Refresh messages</button></div>
     {loading && <p role="status" className="text-sm">Loading messages…</p>}
     {error && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
     <div className="flex flex-wrap items-center gap-3 text-sm">
       {closed && <button type="button" disabled={sending} onClick={() => void change("REOPEN")} className="min-h-11 rounded-lg border border-teal-300 px-3 font-semibold text-teal-700 disabled:opacity-50">Reopen conversation</button>}
-      {admin && !closed && data?.conversation && !data.conversation.assignedTo && <button type="button" disabled={sending} onClick={() => void change("CLAIM")} className="min-h-11 rounded-lg bg-teal-700 px-3 font-semibold text-white disabled:opacity-50">Accept conversation</button>}
+      {admin && !closed && data?.conversation && (!data.conversation.assignedTo || data.conversation.canClaim) && <button type="button" disabled={sending} onClick={() => void change("CLAIM")} className="min-h-11 rounded-lg bg-teal-700 px-3 font-semibold text-white disabled:opacity-50">{data.conversation.assignedTo ? "Take over unavailable assignment" : "Accept conversation"}</button>}
       {admin && assigned && !closed && <><button type="button" disabled={sending} onClick={() => void change("RELEASE")} className="min-h-11 rounded-lg border border-slate-300 px-3 disabled:opacity-50">Release to inbox</button><button type="button" disabled={sending} onClick={() => void change("CLOSE")} className="min-h-11 rounded-lg border border-slate-300 px-3 disabled:opacity-50">Close conversation</button></>}
     </div>
     <div className="flex flex-wrap items-center gap-4 text-sm"><button type="button" disabled={!data?.hasOlder || loading || sending} onClick={() => { setLoading(true); setError(""); setBefore(data?.messages[0]?.sequence); }} className="min-h-11 text-teal-700 disabled:opacity-40">Older messages</button>{before && <button type="button" disabled={loading || sending} onClick={() => { followLatest.current = true; setLoading(true); setError(""); setBefore(undefined); }} className="min-h-11 text-teal-700 disabled:opacity-40">Latest messages</button>}<span className="text-xs text-slate-500">{before ? "Viewing earlier messages" : "Latest messages"}</span></div>

@@ -1159,6 +1159,7 @@ export default function CheckoutForm({
       )}
 
       <div aria-label="Order totals" className="py-4 text-center text-slate-700 text-xl font-bold">
+        {quote && <div aria-label="Checkout policy information" className="mb-3 space-y-2 text-xs font-normal text-slate-500"><p>{quote.servicePolicy ? `Store policies: published revision ${quote.servicePolicy.revision}. This version will be saved with your order.` : "Store policies have not been published. Ask support about any conditions before ordering."}</p><div className="flex flex-wrap justify-center gap-3">{["shipping", "returns", "warranty"].map(topic => <Link key={topic} target="_blank" rel="noreferrer" href={"/help/" + topic + (quote.servicePolicy ? "?revision=" + quote.servicePolicy.id : "")} className="inline-flex min-h-9 items-center text-teal-700 underline">{topic === "shipping" ? "Delivery information" : topic === "returns" ? "Returns policy" : "Warranty information"}</Link>)}</div></div>}
         <p className="mb-2 text-sm font-normal">Delivery fee: {quote ? formatPrice(quote.totals.shippingFee) : "Calculated after checking your delivery address"}</p>
         <p>Total: {formattedPrice}</p>
         {!quote && <p className="mt-2 text-xs font-normal text-slate-500">Items total shown. Delivery will be included after you get a quote.</p>}

@@ -6,7 +6,7 @@ const { CDP } = require("../tests/fixtures/browser-cdp.cjs");
 const pause = (milliseconds) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-async function verifyOperationsBrowser({ origin, cookie, artifactDirectory, cartFixture, orderFixture, supportFixture }) {
+async function verifyOperationsBrowser({ origin, cookie, artifactDirectory, cartFixture, orderFixture, supportFixture, ticketFixture, contentFixture }) {
   const chrome =
     process.env.CHROME_BIN ||
     (process.platform === "win32"
@@ -237,6 +237,8 @@ async function verifyOperationsBrowser({ origin, cookie, artifactDirectory, cart
     }
     if (orderFixture) await require("./check-order-lifecycle-browser.cjs").verifyOrderLifecycleBrowser({ page, origin, artifactDirectory, checks, fixture: orderFixture });
     if (supportFixture) await require("./check-support-browser.cjs").verifySupportBrowser({ page, origin, artifactDirectory, checks, fixture: supportFixture });
+    if (ticketFixture) await require('./check-support-tickets-browser.cjs').verifySupportTicketsBrowser({page,origin,artifactDirectory,checks,fixture:ticketFixture});
+    if (contentFixture) await require('./check-customer-service-browser.cjs').verifyCustomerServiceBrowser({page,origin,artifactDirectory,checks,fixture:contentFixture});
     assert.deepEqual(exceptions, []);
     fs.writeFileSync(
       path.join(artifactDirectory, "p0-browser-results.json"),

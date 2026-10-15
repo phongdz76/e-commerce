@@ -17,7 +17,7 @@ export async function authorizeOperationalRequest(request: Request) {
 }
 
 export async function recordOperationalIncident(
-  category: "PAYMENT_JOB_FAILED" | "NEXT_REQUEST_FAILED",
+  category: "PAYMENT_JOB_FAILED" | "NEXT_REQUEST_FAILED" | "EMAIL_JOB_FAILED",
   route?: string,
   digest?: string,
 ) {

@@ -94,6 +94,157 @@ model OperationalIncident {
   createdAt DateTime @default(now())
 }
 
+model NotificationDelivery {
+  id             String    @id @map("_id")
+  eventId        String
+  recipientId    String    @db.ObjectId
+  orderId        String    @db.ObjectId
+  subject        String
+  href           String
+  amount         Float
+  currency       String
+  state          String    @default("PENDING")
+  version        Int       @default(1)
+  attempts       Int       @default(0)
+  autoAttempts   Int       @default(0)
+  nextAttemptAt  DateTime? @default(now())
+  toEmail        String?
+  resultCode     String?
+  leaseToken     String?
+  leaseExpiresAt DateTime?
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([state, nextAttemptAt])
+  @@index([orderId, createdAt])
+}
+
+model NotificationEvent {
+  id        String   @id @map("_id")
+  kind      String
+  entityId  String   @db.ObjectId
+  createdAt DateTime @default(now())
+}
+
+model NotificationInbox {
+  id          String @id @map("_id")
+  recipientId String @db.ObjectId
+  audience    String
+  sequence    Int    @default(0)
+}
+
+model Notification {
+  id          String    @id @map("_id")
+  recipientId String    @db.ObjectId
+  audience    String
+  eventId     String
+  kind        String
+  entityId    String    @db.ObjectId
+  sequence    Int
+  title       String
+  href        String
+  createdAt   DateTime  @default(now())
+  readAt      DateTime?
+
+  @@index([recipientId, audience, sequence])
+  @@index([recipientId, audience, readAt])
+}
+
+model SupportTicket {
+  id               String   @id @map("_id") @db.ObjectId
+  ownerId          String   @db.ObjectId
+  conversationId   String   @db.ObjectId
+  initialMessageId String
+  category         String
+  subject          String
+  state            String   @default("OPEN")
+  version          Int      @default(1)
+  fingerprint      String
+  context          Json?
+  returnCaseId     String?  @db.ObjectId
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([ownerId, createdAt])
+  @@index([state, updatedAt])
+}
+
+model ReturnCase {
+  id               String   @id @map("_id") @db.ObjectId
+  ownerId          String   @db.ObjectId
+  orderId          String   @db.ObjectId
+  lineIndex        Int
+  quantity         Int
+  ticketId         String   @db.ObjectId
+  reason           String
+  preference       String
+  description      String
+  state            String   @default("REQUESTED")
+  version          Int      @default(1)
+  fingerprint      String
+  item             Json
+  policy           Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([ownerId, createdAt])
+  @@index([orderId, lineIndex])
+  @@index([state, updatedAt])
+}
+
+model ReturnCaseEvent {
+  id        String   @id @map("_id")
+  caseId    String   @db.ObjectId
+  actorId   String   @db.ObjectId
+  action    String
+  state     String
+  text      String
+  reference String?
+  createdAt DateTime @default(now())
+
+  @@index([caseId, createdAt])
+}
+
+model SupportTicketNote {
+  id          String   @id @map("_id")
+  ticketId    String   @db.ObjectId
+  actorId     String   @db.ObjectId
+  text        String
+  fingerprint String
+  createdAt   DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+}
+
+model CustomerServiceSettings {
+  id                  String   @id @map("_id")
+  version             Int      @default(0)
+  draft               Json?
+  publishedRevisionId String?  @db.ObjectId
+  updatedAt           DateTime @updatedAt
+}
+
+model CustomerServiceRevision {
+  id          String   @id @map("_id") @db.ObjectId
+  revision    Int
+  content     Json
+  publishedBy String   @db.ObjectId
+  publishedAt DateTime @default(now())
+
+  @@index([publishedAt])
+}
+
+model SupportSettings {
+  id          String    @id @map("_id")
+  version     Int       @default(0)
+  draft       Json?
+  published   Json?
+  publishedAt DateTime?
+  updatedAt   DateTime  @updatedAt
+}
+
 model SupportConversation {
   id                   String   @id @map("_id") @db.ObjectId
   ownerId              String   @db.ObjectId
@@ -269,6 +420,8 @@ model Order {
   codPaymentInfo         CodPaymentInfo?
   stockReservation       OrderStockReservation?
   totals                 OrderTotals?
+  servicePolicies        Json?
+  returnsVersion         Int?
   management             OrderManagement?
   refundInfo             OrderRefund?
 

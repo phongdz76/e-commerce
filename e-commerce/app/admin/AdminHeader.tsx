@@ -8,6 +8,7 @@ import UserMenu from "@/app/components/nav/UserMenu";
 import AdminDialog from "@/app/admin/components/AdminDialog";
 import { ADMIN_NAVIGATION, isAdminPageActive } from "@/app/admin/adminNavigation";
 import type { safeUser } from "@/types";
+import NotificationsClient from "@/app/components/notifications/NotificationsClient";
 
 export default function AdminHeader({ currentUser }: { currentUser: safeUser | null }) {
   const pathname = usePathname() || "/admin";
@@ -44,7 +45,7 @@ export default function AdminHeader({ currentUser }: { currentUser: safeUser | n
             </ol>
           </nav>
         </div>
-        <UserMenu currentUser={currentUser} isAdmin />
+        <div className="flex shrink-0 items-center gap-3">{currentUser && <NotificationsClient key={currentUser.id} admin compact />}<UserMenu currentUser={currentUser} isAdmin /></div>
       </header>
       {isMenuOpen ? (
         <AdminDialog title="Admin navigation" onClose={() => setIsMenuOpen(false)}>

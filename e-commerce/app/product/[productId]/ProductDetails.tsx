@@ -228,7 +228,7 @@ export default function ProductDetails({ product, initialVariantId }: ProductDet
         <nav aria-label="Product support" className="mt-4 flex flex-wrap gap-x-5 gap-y-3 text-base">
           <Link href="/help/shipping" className="text-teal-700 hover:underline">Shipping &amp; delivery</Link>
           <Link href="/help/returns" className="text-teal-700 hover:underline">Returns &amp; exchanges</Link>
-          <Link href={`/support?productId=${product.id}${selectedVariant ? "&variantId=" + selectedVariant.id : ""}`} className="text-teal-700 hover:underline">Ask about warranty</Link>
+          <Link href={`/support/requests/new?type=WARRANTY&productId=${product.id}${selectedVariant ? "&variantId=" + selectedVariant.id : ""}`} className="text-teal-700 hover:underline">Ask about warranty</Link>
         </nav>
       </div>
       <div className="min-w-0 md:col-span-2">

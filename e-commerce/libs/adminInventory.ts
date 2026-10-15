@@ -54,7 +54,7 @@ export async function readAdminInventory(request: Request, variantId?: string) {
       variantId = variantId.toLowerCase();
       const requestId = params.get("requestId");
       if (requestId && !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(requestId)) return json({ error: "Invalid inventory request" }, 400);
-      const where = { entityType: "PRODUCT_VARIANT", entityId: variantId, action: { in: ["INVENTORY_ADJUSTED", "STOCK_RESERVED", "STOCK_RELEASED", "STOCK_DISPATCHED"] }, status: "SUCCEEDED" };
+      const where = { entityType: "PRODUCT_VARIANT", entityId: variantId, action: { in: ["INVENTORY_ADJUSTED", "STOCK_RESERVED", "STOCK_RELEASED", "STOCK_DISPATCHED", "RETURN_RESTOCKED"] }, status: "SUCCEEDED" };
       const snapshot = await prisma.$transaction(async (tx) => {
         const variant = await tx.productVariant.findUnique({ where: { id: variantId }, select: variantSelect });
         if (!variant) return null;

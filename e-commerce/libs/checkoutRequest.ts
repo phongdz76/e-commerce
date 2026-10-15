@@ -1,9 +1,12 @@
 import { createHash } from "node:crypto";
+import type { Prisma } from "@prisma/client";
 import { getOrderItems, type OrderCart } from "@/libs/orderItems";
 import { getOrderDelivery } from "@/libs/orderDelivery";
 import { CheckoutRequestError } from "@/libs/checkoutErrors";
 import { reserveOrderStock, withStockTransaction } from "@/libs/orderStock";
 import { verifyCheckoutQuote, validateNewCheckoutQuote } from "@/libs/checkoutQuote";
+import { ensureNotificationStorage } from "@/libs/notificationStorage";
+import { notifyOrderCreated } from "@/libs/orderNotifications";
 
 export { CheckoutRequestError } from "@/libs/checkoutErrors";
 
@@ -17,7 +20,8 @@ export async function prepareCheckoutRequest(requestId: unknown, userId: string,
   const itemKeys = cart.items.map((item) => [item.id, item.variantId, item.quantity, item.price]).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
   const quote = verifyCheckoutQuote(quoteToken, userId, cart, delivery);
   const fingerprint = createHash("sha256").update(JSON.stringify([paymentMethod, cart.amount, itemKeys, delivery, options,
-    { ...quote.totals, quotedAt: undefined }])).digest("hex");
+    { ...quote.totals, quotedAt: undefined }, ...(quote.serviceRevisionId ? [{ serviceRevisionId: quote.serviceRevisionId }] : [])])).digest("hex");
+  await ensureNotificationStorage();
   return withStockTransaction(async (tx) => {
     const saved = await tx.checkoutRequest.findUnique({ where: { id } });
     if (saved && (saved.fingerprint !== fingerprint || saved.paymentMethod !== paymentMethod || saved.userId !== userId)) {
@@ -34,7 +38,7 @@ export async function prepareCheckoutRequest(requestId: unknown, userId: string,
     }
     const latest = await getOrderItems(cart.items, tx);
     if (!latest || latest.amount !== cart.amount) throw new CheckoutRequestError("The cart has changed. Confirm its current price and options.", 409, "CHECKOUT_PRICE_CHANGED");
-    await validateNewCheckoutQuote(quote, latest, delivery, tx);
+    const servicePolicies = await validateNewCheckoutQuote(quote, latest, delivery, tx);
     const amount = quote.totals.grandTotal;
     if (paymentMethod === "MOMO" && (amount < 1000 || amount > 50000000)) {
       throw new CheckoutRequestError("MoMo payments including delivery must be between 1,000 and 50,000,000 VND.", 400, "PAYMENT_AMOUNT_INVALID");
@@ -50,11 +54,13 @@ export async function prepareCheckoutRequest(requestId: unknown, userId: string,
     await tx.checkoutRequest.create({ data: { id, userId, fingerprint, paymentMethod, paymentReference, orderId } });
     const order = await tx.order.create({ data: { id: orderId, userId, paymentMethod, amount, currency: "vnd",
       totals: { ...quote.totals, quotedAt: new Date(quote.totals.quotedAt) },
+      ...(servicePolicies ? { servicePolicies: servicePolicies as Prisma.InputJsonValue } : {}),
       paymentIntentId: paymentReference, activePaymentAttemptId: paymentReference, paymentAttemptTracked: true, status: paymentMethod === "STRIPE" ? "draft" : "pending", deliveryStatus: "pending",
       products: latest.items, stockReservation, management: { state: "PLACED", version: 1, updatedAt: now }, ...(delivery || {}),
       ...(paymentMethod === "ZALOPAY" ? { paymentExpiresAt: new Date(now.getTime() + 900000) } : {}) } });
     const attempt = await tx.paymentAttempt.create({ data: { id: paymentReference, orderId, paymentMethod, merchantId, amount: order.amount,
       currency: order.currency, state: paymentMethod === "COD" ? "COD_PENDING" : "CREATED" } });
+    await notifyOrderCreated(tx, order);
     return { order, attempt };
   });
 }

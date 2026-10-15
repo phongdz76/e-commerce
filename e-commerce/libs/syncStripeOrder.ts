@@ -1,6 +1,7 @@
 import type { Order } from "@prisma/client";
 import type Stripe from "stripe";
 import prisma from "@/libs/prismadb";
+import { updateOrderPayment } from "@/libs/updateOrderPayment";
 import { getStripe } from "./stripe";
 import { releaseVerifiedFailedStock, reviewPaidReleasedStock } from "@/libs/orderStock";
 
@@ -57,7 +58,7 @@ export async function syncStripeOrder<T extends StripeOrder>(order: T) {
     intentShipping?.name ||
     intentShipping?.phone
   ) {
-    await prisma.order.updateMany({
+    await updateOrderPayment({
       where: {
         id: order.id,
         paymentIntentId: order.paymentIntentId,

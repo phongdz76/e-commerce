@@ -1,7 +1,9 @@
 export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export const API_PATHS = {
-  SUPPORT: { THREAD: "/api/support", UPLOAD: "/api/support/attachments" },
+  CUSTOMER_SERVICE: "/api/customer-service",
+  NOTIFICATIONS: "/api/notifications",
+  SUPPORT: { THREAD: "/api/support", UPLOAD: "/api/support/attachments", TICKETS: "/api/support/requests", TICKET: (id: string) => `/api/support/requests/${id}`, TICKET_OPTIONS: "/api/support/requests/options", HOURS: "/api/support/hours" },
   CATALOG: { SUGGESTIONS: "/api/catalog/suggestions" },
   AUTH: {
     REGISTER: "/api/register",
@@ -35,6 +37,12 @@ export const API_PATHS = {
     RETRY_PAYMENT: (id: string) => `/api/order/${id}/retry-payment`,
   },
   ADMIN: {
+    CUSTOMER_SERVICE: "/api/admin/customer-service",
+    SUPPORT_TICKETS: "/api/admin/support-requests",
+    SUPPORT_TICKET: (id: string) => `/api/admin/support-requests/${id}`,
+    SUPPORT_HOURS: "/api/admin/support-hours",
+    EMAIL_DELIVERIES: "/api/admin/notifications/email",
+    NOTIFICATIONS: "/api/admin/notifications",
     SUPPORT: "/api/admin/support",
     SUPPORT_THREAD: (id: string) => `/api/admin/support/${id}`,
     REFUNDS: "/api/admin/refunds",

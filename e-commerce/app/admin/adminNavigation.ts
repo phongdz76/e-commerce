@@ -20,6 +20,11 @@ export const ADMIN_NAVIGATION = [
     { label: "Payment issues", href: "/admin/payment-exceptions", icon: FiAlertCircle },
     { label: "Refunds", href: "/admin/refunds", icon: FiCornerUpLeft },
     { label: "Support inbox", href: "/admin/support", icon: FiUsers },
+    { label: "Support requests", href: "/admin/support-requests", icon: FiUsers },
+    { label: "Support hours", href: "/admin/support-hours", icon: FiActivity },
+    { label: "Customer service content", href: "/admin/customer-service", icon: FiActivity },
+    { label: "Notifications", href: "/admin/notifications", icon: FiActivity },
+    { label: "Email delivery", href: "/admin/notifications/email", icon: FiActivity },
   ] },
   { title: "Accounts & Activity", items: [
     { label: "User accounts", href: "/admin/users", icon: FiUsers },
@@ -29,5 +34,5 @@ export const ADMIN_NAVIGATION = [
 ];
 
 export function isAdminPageActive(pathname: string, href: string) {
-  return href === "/admin" ? pathname === href : pathname === href || pathname.startsWith(href + "/");
+  return ["/admin", "/admin/notifications"].includes(href) ? pathname === href : pathname === href || pathname.startsWith(href + "/");
 }

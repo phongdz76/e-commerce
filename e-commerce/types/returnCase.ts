@@ -1,0 +1,10 @@
+import type { ServicePolicySnapshot } from "@/types/customerService";
+export type ReturnItem = { productId: string; variantId: string; sku: string; name: string; option: string; purchasedQuantity: number; unitPrice: number };
+export type ReturnCaseView = {
+  id: string; reference: string; orderId: string; orderReference: string; lineIndex: number; quantity: number; ticketId: string;
+  reason: string; preference: string; description: string; state: string; version: number; item: ReturnItem;
+  policy: ServicePolicySnapshot | null; createdAt: string; updatedAt: string; canManage: boolean; actions: string[];
+};
+export type ReturnCaseDetail = { case: ReturnCaseView; events: { id: string; action: string; state: string; text: string; reference: string | null; createdAt: string }[]; page: number; hasOlder: boolean; imageUrl: string | null };
+export type ReturnCaseList = { items: ReturnCaseView[]; page: number; total: number; totalPages: number };
+export type ReturnOptions = { orderId: string; reference: string; eligible: boolean; message: string; policy: ServicePolicySnapshot | null; items: (ReturnItem & { lineIndex: number; available: number })[] };

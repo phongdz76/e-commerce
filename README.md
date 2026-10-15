@@ -13,6 +13,11 @@ Personal portfolio project built with Next.js, TypeScript, NextAuth and Prisma/M
 - Order confirmation independent of payment, COD acceptance/rejection, recipient corrections before packing and public/internal order notes with version checks and replay protection.
 - Paid-order cancellation before carrier handover, an admin refund queue, full-refund adapters for Stripe/MoMo/VNPay/ZaloPay and recorded manual COD refund receipts. Uncertain submissions are reconciled using their original refund identity.
 - Saved customer/admin support conversations with private images, product/SKU/order context, paginated history, read receipts and an administrator inbox with assignment and close/reopen actions.
+- Support messages inside the floating widget, with drafts retained while closed, and saved in-app notifications for customers/administrators through a header bell and paginated notification pages.
+- Saved order, verified-payment, shipment, cancellation and refund notifications, with a separate transactional email queue and audited manual retries. Event emails are disabled by default.
+- Support requests with account-owned order/product/SKU context, private images, request references and status tracking. Administrators use the shared conversation assignment, private ticket notes and in-app request notifications.
+- Draft/preview/publication of weekly support hours in Vietnam time, shared by help, footer and the support widget. Requests and messages remain available outside published hours.
+- Administrator drafts, previews and immutable published versions of contacts, FAQs and shipping/return/warranty policies, shared by help pages, footer and widget. New orders save their applicable policy content; archived versions remain available after later edits.
 - Atomic inventory reservations: concurrent buyers cannot reserve the same final unit. Stock adjustments and dispatch/release have audit records.
 - COD collection/remittance records, follow-up queues, sales reports and CSV export.
 - VNPay, MoMo, ZaloPay sandbox and Stripe test integrations with verified callbacks, idempotent checkout and payment reconciliation.
@@ -52,6 +57,9 @@ npm run test:stock-mongo
 npm run test:catalog-mongo
 npm run test:content-mongo
 npm run test:support-mongo
+npm run test:support-tickets-mongo
+npm run test:customer-service-mongo
+npm run test:email-mongo
 npm run test:operations-mongo
 npm run test:operations-e2e
 ```
@@ -64,4 +72,4 @@ See [the operations runbook](e-commerce/OPERATIONS.md) for scheduler authenticat
 
 ## Remaining work
 
-Canonical delivery-region validation, delivery-area changes with fee approval and delivery estimates from a reliable source; richer order lifecycle/policy snapshots; actual provider refund UAT, duplicate/late-payment refund handling and returns/partial refunds; transactional notification outbox; support tickets and configurable support hours; reviews, wishlists, promotions and further reporting. Payment-issue review decisions and cancellation approval alone do not confirm money returned. Production use with real money requires a separate merchant and operational acceptance process.
+Canonical delivery-region validation, delivery-area changes with fee approval and delivery estimates from a reliable source; richer order lifecycle; actual provider refund UAT, duplicate/late-payment refund handling and returns/partial refunds; acceptance of the configured external email sender; return/warranty case management; reviews, wishlists, promotions and further reporting. A support enquiry does not approve a return, warranty claim or refund. Payment-issue review decisions and cancellation approval alone do not confirm money returned. Production use with real money requires a separate merchant and operational acceptance process.

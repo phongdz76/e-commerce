@@ -1,4 +1,5 @@
 import prisma from "@/libs/prismadb";
+import { parseServicePolicySnapshot } from "@/utils/customerService";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/actions/getCurrentUser";
 import { syncStripeOrder } from "@/libs/syncStripeOrder";
@@ -80,6 +81,7 @@ export async function GET(
       orderVersion: order.management?.version || 0,
       amount: order.amount,
       totals: order.totals ? { ...order.totals, quotedAt: order.totals.quotedAt.toISOString() } : null,
+      servicePolicies: parseServicePolicySnapshot(order.servicePolicies),
       currency: order.currency,
       status: order.status,
       deliveryStatus: order.deliveryStatus,

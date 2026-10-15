@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import prisma from "@/libs/prismadb";
-import { withStockTransaction } from "@/libs/orderStock";
+import { withSupportTransaction } from "@/libs/supportTransaction";
 import { CheckoutRequestError } from "@/libs/checkoutErrors";
 import { checkAuthRateLimit } from "@/libs/authRateLimit";
 import { getStorefrontProduct } from "@/libs/storefrontProductNames";
@@ -9,6 +9,8 @@ import { orderReference } from "@/utils/orderManagement";
 import { SUPPORT_IMAGE_LIMIT, type SupportMessageInput } from "@/utils/support";
 import type { SupportContext, SupportThread } from "@/types/support";
 import { ensureSupportStorage } from "@/libs/supportStorage";
+import { ensureNotificationStorage } from "@/libs/notificationStorage";
+import { notifySupportMessage } from "@/libs/notifications";
 
 export type SupportViewer = { id: string; role: string };
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -16,7 +18,7 @@ const changed = () => new CheckoutRequestError("This conversation changed. Refre
 const missing = () => new CheckoutRequestError("Conversation not found", 404, "SUPPORT_NOT_FOUND");
 const allowed = (id: string, viewer: SupportViewer) => { if (viewer.role !== "ADMIN" && id !== viewer.id) throw missing(); };
 
-async function contextSnapshot(context: SupportContext | null, ownerId: string) {
+export async function supportContextSnapshot(context: SupportContext | null, ownerId: string) {
   if (!context) return null;
   if (context.kind === "ORDER") {
     const order = await prisma.order.findFirst({ where: { id: context.id, userId: ownerId }, select: { id: true } });
@@ -38,17 +40,32 @@ async function ensureConversation(tx: Prisma.TransactionClient, id: string) {
 export async function sendSupportMessage(id: string, viewer: SupportViewer, input: SupportMessageInput) {
   allowed(id, viewer);
   await ensureSupportStorage();
+  await ensureNotificationStorage();
   const senderRole = viewer.role === "ADMIN" ? "ADMIN" : "CUSTOMER";
   const messageId = hash(["support-message", id, viewer.id, senderRole, input.requestId]);
   const fingerprint = hash({ text: input.text, context: input.context, attachmentId: input.attachmentId });
   const existing = await prisma.supportMessage.findUnique({ where: { id: messageId } });
   if (existing) { if (existing.fingerprint !== fingerprint) throw changed(); return { success: true, id: existing.id, replayed: true }; }
-  const snapshot = await contextSnapshot(input.context, id);
+  const snapshot = await supportContextSnapshot(input.context, id);
   await checkAuthRateLimit("support-message", viewer.id, 20, 60000);
-  return withStockTransaction(async tx => {
+  return withSupportTransaction(tx => appendSupportMessage(tx, id, viewer, input, snapshot));
+}
+
+// Shared by ordinary chat and atomic ticket creation. No nested transaction or provider call.
+export async function appendSupportMessage(tx: Prisma.TransactionClient, id: string, viewer: SupportViewer, input: SupportMessageInput, snapshot: Awaited<ReturnType<typeof supportContextSnapshot>>, reopen = false, notify = true) {
+    allowed(id, viewer);
+    const senderRole = viewer.role === "ADMIN" ? "ADMIN" : "CUSTOMER";
+    const messageId = hash(["support-message", id, viewer.id, senderRole, input.requestId]);
+    const fingerprint = hash({ text: input.text, context: input.context, attachmentId: input.attachmentId });
     const replay = await tx.supportMessage.findUnique({ where: { id: messageId } });
     if (replay) { if (replay.fingerprint !== fingerprint) throw changed(); return { success: true, id: replay.id, replayed: true }; }
-    const conversation = await ensureConversation(tx, id);
+    let conversation = await ensureConversation(tx, id);
+    if (reopen && conversation.status === "CLOSED") {
+      if (conversation.version >= 2147483646) throw changed();
+      const opened = await tx.supportConversation.updateMany({ where: { id, version: conversation.version, status: "CLOSED" }, data: { status: "OPEN", assignedTo: null, version: conversation.version + 1 } });
+      if (opened.count !== 1) throw changed();
+      conversation = { ...conversation, status: "OPEN", assignedTo: null, version: conversation.version + 1 };
+    }
     if (conversation.status !== "OPEN") throw new CheckoutRequestError("This conversation is closed. Reopen it to send another message.", 409, "SUPPORT_CLOSED");
     if (senderRole === "ADMIN" && conversation.assignedTo !== viewer.id) throw new CheckoutRequestError("Accept this conversation before replying. Another administrator may already be handling it.", 409, "SUPPORT_NOT_ASSIGNED");
     if (input.attachmentId) {
@@ -64,8 +81,8 @@ export async function sendSupportMessage(id: string, viewer: SupportViewer, inpu
     if (result.count !== 1) throw changed();
     await tx.supportMessage.create({ data: { id: messageId, conversationId: id, authorId: viewer.id, senderRole, sequence, text: input.text, fingerprint,
       ...(snapshot ? { context: snapshot } : {}), attachmentId: input.attachmentId, createdAt: now } });
+    if (notify) await notifySupportMessage(tx, conversation, { id: messageId, authorId: viewer.id, senderRole });
     return { success: true, id: messageId, replayed: false };
-  });
 }
 
 export async function getSupportThread(id: string, viewer: SupportViewer, before?: number): Promise<SupportThread> {
@@ -78,12 +95,12 @@ export async function getSupportThread(id: string, viewer: SupportViewer, before
   const admin = viewer.role === "ADMIN";
   if (conversation.ownerId !== id) throw missing();
   const messages = await prisma.supportMessage.findMany({ where: { conversationId: id, ...(before ? { sequence: { lt: before } } : {}) }, orderBy: { sequence: "desc" }, take: 21 });
-  const users = admin ? await prisma.user.findMany({ where: { id: { in: [...new Set([id, ...messages.map(message => message.authorId), ...(conversation.assignedTo ? [conversation.assignedTo] : [])])] } }, select: { id: true, name: true, email: true } }) : [];
+  const users = admin ? await prisma.user.findMany({ where: { id: { in: [...new Set([id, ...messages.map(message => message.authorId), ...(conversation.assignedTo ? [conversation.assignedTo] : [])])] } }, select: { id: true, name: true, email: true, role: true, status: true } }) : [];
   const customer = users.find(user => user.id === id);
   const assigned = users.find(user => user.id === conversation.assignedTo);
   return { conversation: { id, status: conversation.status, version: conversation.version, assigned: !!conversation.assignedTo,
     unread: admin ? conversation.adminUnread : conversation.customerUnread, lastSequence: conversation.sequence,
-    ...(admin ? { customer: { name: customer?.name || "Customer", email: customer?.email || null }, assignedTo: conversation.assignedTo ? { id: conversation.assignedTo, name: assigned?.name || "Administrator" } : null } : {}) },
+    ...(admin ? { canClaim: !assigned || assigned.role !== "ADMIN" || assigned.status === "BLOCKED", customer: { name: customer?.name || "Customer", email: customer?.email || null }, assignedTo: conversation.assignedTo ? { id: conversation.assignedTo, name: assigned?.name || "Administrator" } : null } : {}) },
     messages: messages.slice(0, 20).reverse().map(message => {
       const context = message.context && typeof message.context === "object" && !Array.isArray(message.context) ? message.context as Record<string, unknown> : null;
       return { id: message.id, sequence: message.sequence, role: message.senderRole as "CUSTOMER" | "ADMIN", mine: message.authorId === viewer.id && message.senderRole === (admin ? "ADMIN" : "CUSTOMER"), label: message.senderRole === "ADMIN" ? admin ? users.find(user => user.id === message.authorId)?.name || "Support team" : "Support team" : "Customer", text: message.text,
@@ -95,7 +112,7 @@ export async function getSupportThread(id: string, viewer: SupportViewer, before
 
 export async function readSupportMessages(id: string, viewer: SupportViewer, sequence: number) {
   allowed(id, viewer);
-  return withStockTransaction(async tx => {
+  return withSupportTransaction(async tx => {
     const conversation = await tx.supportConversation.findUnique({ where: { id } });
     if (!conversation || conversation.ownerId !== id) throw missing();
     if (!Number.isSafeInteger(sequence) || sequence < 0 || sequence > conversation.sequence) throw new CheckoutRequestError("Invalid read position", 400, "SUPPORT_READ_INVALID");
@@ -116,14 +133,16 @@ export async function changeSupportConversation(id: string, viewer: SupportViewe
   if (viewer.role !== "ADMIN" && action !== "REOPEN") throw new CheckoutRequestError("Forbidden", 403, "FORBIDDEN");
   const auditId = hash(["support-action", id, viewer.id, requestId]).slice(0, 24);
   const fingerprint = hash([action, version]);
-  return withStockTransaction(async tx => {
+  return withSupportTransaction(async tx => {
     const saved = await tx.auditLog.findUnique({ where: { id: auditId } });
     if (saved) { if ((saved.details as Record<string, unknown> | null)?.fingerprint !== fingerprint) throw changed(); return { success: true, replayed: true }; }
     const conversation = await tx.supportConversation.findUnique({ where: { id } });
     if (!conversation || conversation.ownerId !== id) throw missing();
     if (conversation.version !== version || version >= 2147483646) throw changed();
     let data: Prisma.SupportConversationUpdateManyMutationInput;
-    if (action === "CLAIM" && conversation.status === "OPEN" && (!conversation.assignedTo || conversation.assignedTo === viewer.id)) data = { assignedTo: viewer.id };
+    const assignee = action === "CLAIM" && conversation.assignedTo && conversation.assignedTo !== viewer.id ? await tx.user.findUnique({ where: { id: conversation.assignedTo }, select: { role: true, status: true } }) : null;
+    const unavailable = !assignee || assignee.role !== "ADMIN" || assignee.status === "BLOCKED";
+    if (action === "CLAIM" && conversation.status === "OPEN" && (!conversation.assignedTo || conversation.assignedTo === viewer.id || unavailable)) data = { assignedTo: viewer.id };
     else if (action === "RELEASE" && conversation.status === "OPEN" && conversation.assignedTo === viewer.id) data = { assignedTo: null };
     else if (action === "CLOSE" && conversation.status === "OPEN" && conversation.assignedTo === viewer.id) data = { status: "CLOSED", assignedTo: null };
     else if (action === "REOPEN" && conversation.status === "CLOSED") data = { status: "OPEN", assignedTo: null };
@@ -152,7 +171,7 @@ export async function uploadSupportImage(id: string, viewer: SupportViewer, byte
   const old = await prisma.supportAttachment.findUnique({ where: { id: attachmentId }, select: { id: true, fingerprint: true } });
   if (old) { if (old.fingerprint !== fingerprint) throw changed(); return { id: old.id }; }
   await checkAuthRateLimit("support-image-daily", viewer.id, 20, 86400000);
-  return withStockTransaction(async tx => {
+  return withSupportTransaction(async tx => {
     const replay = await tx.supportAttachment.findUnique({ where: { id: attachmentId }, select: { id: true, fingerprint: true } });
     if (replay) { if (replay.fingerprint !== fingerprint) throw changed(); return { id: replay.id }; }
     const conversation = await ensureConversation(tx, id);

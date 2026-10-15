@@ -126,6 +126,7 @@ async function main() {
       ZALOPAY_KEY2: "",
       EMAIL_USER: "",
       EMAIL_PASSWORD: "",
+      SGTECH_EVENT_EMAILS_ENABLED: "false",
       GOOGLE_CLIENT_ID: "",
       GOOGLE_CLIENT_SECRET: "",
       FACEBOOK_CLIENT_ID: "",
@@ -283,10 +284,12 @@ async function main() {
     assert.equal(
       outcomes.filter((response) => response.status === 200).length,
       1,
+      JSON.stringify(await Promise.all(outcomes.map(async response=>({status:response.status,body:await response.clone().json()})))),
     );
     assert.equal(
       outcomes.filter((response) => response.status === 409).length,
       1,
+      JSON.stringify(await Promise.all(outcomes.map(async response=>({status:response.status,body:await response.clone().json()})))),
     );
     const saved = await outcomes
       .find((response) => response.status === 200)
@@ -360,6 +363,9 @@ async function main() {
     );
     const orderFixture = await require("./check-order-lifecycle-http.cjs").verifyOrderLifecycleHttp({ call, prisma, cookies, users, variant, body, checks });
     const supportFixture = await require("./check-support-http.cjs").verifySupportHttp({ call, prisma, cookies, users, product, variant, orderFixture, secret, checks });
+    await require("./check-email-http.cjs").verifyEmailHttp({call,prisma,cookies,cronSecret,checks});
+    const ticketFixture=await require('./check-support-tickets-http.cjs').verifySupportTicketsHttp({call,prisma,cookies,users,product,variant,orderFixture,checks});
+    const contentFixture=await require('./check-customer-service-http.cjs').verifyCustomerServiceHttp({call,prisma,cookies,users,variant,body,checks});
     if (process.env.QA_BROWSER === "true") {
       const {
         verifyOperationsBrowser,
@@ -370,6 +376,8 @@ async function main() {
         artifactDirectory: artifacts,
         orderFixture,
         supportFixture,
+        ticketFixture,
+        contentFixture,
         cartFixture: { id: product.id, variantId: variant.id, name: "Private HTTP QA phone", description: "QA", category: "QA phones", brand: "QA brand", selectedImg: variant.image, quantity: 2, price: 1 },
       });
       checks.push(`Browser passed ${count} responsive/error/recovery groups.`);
