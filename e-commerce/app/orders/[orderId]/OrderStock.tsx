@@ -55,7 +55,16 @@ export default function OrderStock({ orderId }: { orderId: string }) {
       <button type="button" disabled={loading || saving} onClick={() => setReload((value) => value + 1)} className="min-h-11 font-semibold text-teal-700">Reload reservation</button>
       {data?.canCancel && !open && <button type="button" disabled={loading || saving || Boolean(error)} onClick={() => setOpen(true)} className="ml-3 min-h-11 font-semibold text-rose-700">Cancel unpaid order</button>}
       {open && data?.canCancel && <form onSubmit={cancel} className="space-y-3 border-t border-slate-100 pt-3">
-        <label className="block space-y-1"><span>Cancellation reason</span><textarea required minLength={10} maxLength={500} value={reason} disabled={loading || saving || Boolean(error)} onChange={(event) => setReason(event.target.value)} className="min-h-20 w-full rounded-md border border-slate-300 p-3" /></label>
+        <div className="block space-y-1">
+          <div className="flex items-center justify-between">
+            <label htmlFor="cancel-reason">Cancellation reason</label>
+            <span className="text-xs text-slate-400">{reason.trim().length}/500 (min 10)</span>
+          </div>
+          <textarea id="cancel-reason" required minLength={10} maxLength={500} value={reason} disabled={loading || saving || Boolean(error)} onChange={(event) => setReason(event.target.value)} className={"min-h-20 w-full rounded-md border p-3 " + (reason.length > 0 && reason.trim().length < 10 ? "border-rose-400" : "border-slate-300")} />
+          {reason.length > 0 && reason.trim().length < 10 && (
+            <p className="text-xs text-rose-600">Cancellation reason must be at least 10 characters (currently {reason.trim().length}).</p>
+          )}
+        </div>
         <label className="flex items-start gap-2"><input type="checkbox" required checked={confirmed} disabled={loading || saving || Boolean(error)} onChange={(event) => setConfirmed(event.target.checked)} className="mt-1 h-4 w-4 shrink-0" /><span>I want to cancel this unpaid order and release its reserved stock.</span></label>
         <button disabled={loading || saving || Boolean(error) || !confirmed} className="min-h-11 rounded-md bg-rose-700 px-4 text-white disabled:opacity-50">{saving ? "Confirming..." : "Confirm cancellation"}</button>
       </form>}

@@ -67,7 +67,16 @@ export default function OrderRefundPanel({ orderId, admin = false, onChanged }: 
           <label className="block text-sm font-medium">Receipt / bank reference<input aria-label="Manual refund reference" className={field} value={reference} required maxLength={100} disabled={saving} onChange={event => setReference(event.target.value)} /></label>
           <label className="block text-sm font-medium">Refund date and time<input aria-label="Manual refund time" type="datetime-local" className={field} value={occurredAt} required disabled={saving} onChange={event => setOccurredAt(event.target.value)} /></label>
         </>}
-        <label className="block text-sm font-medium">{action === "REQUEST" ? "Reason for cancellation" : "Reason for this action"}<textarea aria-label="Refund reason" className={field} required minLength={10} maxLength={500} value={reason} disabled={saving} onChange={event => setReason(event.target.value)} /></label>
+        <div className="block text-sm font-medium">
+          <div className="flex items-center justify-between">
+            <label htmlFor="refund-reason">{action === "REQUEST" ? "Reason for cancellation" : "Reason for this action"}</label>
+            <span className="text-xs text-slate-400">{reason.trim().length}/500 (min 10)</span>
+          </div>
+          <textarea id="refund-reason" aria-label="Refund reason" className={field + (reason.length > 0 && reason.trim().length < 10 ? " border-rose-400" : "")} required minLength={10} maxLength={500} value={reason} disabled={saving} onChange={event => setReason(event.target.value)} />
+          {reason.length > 0 && reason.trim().length < 10 && (
+            <p className="mt-1 text-xs text-rose-600">Reason must be at least 10 characters (currently {reason.trim().length}).</p>
+          )}
+        </div>
         <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={confirmed} disabled={saving} onChange={event => setConfirmed(event.target.checked)} />{action === "REQUEST" ? "I want to cancel this order and request a full refund." : "I have checked the order, amount and this refund action."}</label>
         <button type="submit" disabled={saving || loading || !confirmed || reason.trim().length < 10 || !data.actions.includes(action)} className="min-h-11 max-w-full rounded-lg bg-slate-700 px-4 py-2 font-semibold text-white disabled:opacity-50">{saving ? "Updating…" : labels[action]}</button>
       </form>}
