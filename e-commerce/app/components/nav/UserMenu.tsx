@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { AiFillCaretDown } from "react-icons/ai";
+import { FiChevronDown } from "react-icons/fi";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import BackDrop from "./BackDrop";
@@ -28,7 +28,7 @@ export default function UserMenu({
     <>
       {isOpen ? <BackDrop onClick={toggleOpen} /> : null}
       <div
-        className="relative z-30"
+        className="relative z-30 shrink-0"
         onBlur={(event) => {
           if (!event.currentTarget.contains(event.relatedTarget))
             setIsOpen(false);
@@ -48,22 +48,28 @@ export default function UserMenu({
           aria-controls={isOpen ? "account-menu" : undefined}
           onClick={toggleOpen}
           className="
-        p-2
-        border-[1px]
-        border-slate-400
         flex
-        flex-row
+        h-10
+        shrink-0
         items-center
-        gap-1
+        gap-1.5
         rounded-full
-        cursor-pointer
-        hover:shadow-md
-        transition
+        border
+        border-slate-300
+        py-1
+        pl-1.5
+        pr-2.5
         text-slate-700
+        transition
+        hover:bg-slate-300/60
+        hover:shadow-sm
+        focus-visible:outline-2
+        focus-visible:outline-teal-600
+        cursor-pointer
         "
         >
-          <Avatar src={currentUser?.image || undefined} size={24} />
-          <AiFillCaretDown className="text-xs" />
+          <Avatar src={currentUser?.image || undefined} size={26} />
+          <FiChevronDown size={15} className="text-slate-600" />
         </button>
         {isOpen && (
           <div
