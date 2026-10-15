@@ -3,6 +3,8 @@ import type { Order, OrderRefund, Prisma } from "@prisma/client";
 import prisma from "@/libs/prismadb";
 import { CheckoutRequestError } from "@/libs/checkoutErrors";
 import { releaseOrderStock, withStockTransaction } from "@/libs/orderStock";
+import { ensureNotificationStorage } from "@/libs/notificationStorage";
+import { notifyRefundChange } from "@/libs/orderNotifications";
 import { orderManagementVersionWhere, orderDeliveryStatusWhere } from "@/libs/orderManagement";
 import { orderBusinessState } from "@/utils/orderManagement";
 import { callRefundProvider, prepareRefundProvider, refundRequestId, type RefundResult } from "@/libs/refundProvider";
@@ -45,6 +47,7 @@ export async function getOrderRefund(orderId: string, viewer: { id: string; role
 }
 
 export async function changeOrderRefund(orderId: string, viewer: { id: string; role: string }, input: RefundInput) {
+  await ensureNotificationStorage();
   if (input.action === "EXECUTE" || input.action === "CHECK") {
     if (viewer.role !== "ADMIN") throw new CheckoutRequestError("Forbidden", 403, "FORBIDDEN");
     if (input.action === "CHECK") {
@@ -107,6 +110,7 @@ export async function changeOrderRefund(orderId: string, viewer: { id: string; r
       data: { refundInfo: { set: info }, management: { set: { state, version: input.orderVersion + 1, updatedAt: now } }, ...(input.action === "APPROVE" ? { deliveryStatus: "cancelled" } : {}) } });
     if (result.count !== 1) throw changed();
     await tx.auditLog.create({ data: { id: operationId, actorId: viewer.id, entityType: "ORDER", entityId: order.id, action, status: "SUCCEEDED", details: { fingerprint, reason: input.reason, refundId: info.id, amount: info.amount, currency: info.currency, state: info.state, ...(info.manualReference ? { reference: info.manualReference, occurredAt: info.manualOccurredAt!.toISOString() } : {}) } } });
+    await notifyRefundChange(tx, order, old, info, viewer.id);
     return { success: true, replayed: false };
   });
 }
@@ -149,6 +153,7 @@ async function executeOrderRefund(orderId: string, actorId: string, input: Refun
 }
 
 async function finishRefund(order: Order, claimed: OrderRefund, result: RefundResult, actorId: string) {
+  await ensureNotificationStorage();
   return withStockTransaction(async tx => {
     const now = new Date();
     const updated = await tx.order.updateMany({ where: { id: order.id, amount: claimed.amount, currency: claimed.currency,
@@ -158,6 +163,7 @@ async function finishRefund(order: Order, claimed: OrderRefund, result: RefundRe
     if (updated.count !== 1) throw changed();
     await tx.auditLog.create({ data: { id: digest(["refund-result", claimed.id, claimed.version]).slice(0, 24), actorId, entityType: "ORDER", entityId: order.id,
       action: result.state === "SUCCEEDED" ? "REFUND_SUCCEEDED" : "REFUND_CHECKED", status: "SUCCEEDED", details: { refundId: claimed.id, amount: claimed.amount, state: result.state, resultCode: result.resultCode, providerRefundId: result.providerRefundId } } });
+    await notifyRefundChange(tx, order, claimed, { ...claimed, state: result.state }, actorId);
   });
 }
 

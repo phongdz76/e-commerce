@@ -1,8 +1,10 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const {randomUUID}=require('node:crypto');
-const sourceLoader=require('./fixtures/load-source.cjs');
+const rawSourceLoader=require('./fixtures/load-source.cjs');
+const sourceLoader=mocks=>rawSourceLoader({'@/libs/notificationStorage':{ensureNotificationStorage:async()=>{}},...mocks});
 const {installStockDatabase}=require('./fixtures/stock-db.cjs');
+const {installNotificationDatabase}=require('./fixtures/notification-db.cjs');
 const png=require('./fixtures/support-image.cjs');
 function fixture(){
  const conversations=new Map(),messages=new Map(),attachments=new Map();
@@ -26,7 +28,8 @@ function fixture(){
  });
  const userRows=new Map([owner,other,admin,admin2].map(u=>[u.id,{...u,email:u.name+'@example.invalid'}]));
  const db={supportConversation:delegate(conversations,{status:'OPEN',version:1,assignedTo:null,sequence:0,customerReadSequence:0,adminReadSequence:0,customerUnread:0,adminUnread:0,lastMessageAt:new Date()}),supportMessage:delegate(messages),supportAttachment:delegate(attachments),user:delegate(userRows),order:{findFirst:async({where})=>where.id==='e'.repeat(24)&&where.userId===owner.id?{id:where.id}:null}};
- const stock=installStockDatabase(db,[],[conversations,messages,attachments]);
+ const notifications=installNotificationDatabase(db);
+ const stock=installStockDatabase(db,[],[conversations,messages,attachments,...notifications.maps]);
  const load=sourceLoader({'@/libs/supportStorage':{ensureSupportStorage:async()=>{}},'@/libs/prismadb':{__esModule:true,default:db},'@/actions/getCurrentUser':{getCurrentUser:async()=>state.user},'@/libs/authRateLimit':{checkAuthRateLimit:async()=>{state.rateCalls++;if(state.limited)throw new RateError();},AuthRateLimitError:RateError},'@/libs/storefrontProductNames':{getStorefrontProduct:async id=>id==='f'.repeat(24)?{id,name:'Current product name',variants:[{id:'1'.repeat(24),name:'Black 256GB'}]}:null},'next/server':{NextResponse:{json:Response.json}}});
  const service=load('libs/support.ts'),parse=load('utils/support.ts').parseSupportMessage;
  const input=(text='Hello support',extra={})=>parse({text,requestId:randomUUID(),...extra});
@@ -143,4 +146,26 @@ test('an unsent image draft does not create an inbox item until its first messag
  assert.equal((await f.service.getSupportInbox(f.admin,'OPEN',1)).total,0);
  await f.send(f.owner,'Here is the product photo',{attachmentId:image.id});
  const inbox=await f.service.getSupportInbox(f.admin,'UNASSIGNED',1);assert.equal(inbox.total,1);assert.equal(inbox.conversations[0].unread,1);
+});
+
+test('notification storage failure rolls back the support message and its unread state',async()=>{
+ const f=fixture();f.db.notification.create=async()=>{throw Error('Notification write failed');};
+ await assert.rejects(f.send());assert.equal(f.messages.size,0);assert.equal(f.conversations.size,0);assert.equal(await f.db.notificationEvent.count(),0);
+});
+
+test('opening or marking a notification does not change the chat read cursor',async()=>{
+ const f=fixture();await f.send();const notifications=f.load('libs/notifications.ts');const list=await notifications.getNotifications(f.admin.id,'ADMIN');assert.equal(list.unread,1);
+ await notifications.readNotifications(f.admin.id,'ADMIN',{id:list.items[0].id});assert.equal(f.conversations.get(f.owner.id).adminUnread,1);
+ await f.service.readSupportMessages(f.owner.id,f.admin,1);assert.equal((await notifications.getNotifications(f.admin2.id,'ADMIN')).unread,1);
+});
+
+test('an active administrator can recover an unavailable assignee, while another active handler stays protected',async()=>{
+ const f=fixture();await f.send();await f.action(f.admin,'CLAIM');
+ assert.equal((await f.service.getSupportThread(f.owner.id,f.admin2)).conversation.canClaim,false);
+ await assert.rejects(f.action(f.admin2,'CLAIM'),e=>e.status===409);
+ await f.db.user.update({where:{id:f.admin.id},data:{status:'BLOCKED'}});
+ assert.equal((await f.service.getSupportThread(f.owner.id,f.admin2)).conversation.canClaim,true);
+ await f.action(f.admin2,'CLAIM');assert.equal(f.conversations.get(f.owner.id).assignedTo,f.admin2.id);
+ await f.send(f.admin2,'The support team can continue this conversation.');
+ assert.equal((await f.service.getSupportThread(f.owner.id,f.owner)).messages.at(-1).text,'The support team can continue this conversation.');
 });

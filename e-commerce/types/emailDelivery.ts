@@ -1,0 +1,2 @@
+export interface EmailQueueItem { id: string; version: number; orderId: string; subject: string; state: string; resultCode: string | null; attempts: number; toEmail: string | null; createdAt: string; nextAttemptAt: string | null; }
+export interface EmailQueue { settings: { enabled: boolean; configured: boolean }; page: number; total: number; totalPages: number; job: { status: string; lastSucceededAt: string | null } | null; items: EmailQueueItem[]; }

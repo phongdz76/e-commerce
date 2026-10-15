@@ -36,6 +36,17 @@ async function verifySupportHttp({call,prisma,cookies,users,product,variant,orde
   let customer=await (await call('/api/support',{cookie:owner})).json();assert.equal(customer.conversation.unread,1);assert.equal(customer.messages.at(-1).label,'Support team');assert.doesNotMatch(JSON.stringify(customer),/authorId|fingerprint|assignedTo|qa-support-second/);
   assert.equal((await call('/api/support',json(owner,{action:'READ',sequence:3}))).status,200);assert.equal((await (await call('/api/support',{cookie:owner})).json()).conversation.unread,0);
   checks.push('two actual admin sessions compete for assignment; only the winner replies; unread/read state persists in both customer and admin APIs');
+  assert.equal((await call('/api/notifications')).status,401);
+  assert.equal((await call('/api/admin/notifications',{cookie:owner})).status,403);
+  const alerts=await (await call('/api/notifications',{cookie:owner})).json();assert.ok(alerts.unread>=1);assert.equal(alerts.items[0].href,'/support');assert.doesNotMatch(JSON.stringify(alerts),/recipientId|eventId|entityId|fingerprint/);
+  assert.equal((await call('/api/notifications',json(cookies[2],{action:'READ',id:alerts.items[0].id}))).status,404);
+  assert.equal((await call('/api/notifications',json(owner,{action:'READ_ALL',through:alerts.through,recipientId:users[2].id,audience:'ADMIN'}))).status,200);
+  assert.equal((await (await call('/api/notifications?filter=UNREAD',{cookie:owner})).json()).items.length,0);
+  assert.equal((await call('/api/notifications',json(owner,{action:'READ_ALL',through:999999}))).status,400);
+  const adminAlerts=await (await call('/api/admin/notifications',{cookie:admin})).json();assert.ok(adminAlerts.unread>=2);
+  assert.equal(await prisma.notification.count({where:{recipientId:users[0].id,audience:'ADMIN',kind:'SUPPORT_MESSAGE'}}),2);
+  assert.equal(await prisma.notificationEvent.count({where:{kind:'SUPPORT_MESSAGE'}}),3); // Six retries of the first send still produce one event.
+  checks.push('persisted customer/admin chat notifications enforce audience and ownership; read-all is bounded and message retries do not duplicate events');
   // Additional old history is a fixture, keeping the real per-minute send limit intact.
   await prisma.supportMessage.createMany({data:Array.from({length:23},(_,i)=>({id:'history-'+randomUUID(),conversationId:users[1].id,authorId:users[1].id,senderRole:'CUSTOMER',sequence:i+4,text:'Earlier QA question '+(i+1),fingerprint:'qa-history-'+i}))});
   await prisma.supportConversation.update({where:{id:users[1].id},data:{sequence:26,adminUnread:23,lastMessageAt:new Date()}});

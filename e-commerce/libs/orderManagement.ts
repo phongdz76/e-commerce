@@ -5,6 +5,8 @@ import { CheckoutRequestError } from "@/libs/checkoutErrors";
 import { releaseOrderStock, withStockTransaction } from "@/libs/orderStock";
 import { orderBusinessState, orderReference, type OrderManagementInput } from "@/utils/orderManagement";
 import type { OrderActivity, OrderManagementAction, OrderManagementView } from "@/types/orderManagement";
+import { ensureNotificationStorage } from "@/libs/notificationStorage";
+import { notifyOrderEvent } from "@/libs/orderNotifications";
 
 export const ORDER_ACTIVITY_ACTIONS = ["ORDER_CONFIRMED", "ORDER_REJECTED", "ORDER_DELIVERY_UPDATED", "ORDER_NOTE_PUBLIC", "ORDER_NOTE_INTERNAL", "ORDER_CANCELLED", "REFUND_REQUESTED", "REFUND_APPROVED", "REFUND_DECLINED", "REFUND_SUCCEEDED"];
 const titles: Record<string, string> = {
@@ -46,6 +48,7 @@ export function availableOrderActions(order: Order): { actions: OrderManagementA
 export async function updateOrderManagement(orderId: string, actorId: string, input: OrderManagementInput) {
   const id = createHash("sha256").update(JSON.stringify(["order-management", orderId, actorId, input.requestId])).digest("hex").slice(0, 24);
   const fingerprint = createHash("sha256").update(JSON.stringify(input)).digest("hex");
+  await ensureNotificationStorage();
   return withStockTransaction(async tx => {
     const saved = await tx.auditLog.findUnique({ where: { id } });
     if (saved) {
@@ -89,6 +92,7 @@ export async function updateOrderManagement(orderId: string, actorId: string, in
       ...(input.action === "NOTE" && "note" in input ? { note: input.note } : {}),
       ...(input.action === "DELIVERY" && "delivery" in input ? { before: { recipientName: order.recipientName, recipientPhone: order.recipientPhone, address: order.address }, after: input.delivery } : {}),
     } } });
+    if (action !== "ORDER_NOTE_INTERNAL") await notifyOrderEvent(tx, order, action, id, { actorId });
     return { success: true, replayed: false };
   });
 }

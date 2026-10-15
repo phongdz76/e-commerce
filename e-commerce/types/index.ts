@@ -104,6 +104,7 @@ export interface AdminSalesProduct {
 }
 
 export interface AdminOrderDetail extends AdminOrderSummary {
+  servicePolicies?: import("./customerService").ServicePolicySnapshot | null;
   totals?: import("./checkout").CheckoutTotals | null;
   address: {
     line1: string;

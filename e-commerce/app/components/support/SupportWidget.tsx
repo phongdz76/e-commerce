@@ -2,13 +2,13 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
-import { FiArrowUpRight, FiMail, FiPhone, FiSend, FiX } from "react-icons/fi";
+import { FiArrowUpRight, FiSend, FiX } from "react-icons/fi";
 import { IoChatbubbleEllipsesSharp } from "react-icons/io5";
 import { SiZalo } from "react-icons/si";
-
-interface SupportWidgetProps {
-  zaloUrl?: string;
-}
+import SupportChatPanel from "./SupportChatPanel";
+import ServiceContact from "./ServiceContact";
+import { useCustomerService } from "@/app/providers/CustomerServiceProvider";
+import { findServiceFaq } from "@/utils/customerService";
 
 interface ChatMessage {
   id: number;
@@ -16,55 +16,6 @@ interface ChatMessage {
   text: string;
   link?: { href: string; label: string };
 }
-
-const topics = [
-  {
-    label: "Find a product",
-    keywords: [
-      "product",
-      "shop",
-      "buy",
-      "price",
-      "phone",
-      "laptop",
-      "san pham",
-      "mua",
-      "gia",
-    ],
-    answer:
-      "Search by product or brand in the header, or browse the shop and filter by category and brand.",
-    link: { href: "/products", label: "Browse products" },
-  },
-  {
-    label: "Track my order",
-    keywords: ["order", "track", "status", "don hang", "theo doi"],
-    answer:
-      "Sign in and open Your Orders to see your purchases. Select an order to view its payment and delivery status.",
-    link: { href: "/orders", label: "View my orders" },
-  },
-  {
-    label: "Shipping & delivery",
-    keywords: ["shipping", "delivery", "ship", "giao hang", "van chuyen"],
-    answer:
-      "Enter your full address and phone number at checkout. Contact SGTech to confirm delivery availability, fees and timing for your address.",
-    link: { href: "/help/shipping", label: "Delivery information" },
-  },
-  {
-    label: "Returns & exchanges",
-    keywords: [
-      "return",
-      "exchange",
-      "refund",
-      "doi tra",
-      "hoan tien",
-      "bao hanh",
-      "warranty",
-    ],
-    answer:
-      "Contact SGTech with your order ID, product name and the issue. Our team can confirm the next steps before you send an item back.",
-    link: { href: "/help/returns", label: "Returns & exchanges" },
-  },
-];
 
 const greeting: ChatMessage = {
   id: 0,
@@ -75,9 +26,13 @@ const greeting: ChatMessage = {
 const focusStyle =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600";
 
-export default function SupportWidget({ zaloUrl }: SupportWidgetProps) {
+export default function SupportWidget() {
+  const { publication, error: serviceError, loading: serviceLoading } = useCustomerService();
+  const zaloUrl = serviceError ? undefined : publication?.content.contact.zaloUrl || undefined;
+  const topics = serviceError ? [] : (publication?.content.faq.items || []).map(item => ({ ...item, label: item.question }));
   const panelId = useId();
-  const [channel, setChannel] = useState<"chat" | "zalo" | null>(null);
+  const [channel, setChannel] = useState<"chat" | "team" | "zalo" | null>(null);
+  const [teamVisited, setTeamVisited] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([greeting]);
   const [draft, setDraft] = useState("");
   const isZaloDemo = channel === "zalo" && !zaloUrl;
@@ -118,20 +73,7 @@ export default function SupportWidget({ zaloUrl }: SupportWidgetProps) {
     if (!text) {
       return;
     }
-    const normalized = text
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/đ/gi, "d")
-      .toLowerCase();
-    const topic =
-      topics.find((item) => normalized === item.label.toLowerCase()) ??
-      [...topics]
-        .reverse()
-        .find((item) =>
-          item.keywords.some((keyword) =>
-            new RegExp(`(^|[^a-z])${keyword}($|[^a-z])`).test(normalized),
-          ),
-        );
+    const topic = !serviceError && !serviceLoading && publication ? findServiceFaq(publication.content.faq.items, text) : null;
     const userId = nextId.current++;
     const replyId = nextId.current++;
     setMessages((current) => [
@@ -142,8 +84,8 @@ export default function SupportWidget({ zaloUrl }: SupportWidgetProps) {
         role: "assistant",
         text:
           topic?.answer ??
-          "For help with a specific product or order, please contact our team by phone or email. You can also find answers in our help center.",
-        link: topic?.link ?? { href: "/help/contact", label: "Contact SGTech" },
+          "I could not match a saved quick answer. Open the help center or send a support request for the team to review.",
+        link: topic?.href ? { href: topic.href, label: "More information" } : { href: "/support/requests/new", label: "Create support request" },
       },
     ]);
     setDraft("");
@@ -160,8 +102,9 @@ export default function SupportWidget({ zaloUrl }: SupportWidgetProps) {
         }
       }}
     >
-      {channel && (
+      {(channel || teamVisited) && (
         <section
+          style={!channel ? { display: "none" } : undefined}
           ref={panel}
           id={panelId}
           role="dialog"
@@ -202,7 +145,7 @@ export default function SupportWidget({ zaloUrl }: SupportWidgetProps) {
 
           <nav
             aria-label="Support channels"
-            className="grid shrink-0 grid-cols-2 border-b border-slate-100 px-4"
+            className="grid shrink-0 grid-cols-3 border-b border-slate-100 px-3"
           >
             <button
               type="button"
@@ -212,6 +155,7 @@ export default function SupportWidget({ zaloUrl }: SupportWidgetProps) {
             >
               Quick answers
             </button>
+            <button type="button" aria-pressed={channel === "team"} onClick={() => { setTeamVisited(true); setChannel("team"); }} className={`min-h-12 border-b-2 px-1 text-sm ${focusStyle} ${channel === "team" ? "border-teal-600 font-bold text-teal-700" : "border-transparent text-slate-500"}`}>Support team</button>
             <button
               type="button"
               aria-pressed={channel === "zalo"}
@@ -227,6 +171,7 @@ export default function SupportWidget({ zaloUrl }: SupportWidgetProps) {
             </button>
           </nav>
 
+          {teamVisited && <div style={channel !== "team" ? { display: "none" } : undefined} className="min-h-0 overflow-y-auto"><SupportChatPanel enabled={channel === "team"} /></div>}
           {channel === "chat" || isZaloDemo ? (
             <>
               <div
@@ -246,7 +191,7 @@ export default function SupportWidget({ zaloUrl }: SupportWidgetProps) {
                 >
                   {isZaloDemo
                     ? "Demo · Messages are not sent to Zalo."
-                    : "Automated answers · For personal help, contact our team."}
+                    : serviceError ? "Quick answers are temporarily unavailable. You can still message the team." : publication?.isDemo ? "Demo quick answers · Store policies have not been published." : "Automated answers from the published FAQ · For personal help, contact our team."}
                 </p>
                 <div className="space-y-3">
                   {messages.map((message) => (
@@ -336,7 +281,7 @@ export default function SupportWidget({ zaloUrl }: SupportWidgetProps) {
                 </form>
               </div>
             </>
-          ) : (
+          ) : channel === "zalo" ? (
             <div className="min-h-0 overflow-y-auto px-6 py-7 text-center">
               <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
                 <SiZalo size={42} aria-hidden="true" />
@@ -358,24 +303,9 @@ export default function SupportWidget({ zaloUrl }: SupportWidgetProps) {
                 <span className="sr-only"> (opens in a new tab)</span>
               </a>
             </div>
-          )}
+          ) : null}
 
-          <div className="grid shrink-0 grid-cols-2 border-t border-slate-100 bg-white px-4 py-2">
-            <a
-              href="tel:19002004"
-              className={`flex min-h-11 items-center justify-center gap-2 rounded-lg text-xs text-slate-600 transition hover:bg-slate-50 hover:text-teal-700 ${focusStyle}`}
-            >
-              <FiPhone size={15} aria-hidden="true" />
-              Call us
-            </a>
-            <a
-              href="mailto:sgtech@gmail.com"
-              className={`flex min-h-11 items-center justify-center gap-2 rounded-lg text-xs text-slate-600 transition hover:bg-slate-50 hover:text-teal-700 ${focusStyle}`}
-            >
-              <FiMail size={15} aria-hidden="true" />
-              Email us
-            </a>
-          </div>
+          <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-2"><ServiceContact compact /></div>
         </section>
       )}
 
@@ -399,16 +329,16 @@ export default function SupportWidget({ zaloUrl }: SupportWidgetProps) {
           type="button"
           title="Chat"
           aria-label={
-            channel === "chat" ? "Close quick help" : "Open quick help"
+            channel === "chat" || channel === "team" ? "Close quick help" : "Open quick help"
           }
-          aria-expanded={channel === "chat"}
+          aria-expanded={channel === "chat" || channel === "team"}
           aria-controls={channel ? panelId : undefined}
           onClick={() =>
-            setChannel((current) => (current === "chat" ? null : "chat"))
+            setChannel((current) => (current === "chat" || current === "team" ? null : "chat"))
           }
           className={`flex h-12 w-12 items-center justify-center rounded-full bg-[#00b7bd] text-white shadow-sm transition-colors hover:bg-[#009ea4] ${focusStyle}`}
         >
-          {channel === "chat" ? (
+          {channel === "chat" || channel === "team" ? (
             <FiX size={23} aria-hidden="true" />
           ) : (
             <IoChatbubbleEllipsesSharp size={25} aria-hidden="true" />

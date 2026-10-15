@@ -21,6 +21,7 @@ function fixture() {
     beforeWrite: null,
     order: {
       id: "a".repeat(24), amount: 1000000, currency: "vnd", status: "pending",
+      userId: "c".repeat(24),
       paymentMethod: "COD", deliveryStatus: "delivered", codPaymentInfo: null,
       createDate: new Date(now - 2 * 86400000),
       products: [{ id: "c".repeat(24), price: 1000000, quantity: 1, name: "Saved product" }],
@@ -50,7 +51,6 @@ function fixture() {
         if (!fieldsMatch || !versionMatch) return { count: 0 };
         writes.push(structuredClone({ where, data }));
         Object.assign(order, structuredClone({ ...data, codPaymentInfo: data.codPaymentInfo.set }));
-        if (state.ambiguousWrite) throw new Error("private-write-timeout-after-commit");
         return { count: 1 };
       },
     },
@@ -66,6 +66,20 @@ function fixture() {
         Object.assign(audits.find((log) => log.id === where.id), data);
       },
     },
+  };
+  const notificationRows = require('./fixtures/notification-db.cjs').installNotificationDatabase(prisma);
+  prisma.$runCommandRaw = async () => ({ok:1});
+  prisma.user = {findMany:async()=>[]};
+  let transactionQueue=Promise.resolve();
+  prisma.$transaction=operation=>{
+    const next=transactionQueue.then(async()=>{
+      const previous=structuredClone(state.order), snapshots=notificationRows.maps.map(map=>structuredClone(map));
+      let result;
+      try{result=await operation(prisma);}catch(error){state.order=previous;notificationRows.maps.forEach((map,i)=>{map.clear();for(const [id,row]of snapshots[i])map.set(id,row);});throw error;}
+      // Simulate an unknown commit result only after all receipt/notification writes committed.
+      if(state.ambiguousWrite)throw new Error('private-write-timeout-after-commit');
+      return result;
+    });transactionQueue=next.catch(()=>{});return next;
   };
   const mocks = {
     "@/libs/prismadb": { __esModule: true, default: prisma },

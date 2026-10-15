@@ -16,6 +16,7 @@ import { getCustomerDeliveryInfo, normalizeCustomerDeliveryStatus } from "@/util
 import ShipmentTracking from "./ShipmentTracking";
 import OrderStock from "./OrderStock";
 import OrderTotalsBreakdown from "@/app/components/orders/OrderTotalsBreakdown";
+import OrderPolicySnapshot from "@/app/components/orders/OrderPolicySnapshot";
 import OrderActivityPanel from "@/app/components/orders/OrderActivityPanel";
 import OrderRefundPanel from "@/app/components/orders/OrderRefundPanel";
 import type { CheckoutTotals } from "@/types/checkout";
@@ -46,6 +47,7 @@ interface OrderAddress {
 }
 
 interface OrderDetail {
+  servicePolicies?: unknown;
   orderVersion?: number;
   totals?: CheckoutTotals | null;
   id: string;
@@ -430,6 +432,7 @@ export default function OrderDetailClient({
 
             {/* Total row */}
             <div className="border-t border-slate-200 px-5 py-4"><OrderTotalsBreakdown totals={order.totals} /></div>
+            <div className="border-t border-slate-200 px-5 py-4"><OrderPolicySnapshot value={order.servicePolicies} /></div>
             <div className="flex items-center justify-between px-5 py-4 border-t border-slate-200 bg-slate-50/50">
               <span className="text-sm font-medium text-slate-600">Total</span>
               <span className="text-lg font-bold text-slate-800">

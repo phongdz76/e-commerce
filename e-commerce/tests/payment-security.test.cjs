@@ -5,6 +5,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const ts = require("typescript");
 const { createHmac } = require("node:crypto");
+const { installStockDatabase } = require("./fixtures/stock-db.cjs");
 
 Object.assign(process.env, {
   VNP_TMNCODE: "FIXTURE1",
@@ -174,6 +175,7 @@ function fixture(method) {
         ),
     },
   };
+  installStockDatabase(prisma, [], [rows, attempts, exceptions]);
   class NextResponse extends Response {
     static redirect(url) {
       return new Response(null, {

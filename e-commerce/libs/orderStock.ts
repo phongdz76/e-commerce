@@ -5,6 +5,8 @@ import type { CartProductProps } from "@/app/product/[productId]/ProductDetails"
 import { CheckoutRequestError } from "@/libs/checkoutErrors";
 import { readInventoryBalance, MAX_STOCK_QUANTITY } from "@/utils/adminInventory";
 import { getMomoPaymentStatus } from "@/libs/momo";
+import { ensureNotificationStorage } from "@/libs/notificationStorage";
+import { notifyOrderEvent } from "@/libs/orderNotifications";
 
 const stockError = () => new CheckoutRequestError("This option was just sold or reserved by another customer. Review your cart before trying again.", 409, "STOCK_UNAVAILABLE");
 const movementId = (orderId: string, variantId: string, action: string, version: number) => createHash("sha256").update(JSON.stringify([orderId, variantId, action, version])).digest("hex").slice(0, 24);
@@ -15,6 +17,9 @@ export async function withStockTransaction<T>(operation: (tx: Prisma.Transaction
     catch (error) {
       const code = error && typeof error === "object" && "code" in error ? error.code : null;
       if (!["P2034", "P2002"].includes(String(code)) || attempt >= 3) throw error;
+      // Event fanout extends a successful transaction. Give its confirmed-conflict
+      // contender time to commit before the next attempt; never retry uncertain outcomes.
+      await new Promise(resolve => setTimeout(resolve, 100 * 2 ** attempt + Math.floor(Math.random() * 50)));
     }
   }
 }
@@ -117,6 +122,7 @@ export async function reviewPaidReleasedStock(orderId: string) {
 }
 
 export async function cancelUnpaidCodStock(orderId: string, actorId: string, version: number, reason: string, options: { ownerId?: string; requireExpired?: boolean; system?: boolean } = {}) {
+  await ensureNotificationStorage();
   return withStockTransaction(async (tx) => {
     const order = await tx.order.findUnique({ where: { id: orderId } });
     if (!order) throw new CheckoutRequestError("Order not found", 404, "ORDER_NOT_FOUND");
@@ -133,6 +139,7 @@ export async function cancelUnpaidCodStock(orderId: string, actorId: string, ver
     if (changed.count !== 1) throw Object.assign(new Error("Order changed"), { code: "P2034" });
     await tx.paymentAttempt.updateMany({ where: { orderId, state: "COD_PENDING" }, data: { state: "ABANDONED", nextCheckAt: null } });
     await tx.auditLog.create({ data: { id: movementId(order.id, order.id, "ORDER_CANCELLED", version), actorId, entityType: "ORDER", entityId: orderId, action: "ORDER_CANCELLED", status: "SUCCEEDED", details: { reason, source: options.system ? "SYSTEM" : "ACCOUNT" } } });
+    await notifyOrderEvent(tx, order, "ORDER_CANCELLED", "once", { actorId });
   });
 }
 

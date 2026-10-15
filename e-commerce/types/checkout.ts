@@ -33,6 +33,7 @@ export interface CheckoutTotals {
 }
 
 export interface CheckoutQuote {
+  servicePolicy?: { id: string; revision: number; publishedAt: string } | null;
   token: string;
   expiresAt: string;
   totals: CheckoutTotals;

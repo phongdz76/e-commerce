@@ -89,6 +89,66 @@ async function verifySupportBrowser({page,origin,artifactDirectory,checks,fixtur
     await click(customer,'Reopen conversation');await customer.wait(ready);
     assert.equal(await customer.evaluate("document.querySelector('[aria-label=\"Saved support messages\"]').innerText.includes('Browser support admin replies to the saved question.')"),true);
     assert.deepEqual(exceptions,[]);checks.push({adminCloseAndCustomerReopen:true,historyRetainedAfterReopen:true});
+    stage='saved notifications in customer and administrator sessions';
+    await navigate(customer,'/notifications',"document.body.innerText.includes('Your notifications') && !!document.querySelector('[aria-label=\"Saved notifications\"]')");
+    for(const width of [320,1440]){
+      await customer.send('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false});
+      assert.equal(await customer.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true);
+      const capture=await customer.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});fs.writeFileSync(path.join(artifactDirectory,`p1-notifications-customer-${width}.png`),Buffer.from(capture.data,'base64'));
+      await customer.evaluate("document.querySelector('button[aria-label^=\"Notifications,\"]').click()");
+      await customer.wait("!!document.querySelector('[aria-label=\"Notification panel\"] [aria-label=\"Saved notifications\"]')");
+      assert.equal(await customer.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true);
+      const popup=await customer.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});fs.writeFileSync(path.join(artifactDirectory,`p1-notification-bell-${width}.png`),Buffer.from(popup.data,'base64'));
+      await customer.evaluate("document.querySelector('[aria-label=\"Close notifications\"]').click()");
+    }
+    const unreadBefore=await customer.evaluate("document.querySelector('main').innerText.match(/\\d+ unread notifications?/)[0]");
+    let failRead=true;const readAttempts=[];
+    customer.listeners.set('Fetch.requestPaused',({requestId,request})=>{
+      const body=request.postData?JSON.parse(request.postData):null;
+      if(request.method==='POST'&&body?.action==='READ_ALL'){readAttempts.push(body);if(failRead){failRead=false;void customer.send('Fetch.fulfillRequest',{requestId,responseCode:503,responseHeaders:[{name:'Content-Type',value:'application/json'}],body:Buffer.from(JSON.stringify({error:'QA notification outage'})).toString('base64')});return;}}
+      void customer.send('Fetch.continueRequest',{requestId});
+    });
+    await customer.send('Fetch.enable',{patterns:[{urlPattern:origin+'/api/notifications*'}]});
+    await click(customer,'Mark all as read');await customer.wait("document.querySelector('[role=alert]')?.innerText.includes('Unable to mark notifications')");
+    assert.equal(await customer.evaluate("document.querySelector('main').innerText.match(/\\d+ unread notifications?/)[0]"),unreadBefore);
+    await click(customer,'Mark all as read');await customer.wait("document.querySelector('main')?.innerText.includes('0 unread notifications') && !!document.querySelector('button[aria-label=\"Notifications, 0 unread\"]')");
+    assert.equal(readAttempts.length,2);assert.equal(readAttempts[0].through,readAttempts[1].through);await customer.send('Fetch.disable');
+    await customer.send('Page.reload');await customer.wait("document.querySelector('main')?.innerText.includes('0 unread notifications')");
+    await navigate(page,'/admin/notifications',"document.body.innerText.includes('Team notifications') && !!document.querySelector('[aria-label=\"Saved notifications\"]')");
+    for(const width of [320,1440]){
+      await page.send('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false});
+      assert.equal(await page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true);
+      const capture=await page.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});fs.writeFileSync(path.join(artifactDirectory,`p1-notifications-admin-${width}.png`),Buffer.from(capture.data,'base64'));
+    }
+    await page.evaluate("document.querySelector('[aria-label=\"Saved notifications\"] li button').click()");await page.wait(`location.pathname==='/admin/support/${fixture.conversationId}' && ${ready}`);
+    checks.push({notificationPagesFitMobileAndDesktop:true,bellPopoverFits:true,failedReadKeepsUnreadAndCanRetry:true,headerBadgeUpdatesAfterRead:true,readAllSurvivesReload:true,notificationOpensCorrectAdminConversation:true});
+    stage='admin email queue with sending disabled';
+    await navigate(page,'/admin/notifications/email',"!!document.querySelector('[aria-label=\"Email deliveries\"] li') && document.body.innerText.includes('Event emails are disabled')");
+    for(const width of [320,1440]){
+      await page.send('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false});
+      assert.equal(await page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true);
+      assert.equal(await page.evaluate("!!document.querySelector('[aria-label=\"Email deliveries\"] li') && !document.querySelector('[aria-label=\"Email deliveries\"]').innerText.includes('Accepted by email server')"),true);
+      const capture=await page.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});fs.writeFileSync(path.join(artifactDirectory,`p1-email-queue-${width}.png`),Buffer.from(capture.data,'base64'));
+    }
+    await page.evaluate("(()=>{const select=document.querySelector('[aria-label=\"Email delivery filter\"]');const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set;setter.call(select,'FAILED');select.dispatchEvent(new Event('change',{bubbles:true}));})()");
+    await page.wait("document.body.innerText.includes('No email deliveries match this filter.')");
+    await page.evaluate("(()=>{const select=document.querySelector('[aria-label=\"Email delivery filter\"]');const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set;setter.call(select,'ALL');select.dispatchEvent(new Event('change',{bubbles:true}));})()");
+    await page.wait("!!document.querySelector('[aria-label=\"Email deliveries\"] li')");
+    checks.push({emailQueueFitsMobileAndDesktop:true,disabledSenderExplained:true,pendingNotClaimedAsDelivered:true,emailStateFilterRoundTrip:true});
+    stage='real support widget keeps a draft while closed and stops message polling';
+    await navigate(customer,'/product/'+fixture.productId+'?variant='+fixture.variantId,"!!document.querySelector('[aria-label=\"Open quick help\"]')&&!!document.querySelector('[aria-label=\"Store contact details\"]')");
+    await customer.evaluate("document.querySelector('[aria-label=\"Open quick help\"]').click()");await click(customer,'Support team');await customer.wait(ready);
+    await fill(customer,'Widget question saved after reopening.');
+    await customer.evaluate("document.querySelector('[aria-label=\"Close support\"]').click()");
+    let closedRequests=0;customer.listeners.set('Network.requestWillBeSent',event=>{if(new URL(event.request.url).pathname==='/api/support'&&event.request.method==='GET')closedRequests++;});
+    await new Promise(resolve=>setTimeout(resolve,11500));assert.equal(closedRequests,0);customer.listeners.delete('Network.requestWillBeSent');
+    await customer.evaluate("document.querySelector('[aria-label=\"Open quick help\"]').click()");await click(customer,'Support team');
+    await customer.wait("document.querySelector('[aria-label=\"Support message\"]')?.value==='Widget question saved after reopening.'");
+    await click(customer,'Send message');await customer.wait("document.querySelector('[aria-label=\"Support message\"]')?.value==='' && document.querySelector('[aria-label=\"Saved support messages\"]')?.textContent.includes('Widget question saved after reopening.')");
+    assert.equal(await customer.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true);
+    for(const width of [320,1440]){await customer.send('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false});assert.equal(await customer.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),true);const capture=await customer.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});fs.writeFileSync(path.join(artifactDirectory,`p1-live-support-widget-${width}.png`),Buffer.from(capture.data,'base64'));}
+    checks.push({realSupportInsideWidget:true,closedWidgetKeepsDraft:true,closedWidgetStopsMessagePolling:true,widgetSendPersists:true});
+    assert.deepEqual(exceptions,[]);
   }catch(error){
     console.error('Support browser QA failed at:',stage);
     for(const [client,name,endpoint]of [[customer,'customer','/api/support'],[page,'admin','/api/admin/support/'+fixture.conversationId]])if(client){

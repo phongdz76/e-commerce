@@ -21,6 +21,7 @@ export interface SupportThread {
     status: string;
     version: number;
     assigned: boolean;
+    canClaim?: boolean;
     assignedTo?: { id: string; name: string } | null;
     unread: number;
     lastSequence: number;

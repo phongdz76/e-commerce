@@ -35,6 +35,7 @@ async function main() {
     await prisma.shippingPolicy.create({ data: { id: "default", version: 1, label: "QA stock pricing", enabled: true, fee: 0, freeShippingThreshold: null, nationwide: true, provinceCodes: [] } });
     await prisma.$runCommandRaw({ createIndexes: "Order", indexes: [{ key: { paymentIntentId: 1 }, name: "Order_paymentIntentId_key", unique: true }] });
     const users = await Promise.all([0, 1].map((index) => prisma.user.create({ data: { name: "Stock QA " + index, email: "stock-qa-" + index + "@example.invalid" } })));
+    await prisma.user.create({data:{name:'Stock notification QA admin',email:'stock-admin@example.invalid',role:'ADMIN',status:'ACTIVE'}});
     const category = await prisma.category.create({ data: { name: "Phone", slug: "stock-qa" } });
     const brand = await prisma.brand.create({ data: { name: "QA", slug: "stock-qa" } });
     const product = await prisma.product.create({ data: { name: "Stock QA phone", slug: "stock-qa", description: "Temporary concurrency test product", status: "ACTIVE", categoryId: category.id, brandId: brand.id } });
@@ -59,11 +60,13 @@ async function main() {
       const winners = contenders.filter((result) => result.status === "fulfilled");
       const losers = contenders.filter((result) => result.status === "rejected");
       assert.equal(winners.length, 1); assert.equal(losers.length, 1); assert.equal(losers[0].reason.code, "STOCK_UNAVAILABLE");
+      assert.equal(await prisma.notificationEvent.count({where:{entityId:winners[0].value.order.id,kind:'ORDER_CREATED'}}),1);
+      assert.equal(await prisma.notification.count({where:{entityId:winners[0].value.order.id,kind:'ORDER_CREATED'}}),2);
       const balance = await prisma.productVariant.findUnique({ where: { id: variant.id } });
       assert.equal(balance.inventory.onHand, 1); assert.equal(balance.inventory.reserved, 1);
       await clearHold(winners[0].value.order);
     }
-    checks.push("ten simultaneous last-unit races: exactly one winner each");
+    checks.push("ten simultaneous last-unit races with active-admin notification fanout: exactly one winner, one stock conflict and one event each");
     const key = randomUUID();
     const duplicates = await Promise.all(Array.from({ length: 6 }, () => checkout.prepareCheckoutRequest(key, users[0].id, "COD", cart, delivery)));
     assert.equal(new Set(duplicates.map((result) => result.order.id)).size, 1);

@@ -19,6 +19,12 @@ function matches(row, where = {}) {
 }
 
 function installStockDatabase(prisma, products, maps = []) {
+  if (!prisma.customerServiceSettings) prisma.customerServiceSettings = {findUnique:async()=>null};
+  if (!prisma.customerServiceRevision) prisma.customerServiceRevision = {findUnique:async()=>null};
+  const notificationMaps = prisma.notificationEvent ? [] : require('./notification-db.cjs').installNotificationDatabase(prisma).maps;
+  if (!prisma.$runCommandRaw) prisma.$runCommandRaw = async () => ({ok:1});
+  if (!prisma.user) prisma.user = {};
+  if (!prisma.user.findMany) prisma.user.findMany = async () => [];
   const variants = new Map(products.flatMap((product) => product.images.map((image, index) => {
     const id = createHash("sha256").update(product.id + ":" + index).digest("hex").slice(0, 24);
     return [id, { id, productId: product.id, sku: "FIXTURE-" + id.slice(-12), name: image.color, price: product.price, currency: "vnd",
@@ -53,7 +59,7 @@ function installStockDatabase(prisma, products, maps = []) {
   prisma.$transaction = (operation) => {
     if (Array.isArray(operation)) return Promise.all(operation);
     const next = queue.then(async () => {
-      const all = [...maps, variants, audits];
+      const all = [...maps, variants, audits, ...notificationMaps];
       const snapshots = all.map((map) => structuredClone(map));
       try { return await operation(prisma); }
       catch (error) { all.forEach((map, index) => { map.clear(); for (const [id, value] of snapshots[index]) map.set(id, value); }); throw error; }

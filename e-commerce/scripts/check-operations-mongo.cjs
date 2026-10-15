@@ -77,6 +77,15 @@ async function main() {
       "SupportConversation",
       "SupportMessage",
       "SupportAttachment",
+      "NotificationEvent",
+      "NotificationInbox",
+      "Notification",
+      "NotificationDelivery",
+      "SupportTicket",
+      "SupportTicketNote",
+      "SupportSettings",
+      "CustomerServiceSettings",
+      "CustomerServiceRevision",
     ])
       await prisma.$runCommandRaw({ create: collection });
     await prisma.$runCommandRaw({
@@ -413,10 +422,25 @@ async function main() {
     assert.equal(operations.job.status, "SUCCEEDED");
     const backupMessageId = "backup-message-" + randomUUID();
     await load("libs/supportStorage.ts").ensureSupportStorage();
+    await load("libs/notificationStorage.ts").ensureNotificationStorage();
     const backupImageId = randomUUID().replaceAll("-", "").slice(0, 24);
     await prisma.supportConversation.create({ data: { id: actor.id, ownerId: actor.id, sequence: 1, adminUnread: 1, assignedTo: null } });
     await prisma.supportAttachment.create({ data: { id: backupImageId, conversationId: actor.id, uploadedBy: actor.id, contentType: "image/png", size: 8, bytes: new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]), fingerprint: "private-backup-fixture", messageId: backupMessageId } });
     await prisma.supportMessage.create({ data: { id: backupMessageId, conversationId: actor.id, authorId: actor.id, senderRole: "CUSTOMER", sequence: 1, text: "Private backup fixture message", fingerprint: "private-backup-fixture", attachmentId: backupImageId } });
+    await prisma.$transaction(tx => load("libs/notifications.ts").publishNotification(tx, { key: "backup-event", kind: "SUPPORT_MESSAGE", entityId: actor.id }, [{ id: actor.id, audience: "ADMIN", title: "Private notification fixture", href: "/admin/support/" + actor.id }]));
+    const backupNotification = await prisma.notification.findFirst({ where: { recipientId: actor.id } });
+    await load("libs/notifications.ts").readNotifications(actor.id, "ADMIN", { id: backupNotification.id });
+    await prisma.notificationDelivery.create({data:{id:'b'.repeat(64),eventId:backupNotification.eventId,recipientId:actor.id,orderId:backupNotification.entityId,subject:'Private queued email fixture',href:'/orders/'+backupNotification.entityId,amount:10000,currency:'vnd',state:'UNKNOWN',version:3,attempts:1,autoAttempts:1,toEmail:'qa-ops@example.invalid',resultCode:'SMTP_OUTCOME_UNCONFIRMED',nextAttemptAt:null,leaseToken:null,leaseExpiresAt:null,startedAt:new Date(),finishedAt:new Date()}});
+    await load('libs/supportTicketStorage.ts').ensureSupportTicketStorage();
+    await prisma.supportTicket.create({data:{id:actor.id,ownerId:actor.id,conversationId:actor.id,initialMessageId:backupMessageId,category:'GENERAL',subject:'Private backup support request',fingerprint:'qa-ticket-backup'}});
+    await prisma.supportTicketNote.create({data:{id:'c'.repeat(64),ticketId:actor.id,actorId:actor.id,text:'Private backup internal note',fingerprint:'qa-note-backup'}});
+    const schedule=load('utils/supportHours.ts').blankSupportSchedule();schedule.week[1].enabled=true;
+    await prisma.supportSettings.create({data:{id:'default',version:3,draft:{...schedule,message:'Private unpublished backup draft'},published:schedule,publishedAt:new Date()}});
+    await load('libs/customerServiceStorage.ts').ensureCustomerServiceStorage();
+    const serviceContent=load('utils/customerServiceStarter.ts').starterServiceContent(),serviceRevision=await prisma.customerServiceRevision.create({data:{id:'d'.repeat(24),revision:2,content:serviceContent,publishedBy:actor.id}});
+    await prisma.customerServiceSettings.create({data:{id:'default',version:3,draft:{...serviceContent,contact:{...serviceContent.contact,storeName:'Private unpublished draft'}},publishedRevisionId:serviceRevision.id}});
+    // Populate a saved policy snapshot only in this disposable BSON backup fixture.
+    await prisma.order.update({where:{id:expiredIds[0]},data:{servicePolicies:{id:serviceRevision.id,revision:2,publishedAt:serviceRevision.publishedAt.toISOString(),pages:{shipping:serviceContent.pages.shipping,returns:serviceContent.pages.returns,warranty:serviceContent.pages.warranty}}}});
     const backup = await verifyBackupRestore({
       sourceUrl: sourceUrl.toString(),
       targetUrl: restoreUrl.toString(),

@@ -15,11 +15,12 @@ function fixture() {
       updateMany: async ({ where, data }) => { let count = 0; for (const row of rows.values()) if (matches(row, where)) { Object.assign(row, structuredClone(data)); count++; } return { count }; } };
   }
   const db = { order: model(orders), checkoutRequest: model(requests), paymentAttempt: model(attempts), shippingPolicy: model(policies) };
+  const serviceSettings=new Map(),serviceRevisions=new Map();db.customerServiceSettings=model(serviceSettings);db.customerServiceRevision=model(serviceRevisions);
   const findPolicy = db.shippingPolicy.findUnique;
   db.shippingPolicy.findUnique = async value => { state.policyReads++; return findPolicy(value); };
   const product = { id, name: 'QA phone', description: 'QA', category: 'Phones', brand: 'QA', price: 100000, inStock: true,
     images: [{ color: 'Black', colorCode: '#000000', image: '/products/phone.webp' }] };
-  const stock = installStockDatabase(db, [product], [orders, requests, attempts, policies]);
+  const stock = installStockDatabase(db, [product], [orders, requests, attempts, policies,serviceSettings,serviceRevisions]);
   const variant = [...stock.variants.values()][0];
   const load = sourceLoader({ '@/libs/prismadb': { __esModule: true, default: db }, '@/actions/getCurrentUser': { getCurrentUser: async () => state.user }, 'next/server': { NextResponse: { json: Response.json } } });
   const items = load('libs/orderItems.ts'), service = load('libs/checkoutQuote.ts'), deliveryService = load('libs/orderDelivery.ts');
@@ -38,6 +39,18 @@ function expired(token) {
   const payload = Buffer.from(JSON.stringify(value)).toString('base64url');
   return payload + '.' + createHmac('sha256', process.env.NEXTAUTH_SECRET).update('sgtech-checkout-v1:' + payload).digest('base64url');
 }
+
+test('a policy published after a quote rejects new checkout before stock writes and cannot retrofit a saved replay',async()=>{
+ const f=fixture(),content=f.load('utils/customerServiceStarter.ts').starterServiceContent(),cart=await f.cart(),key=randomUUID();
+ const oldQuote=await f.service.createCheckoutQuote(userId,cart,f.delivery);
+ const first=await f.checkout(key,userId,'COD',cart,f.delivery,null,{},oldQuote.token);assert.equal(first.order.servicePolicies,undefined);
+ const revision={id:'9'.repeat(24),revision:2,publishedAt:new Date(),content,publishedBy:userId};await f.db.customerServiceRevision.create({data:revision});await f.db.customerServiceSettings.create({data:{id:'default',version:2,publishedRevisionId:revision.id}});
+ await assert.rejects(f.checkout(randomUUID(),userId,'COD',cart,f.delivery,null,{},oldQuote.token),e=>e.code==='QUOTE_SERVICE_CHANGED');assert.equal(f.orders.size,1);assert.equal(f.variant.inventory.reserved,1);
+ const replay=await f.checkout(key,userId,'COD',cart,f.delivery,null,{},oldQuote.token);assert.equal(replay.order.id,first.order.id);assert.equal(replay.order.servicePolicies,undefined);
+ const fresh=await f.service.createCheckoutQuote(userId,cart,f.delivery);assert.equal(fresh.servicePolicy.id,revision.id);await assert.rejects(f.checkout(key,userId,'COD',cart,f.delivery,null,{},fresh.token),e=>e.status===409);
+ const created=await f.checkout(randomUUID(),userId,'COD',cart,f.delivery,null,{},fresh.token);assert.equal(created.order.servicePolicies.id,revision.id);assert.deepEqual(created.order.servicePolicies.pages.returns,content.pages.returns);
+ revision.content.pages.returns.sections[0].text='Later edit in the test caller';assert.notEqual(f.orders.get(created.order.id).servicePolicies.pages.returns.sections[0].text,revision.content.pages.returns.sections[0].text);
+});
 
 test('chosen demo shipping policy charges 15000 below 300000 and is free at the threshold', () => {
   const { calculateCheckoutTotals, DEMO_SHIPPING_POLICY } = pure;

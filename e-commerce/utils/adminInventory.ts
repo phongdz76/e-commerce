@@ -8,7 +8,7 @@ export const INVENTORY_ACTION_LABELS: Record<InventoryAction, string> = {
   COUNT: "Physical recount",
 };
 export const INVENTORY_MOVEMENT_LABELS: Record<InventoryMovementAction, string> = {
-  ...INVENTORY_ACTION_LABELS, STOCK_RESERVED: "Order stock reserved", STOCK_RELEASED: "Order stock released", STOCK_DISPATCHED: "Order stock dispatched",
+  ...INVENTORY_ACTION_LABELS, STOCK_RESERVED: "Order stock reserved", STOCK_RELEASED: "Order stock released", STOCK_DISPATCHED: "Order stock dispatched", RETURN_RESTOCKED: "Inspected return restocked",
 };
 
 export function isInventoryQuantity(value: unknown): value is number {

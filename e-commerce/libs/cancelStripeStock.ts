@@ -4,6 +4,8 @@ import { getStripe } from "@/libs/stripe";
 import { syncStripeOrder } from "@/libs/syncStripeOrder";
 import { withStockTransaction } from "@/libs/orderStock";
 import { CheckoutRequestError } from "@/libs/checkoutErrors";
+import { ensureNotificationStorage } from "@/libs/notificationStorage";
+import { notifyOrderEvent } from "@/libs/orderNotifications";
 
 export async function cancelStripeStock(orderId: string, actorId: string, version: number, reason: string, ownerId?: string) {
   const order = await prisma.order.findUnique({ where: { id: orderId } });
@@ -23,6 +25,7 @@ export async function cancelStripeStock(orderId: string, actorId: string, versio
   }
   if (intent.status !== "canceled") throw new CheckoutRequestError("Payment is already being processed. Stock must remain reserved until it is verified.", 409, "ORDER_CANCEL_LOCKED");
   await syncStripeOrder(order);
+  await ensureNotificationStorage();
   await withStockTransaction(async (tx) => {
     const current = await tx.order.findUnique({ where: { id: order.id } });
     if (!current || (ownerId && current.userId !== ownerId) || current.paymentIntentId !== order.paymentIntentId ||
@@ -34,5 +37,6 @@ export async function cancelStripeStock(orderId: string, actorId: string, versio
     if (!changed.count) throw Object.assign(new Error("Order changed"), { code: "P2034" });
     await tx.auditLog.create({ data: { id: createHash("sha256").update("cancel-stripe:" + order.id).digest("hex").slice(0, 24), actorId,
       action: "ORDER_CANCELLED", entityType: "ORDER", entityId: order.id, status: "SUCCEEDED", details: { reason } } });
+    await notifyOrderEvent(tx, current, "ORDER_CANCELLED", "once", { actorId });
   });
 }

@@ -7,6 +7,7 @@ import CartProvider from "./providers/CartProvider";
 import { Toaster } from "react-hot-toast";
 import SupportWidget from "./components/support/SupportWidget";
 import StoreLayoutWrapper from "./components/layout/StoreLayoutWrapper";
+import CustomerServiceProvider from "./providers/CustomerServiceProvider";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -38,17 +39,17 @@ export default function RootLayout({
             },
           }}
         />
-        <CartProvider>
+        <CustomerServiceProvider><CartProvider>
           <StoreLayoutWrapper
             navbar={<NavBar />}
             footer={<Footer />}
             supportWidget={
-              <SupportWidget zaloUrl={process.env.NEXT_PUBLIC_ZALO_URL} />
+              <SupportWidget />
             }
           >
             {children}
           </StoreLayoutWrapper>
-        </CartProvider>
+        </CartProvider></CustomerServiceProvider>
       </body>
     </html>
   );

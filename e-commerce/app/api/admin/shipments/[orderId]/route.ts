@@ -7,6 +7,8 @@ import { startAdminAudit, finishAdminAudit } from "@/libs/adminAudit";
 import { consumeOrderStock, withStockTransaction } from "@/libs/orderStock";
 import { CheckoutRequestError } from "@/libs/checkoutErrors";
 import { orderManagementVersionWhere } from "@/libs/orderManagement";
+import { ensureNotificationStorage } from "@/libs/notificationStorage";
+import { notifyOrderEvent } from "@/libs/orderNotifications";
 import {
   SHIPMENT_TRANSITIONS,
   getShipmentInput,
@@ -283,6 +285,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
         },
       };
     }
+    await ensureNotificationStorage();
     const saveShipment = async (db: Prisma.TransactionClient) => {
     if (order.stockReservation || order.management || order.refundInfo) {
       const latest = await db.order.findUnique({ where: { id: order.id }, select: ORDER_SELECT });
@@ -309,9 +312,14 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       },
     });
     if (result.count !== 1) throw new CheckoutRequestError("Shipment changed. Refresh before trying again.", 409, "SHIPMENT_CHANGED");
+    if (input.deliveryStatus !== currentStatus || input.carrier !== before.carrier || input.trackingNumber !== before.trackingNumber) {
+      const updated = await db.order.findUnique({ where: { id: order.id } });
+      if (!updated) throw new Error("Shipment order disappeared");
+      await notifyOrderEvent(db, updated, "SHIPMENT_UPDATED", String(input.version + 1), { actorId: currentUser.id, deliveryStatus: input.deliveryStatus });
+    }
     return result;
     };
-    const result = order.stockReservation || order.management || order.refundInfo ? await withStockTransaction(saveShipment) : await saveShipment(prisma);
+    const result = await withStockTransaction(saveShipment);
     if (result.count !== 1) {
       await finishAdminAudit(audit.id, "FAILED");
       return NextResponse.json(

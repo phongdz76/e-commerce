@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { parseServicePolicySnapshot } from "@/utils/customerService";
 import { ADMIN_DELIVERY_FILTERS, ADMIN_ORDER_FILTERS, ADMIN_ORDER_METHODS } from "@/utils/adminOrders";
 import { isCatalogImageUrl } from "@/utils/catalogImage";
 import { orderBusinessState, orderIdFromReference, orderReference } from "@/utils/orderManagement";
@@ -7,6 +8,7 @@ export const ADMIN_ORDER_SELECT = {
   id: true,
   amount: true,
   totals: true,
+  servicePolicies: true,
   management: true,
   currency: true,
   status: true,
@@ -102,6 +104,7 @@ export function toAdminOrderDetail(order: AdminOrderRecord) {
   return {
     ...toAdminOrderSummary(order),
     totals: order.totals ? { ...order.totals, quotedAt: order.totals.quotedAt.toISOString() } : null,
+    servicePolicies: parseServicePolicySnapshot(order.servicePolicies),
     recipientPhone: order.recipientPhone,
     address: order.address ? {
       line1: order.address.line1,

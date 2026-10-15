@@ -1,0 +1,33 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const {randomUUID}=require('node:crypto');
+const {PrismaClient}=require('@prisma/client');
+const sourceLoader=require('../tests/fixtures/load-source.cjs');
+require('@next/env').loadEnvConfig(path.resolve(__dirname,'..'));
+async function main(){
+ const database='sgtech_content_qa_'+Date.now()+'_'+randomUUID().slice(0,6),connection=new URL(process.env.DATABASE_URL),application=connection.pathname;connection.pathname='/'+database;assert.notEqual(connection.pathname,application);assert.match(database,/^sgtech_content_qa_\d+_[a-f0-9]+$/);
+ const db=new PrismaClient({datasources:{db:{url:connection.toString()}}}),second=new PrismaClient({datasources:{db:{url:connection.toString()}}}),loader=client=>sourceLoader({'@/libs/prismadb':{__esModule:true,default:client}}),load=loader(db),otherLoad=loader(second),service=load('libs/customerService.ts'),otherService=otherLoad('libs/customerService.ts'),checks=[];
+ try{
+  const [admin,admin2]=await Promise.all([0,1].map(i=>db.user.create({data:{name:'CMS QA '+i,email:'cms-'+i+'@example.invalid',role:'ADMIN'}})));
+  assert.equal((await service.getServicePublication()).isDemo,true);assert.equal(await db.customerServiceSettings.count(),0);
+  const content=load('utils/customerServiceStarter.ts').starterServiceContent();content.contact.phone='0901234567';content.pages.returns.sections[0].text='QA first published instructions.';
+  const save={action:'SAVE',version:0,requestId:randomUUID(),content,revisionId:null};await Promise.all(Array.from({length:6},(_,i)=>(i%2?service:otherService).updateCustomerService(admin.id,save)));assert.equal((await service.getAdminCustomerService()).version,1);assert.equal((await service.getServicePublication()).isDemo,true);
+  checks.push('first-use collections and six two-client draft retries save once without publishing or exposing contact drafts');
+  const publish={action:'PUBLISH',version:1,requestId:randomUUID(),content:null,revisionId:null};await Promise.all(Array.from({length:6},(_,i)=>(i%2?service:otherService).updateCustomerService(admin.id,publish)));const first=await service.getServicePublication();assert.equal(first.revision,2);assert.equal(await db.customerServiceRevision.count(),1);assert.doesNotMatch(JSON.stringify(first),/publishedBy|fingerprint|draft/);
+  checks.push('six publication replays create one immutable public revision and one settings pointer/audit');
+  const quoteService=load('libs/checkoutQuote.ts'),cart={items:[{id:'1'.repeat(24),variantId:'2'.repeat(24),price:100000,quantity:1}],amount:100000},delivery={recipientName:'QA buyer',recipientPhone:'0901234567',address:{country:'VN',city:'QA city',line1:'QA address',postal_code:'',state:'',provinceCode:'79'}};
+  const oldQuote=await quoteService.createCheckoutQuote(admin.id,cart,delivery);assert.equal(oldQuote.servicePolicy.id,first.id);
+  const newer=structuredClone(content);newer.pages.returns.sections[0].text='QA second published instructions.';
+  const editors=await Promise.allSettled([admin,admin2].map(actor=>service.updateCustomerService(actor.id,{...save,version:2,requestId:randomUUID(),content:newer})));assert.equal(editors.filter(r=>r.status==='fulfilled').length,1);assert.equal(editors.filter(r=>r.status==='rejected'&&r.reason.status===409).length,1);assert.equal((await service.getServicePublication()).id,first.id);
+  await service.updateCustomerService(admin.id,{...publish,version:3,requestId:randomUUID()});assert.equal(await db.customerServiceRevision.count(),2);assert.deepEqual(await service.getServicePublication(first.id),first);
+  const verified=quoteService.verifyCheckoutQuote(oldQuote.token,admin.id,cart,delivery);await assert.rejects(db.$transaction(tx=>quoteService.validateNewCheckoutQuote(verified,cart,delivery,tx)),e=>e.code==='QUOTE_SERVICE_CHANGED');
+  checks.push('competing editors cannot overwrite a draft; publication invalidates the old signed quote while archived content stays unchanged');
+  const failedClient=db.$extends({query:{auditLog:{create:async()=>{throw Error('QA audit write interruption');}}}}),failedService=loader(failedClient)('libs/customerService.ts'),next={...publish,version:4,requestId:randomUUID()},before=await service.getServicePublication();
+  await assert.rejects(failedService.updateCustomerService(admin.id,next));assert.equal((await service.getAdminCustomerService()).version,4);assert.equal(await db.customerServiceRevision.count(),2);assert.deepEqual(await service.getServicePublication(),before);await service.updateCustomerService(admin.id,next);
+  checks.push('a failed publication audit rolls back the revision and pointer atomically; retry recovers without an orphan publication');
+  const latest=await service.getServicePublication();await service.updateCustomerService(admin.id,{action:'RESTORE',version:5,requestId:randomUUID(),content:null,revisionId:first.id});assert.equal((await service.getServicePublication()).id,latest.id);await service.updateCustomerService(admin.id,{...publish,version:6,requestId:randomUUID()});const restored=await service.getServicePublication();assert.notEqual(restored.id,first.id);assert.deepEqual(restored.content,first.content);
+  await db.customerServiceRevision.createMany({data:Array.from({length:21},(_,i)=>({id:require('node:crypto').createHash('sha256').update('qa-history-'+i).digest('hex').slice(0,24),revision:100+i,content,publishedBy:admin.id,publishedAt:new Date(946684800000+i*1000)}))});assert.equal((await service.getAdminCustomerService()).history.length,20);assert.equal((await service.getAdminCustomerService(2)).history.length,5);
+  checks.push('restoring old content changes only the draft until republished under a new identity; immutable publication history paginates correctly');
+  fs.mkdirSync(path.resolve(__dirname,'../.artifacts'),{recursive:true});fs.writeFileSync(path.resolve(__dirname,'../.artifacts/customer-service-mongo-results.json'),JSON.stringify({checks,applicationDatabaseWrites:0,providerNetworkCalls:0,externalEmails:0},null,2));console.log('Customer service MongoDB passed: '+checks.length+' groups.');
+ }finally{assert.equal(connection.pathname,'/'+database);assert.notEqual(connection.pathname,application);assert.match(database,/^sgtech_content_qa_\d+_[a-f0-9]+$/);await db.$runCommandRaw({dropDatabase:1});await Promise.all([db.$disconnect(),second.$disconnect()]);}
+}
+main().catch(error=>{console.error('Customer service MongoDB verification failed.',error instanceof assert.AssertionError?error.stack:{name:error.name,code:error.code});process.exitCode=1;});

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/libs/prismadb";
+import { updateOrderPayment } from "@/libs/updateOrderPayment";
 import { getZaloPayConfig, verifyZaloPayMac } from "@/libs/zalopay";
 import { reviewPaidReleasedStock } from "@/libs/orderStock";
 
@@ -67,7 +68,7 @@ export async function POST(request: Request) {
         return_message: "Payment does not match order",
       });
     }
-    await prisma.order.updateMany({
+    await updateOrderPayment({
       where: {
         id: order.id,
         paymentMethod: "ZALOPAY",

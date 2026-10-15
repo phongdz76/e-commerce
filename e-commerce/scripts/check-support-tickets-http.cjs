@@ -1,0 +1,37 @@
+const assert=require('node:assert/strict');
+const {randomUUID}=require('node:crypto');
+async function verifySupportTicketsHttp({call,prisma,cookies,users,product,variant,orderFixture,checks}){
+ const owner=cookies[2],admin=cookies[0],root='/api/support/requests';
+ const post=(cookie,body)=>({cookie,method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ assert.equal((await call(root)).status,401);assert.equal((await call('/api/admin/support-requests',{cookie:owner})).status,403);
+ const payload={requestId:randomUUID(),category:'WARRANTY',subject:'HTTP warranty request',description:'Please review the selected QA product for this request.',context:{kind:'PRODUCT',id:product.id,variantId:variant.id,title:'Forged ticket product',href:'https://bad.example'}};
+ assert.equal((await call(root,post(owner,{...payload,context:{kind:'ORDER',id:orderFixture.paidOrderId}}))).status,404);
+ const results=await Promise.all(Array.from({length:3},()=>call(root,post(owner,payload))));assert.ok(results.every(response=>response.status===200));const {id}=await results[0].json();
+ assert.equal(await prisma.supportTicket.count({where:{ownerId:users[2].id}}),1);assert.equal(await prisma.supportMessage.count({where:{conversationId:users[2].id}}),1);assert.equal(await prisma.notificationEvent.count({where:{entityId:id,kind:'TICKET_CREATED'}}),1);
+  const filtered=await(await call('/api/admin/support-requests?conversationId='+users[2].id,{cookie:admin})).json();assert.equal(filtered.total,1);assert.equal(filtered.items[0].id,id);
+  assert.equal((await call(root+'?conversationId='+users[2].id,{cookie:cookies[1]})).status,400);
+ assert.equal((await call(root+'/'+id,{cookie:cookies[1]})).status,404);const customer=await(await call(root+'/'+id,{cookie:owner})).json();assert.match(customer.ticket.context.title,new RegExp(product.name));assert.doesNotMatch(JSON.stringify(customer),/Forged ticket|bad\.example|fingerprint|actorId|notes/);
+ const conversation='/api/admin/support/'+users[2].id,current=await(await call(conversation,{cookie:admin})).json();assert.equal((await call(conversation,post(admin,{action:'CLAIM',version:current.conversation.version,requestId:randomUUID()}))).status,200);
+ const detail='/api/admin/support-requests/'+id;
+ const note={action:'NOTE',version:1,requestId:randomUUID(),text:'HTTP-PRIVATE-TICKET-NOTE'};
+ const before=await prisma.notificationEvent.count({where:{entityId:id}});for(let i=0;i<2;i++)assert.equal((await call(detail,post(admin,note))).status,200);
+ assert.equal(await prisma.supportTicketNote.count({where:{ticketId:id}}),1);assert.equal(await prisma.notificationEvent.count({where:{entityId:id}}),before);
+ assert.doesNotMatch(await(await call(root+'/'+id,{cookie:owner})).text(),/HTTP-PRIVATE|notes|fingerprint|actorId/);
+ assert.equal((await call(root+'/'+id,post(owner,{...note,version:2}))).status,403);
+ assert.equal((await call(detail,post(admin,{action:'RESOLVED',version:2,requestId:randomUUID()}))).status,200);
+ assert.equal((await call(root+'/'+id,post(owner,{action:'CLOSED',version:3,requestId:randomUUID()}))).status,200);
+ assert.equal((await call(root+'/'+id,post(owner,{action:'REOPEN',version:4,requestId:randomUUID()}))).status,200);
+ assert.equal((await prisma.supportTicket.findUnique({where:{id}})).state,'OPEN');assert.equal((await prisma.supportConversation.findUnique({where:{id:users[2].id}})).status,'OPEN');
+ checks.push('real ticket intake/context/ownership and replay create one initial message; private notes stay admin-only; resolve/close/reopen keeps the shared chat');
+ const settings='/api/admin/support-hours';assert.equal((await call(settings)).status,401);assert.equal((await call(settings,{cookie:owner})).status,403);
+ const unpublished=await(await call('/api/support/hours')).json();assert.equal(unpublished.status,'UNCONFIGURED');assert.equal(unpublished.schedule,null);
+ const schedule={timeZone:'Asia/Ho_Chi_Minh',message:'HTTP published support hours, replies when available.',week:Array.from({length:7},(_,day)=>({day,enabled:day>0&&day<6,start:'09:00',end:'17:00'}))};
+ const save={action:'SAVE',version:0,requestId:randomUUID(),schedule};for(let i=0;i<2;i++)assert.equal((await call(settings,post(admin,save))).status,200);
+ assert.equal((await(await call('/api/support/hours')).json()).schedule,null);
+ assert.equal((await call(settings,post(admin,{action:'PUBLISH',version:1,requestId:randomUUID()}))).status,200);
+ const published=await(await call('/api/support/hours')).json();assert.equal(published.schedule.message,schedule.message);assert.doesNotMatch(JSON.stringify(published),/draft|fingerprint|actorId/);
+ assert.equal((await call(settings,post(admin,{...save,version:1,requestId:randomUUID()}))).status,409);
+ checks.push('real anonymous hours API exposes publication only; administrator draft/save/publish is audited and stale editors cannot overwrite it');
+ return {ticketId:id,ownerId:users[2].id,ownerCookie:owner,adminCookie:admin,productId:product.id,variantId:variant.id};
+}
+module.exports={verifySupportTicketsHttp};

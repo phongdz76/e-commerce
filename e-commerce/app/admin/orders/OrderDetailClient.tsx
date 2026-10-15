@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import OrderTotalsBreakdown from "@/app/components/orders/OrderTotalsBreakdown";
+import OrderPolicySnapshot from "@/app/components/orders/OrderPolicySnapshot";
 import OrderActivityPanel from "@/app/components/orders/OrderActivityPanel";
 import OrderRefundPanel from "@/app/components/orders/OrderRefundPanel";
 import axios from "axios";
@@ -269,6 +270,7 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
                       Total order value
                     </span>
                     <OrderTotalsBreakdown totals={order.totals} />
+                    <OrderPolicySnapshot value={order.servicePolicies} />
                     <span className="break-words text-2xl sm:text-3xl font-extrabold text-emerald-950 tracking-tight">
                       {formatAdminOrderAmount(order.amount, order.currency)}
                     </span>

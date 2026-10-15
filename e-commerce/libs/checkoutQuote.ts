@@ -6,12 +6,13 @@ import { getOrderDelivery } from "@/libs/orderDelivery";
 import { CheckoutRequestError } from "@/libs/checkoutErrors";
 import { calculateCheckoutTotals, DEMO_SHIPPING_POLICY, parseShippingPolicy } from "@/utils/checkoutTotals";
 import type { CheckoutTotals, CheckoutQuote } from "@/types/checkout";
+import { currentServicePolicies } from "@/libs/customerService";
 
 type Delivery = NonNullable<ReturnType<typeof getOrderDelivery>>;
-type PolicyDatabase = Pick<Prisma.TransactionClient, "shippingPolicy">;
+type PolicyDatabase = Pick<Prisma.TransactionClient, "shippingPolicy" | "customerServiceSettings" | "customerServiceRevision">;
 type FingerprintCart = { items: { id: string; variantId?: string | null; quantity: number; price: number }[] };
 type FingerprintDelivery = { recipientName: string; recipientPhone: string; address: { city: string; country: string; line1: string; postal_code: string; state: string; provinceCode?: string | null; districtCode?: string | null; wardCode?: string | null } };
-export type VerifiedCheckoutQuote = { fingerprint: string; expiresAt: string; totals: CheckoutTotals };
+export type VerifiedCheckoutQuote = { fingerprint: string; expiresAt: string; totals: CheckoutTotals; serviceRevisionId?: string | null };
 export const checkoutFingerprint = (cart: FingerprintCart, delivery: FingerprintDelivery | null) => createHash("sha256").update(JSON.stringify([
   cart.items.map(item => [item.id, item.variantId, item.quantity, item.price]).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
   delivery ? [delivery.recipientName, delivery.recipientPhone, delivery.address.city, delivery.address.country, delivery.address.line1,
@@ -41,9 +42,10 @@ export function verifyCheckoutQuote(token: unknown, userId: string, cart: OrderC
   let value;
   try { value = JSON.parse(Buffer.from(payload, "base64url").toString()); } catch { throw new CheckoutRequestError("This delivery quote is invalid. Get a new quote.", 400, "QUOTE_INVALID"); }
   if (value.userId !== userId || value.fingerprint !== checkoutFingerprint(cart, delivery) || value.version !== 1 ||
+      value.serviceRevisionId != null && (typeof value.serviceRevisionId !== "string" || !/^[a-f\d]{24}$/.test(value.serviceRevisionId)) ||
       !Number.isFinite(Date.parse(value.expiresAt)) || !value.totals || !Number.isSafeInteger(value.totals.grandTotal) ||
       value.totals.subtotal !== cart.amount) throw new CheckoutRequestError("The cart or delivery details changed. Get a new quote.", 409, "QUOTE_MISMATCH");
-  return { fingerprint: value.fingerprint, expiresAt: value.expiresAt, totals: value.totals };
+  return { fingerprint: value.fingerprint, expiresAt: value.expiresAt, totals: value.totals, serviceRevisionId: value.serviceRevisionId || null };
 }
 
 export async function validateNewCheckoutQuote(quote: VerifiedCheckoutQuote, cart: OrderCart, delivery: Delivery | null, db: PolicyDatabase) {
@@ -53,14 +55,18 @@ export async function validateNewCheckoutQuote(quote: VerifiedCheckoutQuote, car
   if (!policy.enabled || !code || (!policy.nationwide && !policy.provinceCodes.includes(code))) throw new CheckoutRequestError("Delivery is not available for this address.", 409, "SHIPPING_UNAVAILABLE");
   const current = calculateCheckoutTotals(cart.items, policy, new Date(quote.totals.quotedAt));
   if (JSON.stringify(current) !== JSON.stringify(quote.totals)) throw new CheckoutRequestError("Delivery pricing has changed. Review a new quote before ordering.", 409, "QUOTE_CHANGED");
+  const policies = await currentServicePolicies(db);
+  if ((policies?.id || null) !== (quote.serviceRevisionId || null)) throw new CheckoutRequestError("Store policies changed. Review the published policies and request a new quote before ordering.", 409, "QUOTE_SERVICE_CHANGED");
+  return policies;
 }
 
 export async function createCheckoutQuote(userId: string, cart: OrderCart, delivery: Delivery): Promise<CheckoutQuote> {
   const policy = await currentShippingPolicy();
   if (!delivery.address.provinceCode) throw new CheckoutRequestError("Select the province or city for this delivery address.", 400, "DELIVERY_REGION_REQUIRED");
   const now = new Date();
-  const quote = { fingerprint: checkoutFingerprint(cart, delivery), expiresAt: new Date(now.getTime() + 10 * 60000).toISOString(), totals: calculateCheckoutTotals(cart.items, policy, now) };
+  const policies = await currentServicePolicies();
+  const quote = { fingerprint: checkoutFingerprint(cart, delivery), expiresAt: new Date(now.getTime() + 10 * 60000).toISOString(), totals: calculateCheckoutTotals(cart.items, policy, now), serviceRevisionId: policies?.id || null };
   await validateNewCheckoutQuote(quote, cart, delivery, prisma);
   const payload = Buffer.from(JSON.stringify({ ...quote, userId, version: 1 })).toString("base64url");
-  return { token: payload + "." + signature(payload), expiresAt: quote.expiresAt, totals: quote.totals };
+  return { token: payload + "." + signature(payload), expiresAt: quote.expiresAt, totals: quote.totals, servicePolicy: policies ? { id: policies.id, revision: policies.revision, publishedAt: policies.publishedAt } : null };
 }

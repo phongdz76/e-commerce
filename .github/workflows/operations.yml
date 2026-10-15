@@ -34,3 +34,6 @@ jobs:
       - run: npm ci
       - run: npm run worker:payments -- --once
       - run: node scripts/check-operations-health.cjs
+      - name: Process transactional email queue independently
+        if: ${{ !cancelled() }}
+        run: npm run worker:emails

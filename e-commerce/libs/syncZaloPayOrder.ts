@@ -1,5 +1,6 @@
 import type { Order } from "@prisma/client";
 import prisma from "@/libs/prismadb";
+import { updateOrderPayment } from "@/libs/updateOrderPayment";
 import { callZaloPay, getZaloPayConfig, zaloPayMac } from "./zalopay";
 import { releaseVerifiedFailedStock, reviewPaidReleasedStock } from "@/libs/orderStock";
 
@@ -35,7 +36,7 @@ export async function syncZaloPayOrder<T extends ZaloPayOrder>(
     ) {
       throw new Error("ZaloPay amount does not match the order");
     }
-    await prisma.order.updateMany({
+    await updateOrderPayment({
       where: {
         id: order.id,
         paymentMethod: "ZALOPAY",
@@ -53,7 +54,7 @@ export async function syncZaloPayOrder<T extends ZaloPayOrder>(
     order.paymentExpiresAt.getTime() <= Date.now()
   ) {
     // Only expire after ZaloPay explicitly reports no payment in progress.
-    await prisma.order.updateMany({
+    await updateOrderPayment({
       where: {
         id: order.id,
         paymentMethod: "ZALOPAY",

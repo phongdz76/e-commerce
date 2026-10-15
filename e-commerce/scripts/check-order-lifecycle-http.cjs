@@ -41,11 +41,17 @@ async function verifyOrderLifecycleHttp({call,prisma,cookies,users,variant,body,
   let saved=await prisma.order.findUnique({where:{id:confirmed.id}});
   assert.equal(saved.amount,25000);assert.equal(saved.status,'pending');assert.equal(saved.stockReservation.expiresAt,null);assert.equal(saved.address.provinceCode,'79');
   assert.equal((await manage(confirmed.id,'NOTE',{note:'Public delivery instruction',visibility:'PUBLIC',reason:'Internal approval explanation, never public.'})).status,200);
+  const alertsBeforePrivate=await prisma.notificationEvent.count({where:{entityId:confirmed.id}});
   assert.equal((await manage(confirmed.id,'NOTE',{note:'PRIVATE-INTERNAL-INSTRUCTION',visibility:'INTERNAL'})).status,200);
+  assert.equal(await prisma.notificationEvent.count({where:{entityId:confirmed.id}}),alertsBeforePrivate);
   const publicActivity=await (await call(`/api/order/${confirmed.id}/activity`,{cookie:owner})).text();
   assert.match(publicActivity,/Public delivery instruction/);assert.doesNotMatch(publicActivity,/PRIVATE-INTERNAL|Internal approval|fingerprint|providerRequestId/);
   assert.equal((await call(`/api/order/${confirmed.id}/activity`,{cookie:cookies[2]})).status,404);
   assert.equal((await ship(confirmed.id,'preparing')).status,200);
+  assert.equal(await prisma.notificationEvent.count({where:{entityId:confirmed.id,kind:'SHIPMENT_UPDATED'}}),1);
+  const privateShipment={deliveryStatus:'preparing',version:1,carrier:'',trackingNumber:'',note:'PRIVATE-PACKING-INSTRUCTION'};
+  assert.equal((await call(`/api/admin/shipments/${confirmed.id}`,{...json(admin,privateShipment),method:'PATCH'})).status,200);
+  assert.equal(await prisma.notificationEvent.count({where:{entityId:confirmed.id,kind:'SHIPMENT_UPDATED'}}),1);
   assert.equal((await manage(confirmed.id,'DELIVERY',{fullName:'Another recipient',phone:'0901234567',address:'Another street',city:'QA city'})).status,409);
   checks.push('real COD confirmation/rejection race, immutable totals and recipient correction; packing locks edits and customer activity excludes internal notes');
   // Explicit paid fixtures stand in for previous successful sandbox payments. No gateway is called.
@@ -67,6 +73,9 @@ async function verifyOrderLifecycleHttp({call,prisma,cookies,users,variant,body,
   for(let i=0;i<2;i++)assert.equal((await call(`/api/admin/orders/${manual.id}/refund`,json(admin,manualBody))).status,200);
   const manualSaved=await prisma.order.findUnique({where:{id:manual.id}});assert.equal(manualSaved.refundInfo.state,'SUCCEEDED');assert.equal(manualSaved.status,'paid');
   assert.equal(await prisma.auditLog.count({where:{entityId:manual.id,action:'REFUND_SUCCEEDED'}}),1);
+  const refundEvents=await prisma.notificationEvent.findMany({where:{entityId:manual.id}});
+  assert.equal(refundEvents.filter(event=>event.kind==='REFUND_SUCCEEDED').length,1);
+  const refundEmail=await prisma.notificationDelivery.findFirst({where:{orderId:manual.id,subject:{startsWith:'Manual refund receipt recorded'}}});assert.ok(refundEmail);assert.equal(refundEmail.state,'PENDING');
   const queue=await (await call('/api/admin/refunds?state=SUCCEEDED',{cookie:admin})).json();assert.ok(queue.refunds.some(row=>row.orderId===manual.id));
   const customer=await (await call(`/api/order/${manual.id}/refund`,{cookie:owner})).text();assert.doesNotMatch(customer,/QA-MANUAL-BANK|decisionReason|merchantId|providerRequestId/);
   checks.push('manual COD refund requires a saved receipt and completes once on replay; real admin refund queue and customer projection stay consistent');
@@ -87,6 +96,11 @@ async function verifyOrderLifecycleHttp({call,prisma,cookies,users,variant,body,
   assert.equal((await refund(legacy.id,'REQUEST',owner)).status,200);assert.equal((await refund(legacy.id,'APPROVE')).status,200);
   const legacySaved=await prisma.order.findUnique({where:{id:legacy.id}});assert.equal(legacySaved.status,'paid');assert.equal(legacySaved.management.state,'CANCELLED');assert.equal(legacySaved.stockReservation.state,'RELEASED');
   checks.push('legacy BSON with missing management/delivery fields can be reviewed and cancelled without a backfill or invented payment state');
+  const orderAlerts=await prisma.notification.findMany({where:{entityId:confirmed.id}}),emails=await prisma.notificationDelivery.findMany({where:{orderId:confirmed.id}});
+  for(const kind of ['ORDER_CREATED','ORDER_CONFIRMED','ORDER_DELIVERY_UPDATED','ORDER_NOTE_PUBLIC','SHIPMENT_UPDATED','REFUND_REQUESTED','REFUND_APPROVED'])assert.ok(orderAlerts.some(alert=>alert.kind===kind),'missing '+kind);
+  assert.doesNotMatch(JSON.stringify([...orderAlerts,...emails]),/PRIVATE-INTERNAL|PRIVATE-PACKING|Internal approval|Corrected QA street|0901234567|Cancel before dispatch/);
+  assert.ok(emails.every(email=>email.state==='PENDING'&&email.attempts===0));
+  checks.push('real domain transactions publish order/shipment/refund alerts and queue emails once; private notes do not publish or leak, manual receipts do not claim a gateway payout');
   const confirmationOrder=await create();
   const paidOrder=await create();await prisma.order.update({where:{id:paidOrder.id},data:{status:'paid'}});
   // The shared cart browser check expects one available unit; preserve these QA orders' existing holds.

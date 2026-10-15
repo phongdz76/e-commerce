@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import type { Order } from "@prisma/client";
 import prisma from "@/libs/prismadb";
+import { updateOrderPayment } from "@/libs/updateOrderPayment";
 import { reviewPaidReleasedStock } from "@/libs/orderStock";
 import {
   getActivePaymentReference,
@@ -53,7 +54,7 @@ export async function updatePaymentStatus(
     activePaymentAttemptId: order.activePaymentAttemptId || null,
   });
   if (confirmedPaid || reference === activeReference) {
-    await prisma.order.updateMany({
+    await updateOrderPayment({
       where: {
         id: order.id,
         paymentMethod: order.paymentMethod,

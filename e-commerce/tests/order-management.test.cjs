@@ -196,6 +196,7 @@ test('refund approval audit outage rolls stock and cancellation back, leaving a 
 test('a later Stripe sync cannot overwrite a legacy delivery address corrected through order management',async()=>{
   const order={id:'a'.repeat(24),paymentMethod:'STRIPE',paymentIntentId:'pi_original',amount:115000,currency:'vnd',status:'paid',management:{state:'CONFIRMED',version:2,updatedAt:new Date()},recipientName:'Corrected recipient',address:{line1:'Corrected street'}};
   const db={order:{updateMany:async({data})=>{Object.assign(order,data);return {count:1};},findUnique:async()=>structuredClone(order)}};
+  installStockDatabase(db,[],[]);
   const load=sourceLoader({'@/libs/prismadb':{__esModule:true,default:db},'./stripe':{getStripe:()=>({paymentIntents:{retrieve:async()=>({id:'pi_original',status:'succeeded',amount:115000,amount_received:115000,currency:'vnd',shipping:{name:'Old recipient',address:{line1:'Old street'}}})}})}});
   await load('libs/syncStripeOrder.ts').syncStripeOrder(order);
   assert.equal(order.recipientName,'Corrected recipient');assert.equal(order.address.line1,'Corrected street');
