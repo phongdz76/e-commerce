@@ -55,8 +55,8 @@ export default function NavBarClient({ currentUser, logoClassName }: NavBarClien
       }} className={`${isSearchOpen ? "block" : "hidden"} absolute -left-4 -right-4 top-full z-40 mt-4 border-t border-slate-300 bg-slate-200 p-4 shadow-md md:static md:mt-0 md:block md:w-full md:min-w-0 md:border-0 md:bg-transparent md:p-0 md:shadow-none`}>
         <SearchBar onNavigate={() => setIsSearchOpen(false)} />
       </div>
-      <div className="flex shrink-0 items-center gap-2 sm:gap-5 md:justify-self-end md:gap-6">
-        <button ref={searchTrigger} type="button" aria-label={isSearchOpen ? "Close search" : "Open search"} aria-expanded={isSearchOpen} aria-controls="header-search-panel" onClick={() => setIsSearchOpen((open) => !open)} className="flex h-10 w-10 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-300/60 focus-visible:outline-2 focus-visible:outline-teal-600 md:hidden">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-3 md:justify-self-end md:gap-4">
+        <button ref={searchTrigger} type="button" aria-label={isSearchOpen ? "Close search" : "Open search"} aria-expanded={isSearchOpen} aria-controls="header-search-panel" onClick={() => setIsSearchOpen((open) => !open)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-300/60 focus-visible:outline-2 focus-visible:outline-teal-600 md:hidden">
           {isSearchOpen ? <FiX size={22} /> : <FiSearch size={22} />}
         </button>
         {currentUser && <NotificationsClient key={currentUser.id} compact />}

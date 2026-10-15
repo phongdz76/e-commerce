@@ -7,6 +7,7 @@ import { API_PATHS } from "@/utils/apiPaths";
 import { ORDER_BUSINESS_LABELS } from "@/utils/orderManagement";
 import { formatAdminOrderDate } from "@/utils/adminOrders";
 import type { OrderManagementAction, OrderManagementView } from "@/types/orderManagement";
+import Pagination from "@/app/components/Pagination";
 
 const labels = { CONFIRM: "Confirm order", REJECT: "Decline COD order", DELIVERY: "Edit recipient / address", NOTE: "Add note" };
 const field = "w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-base disabled:opacity-60";
@@ -80,7 +81,16 @@ export default function OrderActivityPanel({ orderId, admin = false, onChanged }
           <label className="block text-sm font-medium">Note visibility<select aria-label="Note visibility" className={field + " mt-1"} value={visibility} disabled={saving} onChange={event => setVisibility(event.target.value)}><option value="INTERNAL">Admin only</option><option value="PUBLIC">Visible to customer</option></select></label>
           <label className="block text-sm font-medium">Note<textarea aria-label="Order note" className={field + " mt-1"} value={note} required maxLength={2000} disabled={saving} onChange={event => setNote(event.target.value)} /></label>
         </>}
-        <label className="block text-sm font-medium">Reason for this change <span className="font-normal text-slate-500">(admin only)</span><textarea aria-label="Order change reason" className={field + " mt-1"} value={reason} required minLength={10} maxLength={500} disabled={saving} onChange={event => setReason(event.target.value)} /></label>
+        <div className="block text-sm font-medium">
+          <div className="flex items-center justify-between">
+            <label htmlFor="order-reason">Reason for this change <span className="font-normal text-slate-500">(admin only)</span></label>
+            <span className="text-xs text-slate-400">{reason.trim().length}/500 (min 10)</span>
+          </div>
+          <textarea id="order-reason" aria-label="Order change reason" className={field + " mt-1" + (reason.length > 0 && reason.trim().length < 10 ? " border-rose-400" : "")} value={reason} required minLength={10} maxLength={500} disabled={saving} onChange={event => setReason(event.target.value)} />
+          {reason.length > 0 && reason.trim().length < 10 && (
+            <p className="mt-1 text-xs text-rose-600">Reason must be at least 10 characters (currently {reason.trim().length}).</p>
+          )}
+        </div>
         <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={confirmed} disabled={saving} onChange={event => setConfirmed(event.target.checked)} />I have reviewed this action and the current order.</label>
         <button type="submit" disabled={saving || loading || !confirmed || reason.trim().length < 10 || !data.actions.includes(action)} className="min-h-11 rounded-lg bg-slate-700 px-4 py-2 font-semibold text-white disabled:opacity-50">{saving ? "Saving…" : labels[action]}</button>
       </form>
@@ -88,7 +98,17 @@ export default function OrderActivityPanel({ orderId, admin = false, onChanged }
     <div className="border-t border-slate-100 pt-4"><h3 className="mb-3 font-semibold">Order history</h3>
       {data && !data.events.length && <p className="text-sm text-slate-500">No order updates recorded yet. Shipping and payment updates are shown in their sections.</p>}
       <ol className="space-y-3">{data?.events.map(event => <li key={event.id} className="border-l-2 border-teal-200 pl-3 text-sm"><p className="font-medium">{event.title}{event.visibility === "INTERNAL" ? " · Admin only" : ""}</p><time className="text-xs text-slate-500">{formatAdminOrderDate(event.createdAt)}</time>{event.message && <p className="mt-1 whitespace-pre-wrap break-words">{event.message}</p>}{admin && event.reason && <p className="mt-1 break-words text-slate-500">Reason: {event.reason}</p>}</li>)}</ol>
-      {data && <div className="mt-3 flex items-center gap-4 text-sm"><button type="button" disabled={page <= 1 || loading} onClick={() => { setLoading(true); setPage(value => value - 1); }} className="min-h-11 text-teal-700 disabled:opacity-40">Previous</button><span>Page {page}</span><button type="button" disabled={!data.hasMore || loading} onClick={() => { setLoading(true); setPage(value => value + 1); }} className="min-h-11 text-teal-700 disabled:opacity-40">Next</button></div>}
+      {data && (
+        <Pagination
+          currentPage={page}
+          hasMore={data.hasMore}
+          isLoading={loading}
+          onPageChange={(nextPage) => {
+            setLoading(true);
+            setPage(nextPage);
+          }}
+        />
+      )}
     </div>
   </section>;
 }
