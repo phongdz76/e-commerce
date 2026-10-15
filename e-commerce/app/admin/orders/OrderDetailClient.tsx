@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import OrderTotalsBreakdown from "@/app/components/orders/OrderTotalsBreakdown";
+import OrderActivityPanel from "@/app/components/orders/OrderActivityPanel";
+import OrderRefundPanel from "@/app/components/orders/OrderRefundPanel";
 import axios from "axios";
 import {
   FiArrowLeft,
@@ -94,7 +97,7 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
               </div>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-xl font-bold tracking-tight text-slate-800">
+                  <h2 className="break-all text-xl font-bold tracking-tight text-slate-800">
                     Order {getAdminOrderReference(order.id)}
                   </h2>
                   <span className="font-mono text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/60">
@@ -115,6 +118,8 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
           </div>
 
           {/* 3 Detail Cards */}
+          <OrderActivityPanel key={order.id + "-activity"} orderId={order.id} admin onChanged={handleCodRecorded} />
+          <OrderRefundPanel key={order.id + "-refund"} orderId={order.id} admin onChanged={handleCodRecorded} />
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
             {/* Customer Card */}
             <section className="flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs hover:shadow-md transition-shadow duration-200">
@@ -263,6 +268,7 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
                     <span className="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider">
                       Total order value
                     </span>
+                    <OrderTotalsBreakdown totals={order.totals} />
                     <span className="break-words text-2xl sm:text-3xl font-extrabold text-emerald-950 tracking-tight">
                       {formatAdminOrderAmount(order.amount, order.currency)}
                     </span>

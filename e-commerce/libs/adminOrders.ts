@@ -1,10 +1,13 @@
 import type { Prisma } from "@prisma/client";
 import { ADMIN_DELIVERY_FILTERS, ADMIN_ORDER_FILTERS, ADMIN_ORDER_METHODS } from "@/utils/adminOrders";
 import { isCatalogImageUrl } from "@/utils/catalogImage";
+import { orderBusinessState, orderIdFromReference, orderReference } from "@/utils/orderManagement";
 
 export const ADMIN_ORDER_SELECT = {
   id: true,
   amount: true,
+  totals: true,
+  management: true,
   currency: true,
   status: true,
   deliveryStatus: true,
@@ -27,6 +30,9 @@ export function getAdminOrderFilters(params: URLSearchParams) {
   const search = (params.get("search") || "").trim();
   const pageValue = params.get("page") || "1";
   const page = Number(pageValue);
+  const from = params.get("from") || "";
+  const to = params.get("to") || "";
+  const validDate = (value: string) => !value || (/^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value + "T00:00:00Z")) && new Date(value + "T00:00:00Z").toISOString().slice(0, 10) === value);
   const selected = ADMIN_ORDER_FILTERS.find((filter) => filter.value === status);
   if (
     !selected ||
@@ -36,11 +42,12 @@ export function getAdminOrderFilters(params: URLSearchParams) {
     !/^\d+$/.test(pageValue) ||
     !Number.isSafeInteger(page) ||
     page < 1 ||
-    page > 1000
+    page > 1000 || !validDate(from) || !validDate(to) || (from && to && from > to)
   ) {
     return null;
   }
   const where: Prisma.OrderWhereInput = {};
+  if (from || to) where.createDate = { ...(from ? { gte: new Date(from + "T00:00:00+07:00") } : {}), ...(to ? { lt: new Date(new Date(to + "T00:00:00+07:00").getTime() + 86400000) } : {}) };
   if (selected.statuses.length > 0) {
     where.status = { in: selected.statuses };
   }
@@ -59,8 +66,9 @@ export function getAdminOrderFilters(params: URLSearchParams) {
       { user: { is: { name: { contains: search, mode: "insensitive" } } } },
       { user: { is: { email: { contains: search, mode: "insensitive" } } } },
     ];
-    if (/^[a-f\d]{24}$/i.test(search)) {
-      where.OR.push({ id: search.toLowerCase() });
+    const referenceId = orderIdFromReference(search);
+    if (/^[a-f\d]{24}$/i.test(search) || referenceId) {
+      where.OR.push({ id: referenceId || search.toLowerCase() });
     }
   }
   return { where, page };
@@ -69,6 +77,8 @@ export function getAdminOrderFilters(params: URLSearchParams) {
 export function toAdminOrderSummary(order: AdminOrderRecord) {
   return {
     id: order.id,
+    reference: orderReference(order.id),
+    orderState: orderBusinessState(order),
     amount: order.amount,
     currency: order.currency,
     status: order.status,
@@ -91,6 +101,7 @@ export function toAdminOrderSummary(order: AdminOrderRecord) {
 export function toAdminOrderDetail(order: AdminOrderRecord) {
   return {
     ...toAdminOrderSummary(order),
+    totals: order.totals ? { ...order.totals, quotedAt: order.totals.quotedAt.toISOString() } : null,
     recipientPhone: order.recipientPhone,
     address: order.address ? {
       line1: order.address.line1,

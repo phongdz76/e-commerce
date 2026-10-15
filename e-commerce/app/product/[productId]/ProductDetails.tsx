@@ -29,6 +29,7 @@ export interface CartProductProps {
   selectedImg: SelectedImgProps;
   quantity: number;
   price: number;
+  needsSelection?: boolean;
 }
 
 export interface SelectedImgProps {
@@ -227,20 +228,98 @@ export default function ProductDetails({ product, initialVariantId }: ProductDet
         <nav aria-label="Product support" className="mt-4 flex flex-wrap gap-x-5 gap-y-3 text-base">
           <Link href="/help/shipping" className="text-teal-700 hover:underline">Shipping &amp; delivery</Link>
           <Link href="/help/returns" className="text-teal-700 hover:underline">Returns &amp; exchanges</Link>
-          <Link href="/help/contact" className="text-teal-700 hover:underline">Ask about warranty</Link>
+          <Link href={`/support?productId=${product.id}${selectedVariant ? "&variantId=" + selectedVariant.id : ""}`} className="text-teal-700 hover:underline">Ask about warranty</Link>
         </nav>
       </div>
-      <div className="min-w-0 space-y-6 md:col-span-2">
-        <section aria-labelledby="sku-specifications" className="rounded-xl border border-slate-200 bg-white p-5">
-          <h2 id="sku-specifications" className="text-lg font-semibold text-slate-800">Technical specifications</h2>
-          {selectedVariant && <p className="mt-1 break-words text-sm text-slate-500">{selectedVariant.name} · {selectedVariant.sku}</p>}
-          {selectedVariant?.specifications?.length ? <dl className="mt-4 divide-y divide-slate-100">
-            {selectedVariant.specifications.map(row => <div key={row.key} className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-4 py-3 text-sm"><dt className="break-words text-slate-500">{row.label}</dt><dd className="whitespace-pre-line break-words font-medium text-slate-800">{row.value}</dd></div>)}
-          </dl> : <p className="mt-3 text-sm text-slate-500">Specifications have not been provided for this option. Contact the store for details.</p>}
-        </section>
-        <div className="grid min-w-0 gap-6 sm:grid-cols-2">
-          <section aria-labelledby="sku-warranty" className="min-w-0 rounded-xl border border-slate-200 bg-white p-5"><h2 id="sku-warranty" className="text-lg font-semibold text-slate-800">Warranty</h2><p className="mt-3 whitespace-pre-line break-words text-sm leading-6 text-slate-600">{selectedVariant?.warrantyText || "Warranty information has not been provided for this option. Ask the store about coverage and conditions."}</p></section>
-          <section aria-labelledby="sku-package" className="min-w-0 rounded-xl border border-slate-200 bg-white p-5"><h2 id="sku-package" className="text-lg font-semibold text-slate-800">In the box</h2><p className="mt-3 whitespace-pre-line break-words text-sm leading-6 text-slate-600">{selectedVariant?.packageContents || "Box contents have not been provided for this option. Confirm included accessories with the store."}</p></section>
+      <div className="min-w-0 md:col-span-2">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs divide-y divide-slate-100">
+          {/* Section: Specifications */}
+          <section aria-labelledby="sku-specifications" className="p-6 md:p-8">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8">
+              <div className="md:col-span-4 space-y-2">
+                <h2 id="sku-specifications" className="text-base font-bold text-slate-900 tracking-tight">
+                  Technical specifications
+                </h2>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Configuration details for this option
+                </p>
+                {selectedVariant && (
+                  <div className="pt-2 flex flex-wrap gap-1.5">
+                    <span className="inline-flex items-center rounded-md bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-800">
+                      {selectedVariant.name}
+                    </span>
+                    <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-1 text-xs font-mono text-slate-600" title={`SKU: ${selectedVariant.sku}`}>
+                      SKU: {selectedVariant.sku.length > 16 ? `${selectedVariant.sku.slice(0, 10)}...${selectedVariant.sku.slice(-4)}` : selectedVariant.sku}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="md:col-span-8">
+                {selectedVariant?.specifications?.length ? (
+                  <div className="w-fit">
+                    <dl className="overflow-hidden rounded-xl border border-slate-200/90 bg-slate-50/70 divide-y divide-slate-200/60 shadow-2xs">
+                      {selectedVariant.specifications.map((row) => (
+                        <div
+                          key={row.key}
+                          className="flex items-center gap-2.5 px-4 py-2 text-sm"
+                        >
+                          <dt className="text-slate-500 font-medium capitalize">
+                            {row.label}:
+                          </dt>
+                          <dd className="text-slate-900 font-bold">
+                            {row.value}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500 italic py-2">
+                    Specifications have not been provided for this option. Contact the store for details.
+                  </p>
+                )}
+              </div>
+            </div>
+          </section>
+
+          {/* Section: Warranty */}
+          <section aria-labelledby="sku-warranty" className="p-6 md:p-8">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8">
+              <div className="md:col-span-4">
+                <h2 id="sku-warranty" className="text-base font-bold text-slate-900 tracking-tight">
+                  Warranty policy
+                </h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  Official store protection
+                </p>
+              </div>
+              <div className="md:col-span-8">
+                <p className="text-sm leading-relaxed text-slate-600 whitespace-pre-line break-words">
+                  {selectedVariant?.warrantyText || "Warranty information has not been provided for this option. Ask the store about coverage and conditions."}
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* Section: In the box */}
+          <section aria-labelledby="sku-package" className="p-6 md:p-8">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8">
+              <div className="md:col-span-4">
+                <h2 id="sku-package" className="text-base font-bold text-slate-900 tracking-tight">
+                  In the box
+                </h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  Standard packaging contents
+                </p>
+              </div>
+              <div className="md:col-span-8">
+                <p className="text-sm leading-relaxed text-slate-600 whitespace-pre-line break-words">
+                  {selectedVariant?.packageContents || "Box contents have not been provided for this option. Confirm included accessories with the store."}
+                </p>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     </div>

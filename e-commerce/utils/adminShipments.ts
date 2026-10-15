@@ -17,7 +17,11 @@ export function getShipmentLockReason(order: {
   status: string;
   paymentMethod: string;
   deliveryStatus: string | null;
+  management?: { state: string } | null;
+  refundInfo?: { state: string } | null;
 }) {
+  if (order.refundInfo && order.refundInfo.state !== "DECLINED") return "A cancellation/refund is open. Resolve it from the order before updating the shipment.";
+  if (order.management && order.management.state !== "CONFIRMED") return "Confirm this order from Order details before preparing the shipment.";
   if (
     !Object.hasOwn(
       SHIPMENT_TRANSITIONS,

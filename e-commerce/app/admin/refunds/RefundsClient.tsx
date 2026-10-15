@@ -14,6 +14,7 @@ import AdminFeedback from "@/app/admin/components/AdminFeedback";
 import AdminPagination from "@/app/admin/components/AdminPagination";
 import AdminDialog from "@/app/admin/components/AdminDialog";
 import PaymentHistory from "@/app/admin/payments/PaymentHistory";
+import RefundRequestsClient from "./RefundRequestsClient";
 
 interface RefundQueueResponse {
   exceptions: SafePaymentException[];
@@ -70,18 +71,19 @@ export default function RefundsClient() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader title="Refunds" description="Follow up on payment issues that have been reviewed and marked as requiring a refund.">
+      <AdminPageHeader title="Refunds" description="Review paid-order cancellations and track refunds, alongside payment issues needing separate reconciliation.">
         <AdminRefreshButton isLoading={isLoading} onRefresh={handleRefresh} />
         <Link href="/admin/payment-exceptions" className="inline-flex min-h-11 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold hover:bg-slate-100">
           Review payment issues <FiArrowRight aria-hidden="true" />
         </Link>
       </AdminPageHeader>
+      <RefundRequestsClient refreshKey={refresh} />
       <section className="rounded-lg border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900">
         <div className="flex items-start gap-3">
           <FiCornerUpLeft className="mt-1 shrink-0 text-lg" aria-hidden="true" />
           <div>
             <h2 className="font-semibold">Refund follow-up</h2>
-            <p className="mt-1">A refund requirement records a review decision. It does not confirm that money has been returned. Refund execution and confirmation are not available on this page yet.</p>
+            <p className="mt-1">The payment issues below record review decisions, which do not return money. Open the order to check whether pre-dispatch cancellation applies. Duplicate and late payments still need separate reconciliation.</p>
           </div>
         </div>
       </section>

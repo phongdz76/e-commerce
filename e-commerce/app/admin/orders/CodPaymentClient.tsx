@@ -18,7 +18,7 @@ interface CodPaymentClientProps {
   onRecorded: () => void;
 }
 
-const inputClassName = "min-h-11 w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100 disabled:opacity-60";
+const inputClassName = "min-h-11 w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm transition-colors focus:border-teal-600 focus:!outline-none focus-visible:!outline-none focus:!ring-0 focus-visible:!ring-0 disabled:opacity-60";
 
 function ReceiptDetails({ receipt, currency }: { receipt: AdminCodReceipt; currency: string }) {
   return (

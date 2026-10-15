@@ -47,6 +47,7 @@ async function main() {
       "OperationalJob",
       "OperationalIncident",
       "AuditLog",
+      "ShippingPolicy",
       "CheckoutRequest",
       "AuthRateLimit",
     ])
@@ -230,14 +231,52 @@ async function main() {
       phone: "0900000000",
       address: "Private QA Street",
       city: "QA city",
+      provinceCode: "79",
     });
+    const cartItems = body(users[1]).items;
+    assert.equal((await call("/api/admin/shipping-policy")).status, 401);
+    assert.equal((await call("/api/admin/shipping-policy", { cookie: cookies[1] })).status, 403);
+    const policy = (await (await call("/api/admin/shipping-policy", { cookie: cookies[0] })).json()).policy;
+    assert.equal(policy.fee, 15000); assert.equal(policy.freeShippingThreshold, 300000);
+    const unquoted = await call("/api/order/create-cod", { cookie: cookies[1], method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body(users[1])) });
+    assert.equal(unquoted.status, 400); assert.equal((await unquoted.json()).code, "QUOTE_REQUIRED");
+    const staleBody = body(users[1]);
+    const staleQuote = await (await call("/api/checkout/quote", { cookie: cookies[1], method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(staleBody) })).json();
+    for (const [version, fee] of [[0, 16000], [1, 15000]]) {
+      const update = await call("/api/admin/shipping-policy", { cookie: cookies[0], method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...policy, version, fee, requestId: randomUUID(), reason: "Isolated QA delivery policy change" }) });
+      assert.equal(update.status, 200);
+      if (fee === 16000) {
+        const stale = await call("/api/order/create-cod", { cookie: cookies[1], method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...staleBody, quoteToken: staleQuote.token }) });
+        assert.equal(stale.status, 409); assert.equal((await stale.json()).code, "QUOTE_CHANGED");
+        assert.equal((await prisma.productVariant.findUnique({ where: { id: variant.id } })).inventory.reserved, 0);
+      }
+    }
+    checks.push("real shipping policy authorization/version/audit and mandatory signed quote; policy changes reject stale pricing without stock writes");
+    assert.equal((await call("/api/cart/quote", { method: "POST", body: JSON.stringify({ items: cartItems }) })).status, 401);
+    const cartReview = await call("/api/cart/quote", { cookie: cookies[1], method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: [{ ...cartItems[0], price: 1, quantity: 2 }, { ...cartItems[0], id: "f".repeat(24) }] }) });
+    assert.equal(cartReview.status, 200);
+    const reviewed = await cartReview.json();
+    assert.deepEqual(reviewed.lines.map(line => line.issues), [["QUANTITY_REDUCED", "PRICE_CHANGED"], ["UNAVAILABLE"]]);
+    assert.equal(reviewed.canCheckout, false);
+    assert.equal((await prisma.productVariant.findUnique({ where: { id: variant.id } })).inventory.reserved, 0);
+    checks.push("actual authenticated cart review isolates unavailable rows and proposes price/quantity changes without reserving units");
+    const checkoutBodies = await Promise.all([1, 2].map(async index => {
+      const payload = body(users[index]);
+      const quoteResponse = await call("/api/checkout/quote", { cookie: cookies[index], method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      assert.equal(quoteResponse.status, 200);
+      const quote = await quoteResponse.json();
+      assert.equal(quote.totals.subtotal, 10000); assert.equal(quote.totals.shippingFee, 15000); assert.equal(quote.totals.grandTotal, 25000);
+      return { ...payload, quoteToken: quote.token };
+    }));
     const outcomes = await Promise.all(
-      [1, 2].map((index) =>
+      [1, 2].map((index, position) =>
         call("/api/order/create-cod", {
           cookie: cookies[index],
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body(users[index])),
+          body: JSON.stringify(checkoutBodies[position]),
         }),
       ),
     );
@@ -263,6 +302,8 @@ async function main() {
     const order = await prisma.order.findUnique({
       where: { id: saved.order.id },
     });
+    assert.equal(order.amount, 25000); assert.equal(order.totals.subtotal, 10000); assert.equal(order.totals.shippingFee, 15000);
+    assert.equal(order.totals.shippingBaseFee, 15000); assert.equal(order.totals.freeShippingThreshold, 300000);
     await prisma.order.update({
       where: { id: order.id },
       data: {
@@ -317,6 +358,8 @@ async function main() {
     checks.push(
       "Operations and holds pages render with real session, API and MongoDB",
     );
+    const orderFixture = await require("./check-order-lifecycle-http.cjs").verifyOrderLifecycleHttp({ call, prisma, cookies, users, variant, body, checks });
+    const supportFixture = await require("./check-support-http.cjs").verifySupportHttp({ call, prisma, cookies, users, product, variant, orderFixture, secret, checks });
     if (process.env.QA_BROWSER === "true") {
       const {
         verifyOperationsBrowser,
@@ -325,6 +368,9 @@ async function main() {
         origin,
         cookie: cookies[0],
         artifactDirectory: artifacts,
+        orderFixture,
+        supportFixture,
+        cartFixture: { id: product.id, variantId: variant.id, name: "Private HTTP QA phone", description: "QA", category: "QA phones", brand: "QA brand", selectedImg: variant.image, quantity: 2, price: 1 },
       });
       checks.push(`Browser passed ${count} responsive/error/recovery groups.`);
     }
@@ -455,6 +501,7 @@ async function main() {
 }
 main().catch((error) => {
   console.error("Production-server E2E failed:", error.code || error.name);
-  if (error.name === "AssertionError") console.error(error.message);
+  if (error.name === "AssertionError") console.error(error.stack);
+  else console.error(error.stack?.split("\n").filter(line => line.trim().startsWith("at ")).slice(0, 6).join("\n"));
   process.exitCode = 1;
 });

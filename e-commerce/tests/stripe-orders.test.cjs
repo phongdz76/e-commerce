@@ -45,7 +45,7 @@ const product = products.find((p) => p.inStock);
 const cart = [{ ...product, selectedImg: product.images[0], quantity: 1 }];
 const copy = (value) => structuredClone(value);
 
-function fixture() {
+function fixture(shippingFee = 0) {
   const rows = new Map();
   const intents = new Map();
   const requestKeys = new Map();
@@ -220,6 +220,7 @@ function fixture() {
     },
   };
   const mocks = {
+    "@/libs/checkoutQuote": require("./fixtures/approved-checkout.cjs").withFee(shippingFee),
     "@/actions/getCurrentUser": { getCurrentUser: async () => state.user },
     "@/libs/prismadb": { __esModule: true, default: prisma },
     "@/libs/stripe": { getStripe: () => stripe },
@@ -288,7 +289,7 @@ function fixture() {
     });
   const create = (body = {}) =>
     prepare(
-      request({ items: cart, checkout_request_id: "stable-request", ...body }),
+      request({ items: cart, checkout_request_id: "stable-request", fullName: "Recipient", phone: "+84901234567", address: "Example address", ...body }),
     );
   const pay = (id) =>
     Object.assign(intents.get(id), {
@@ -1166,4 +1167,42 @@ test("signed webhook retries and out-of-order events update an existing order on
     if (previous === undefined) delete process.env.STRIPE_WEBHOOK_SECRET;
     else process.env.STRIPE_WEBHOOK_SECRET = previous;
   }
+});
+
+test('COD, Stripe, VNPay and MoMo charge the delivery-inclusive order snapshot', async () => {
+  const previousFetch = global.fetch;
+  let received;
+  global.fetch = async (_url, options) => {
+    received = JSON.parse(options.body);
+    return Response.json({ resultCode: 0, payUrl: 'https://test-payment.momo.vn/gateway/pay' });
+  };
+  try {
+    const card = fixture(15000);
+    const cardResponse = await card.create();
+    assert.equal(cardResponse.status, 200);
+    assert.equal((await cardResponse.json()).paymentIntent.amount, product.price + 15000);
+    for (const method of ['COD', 'VNPAY', 'MOMO']) {
+      const f = fixture(15000);
+      const response = await f.deliveryRoutes[method](f.request(checkoutBody()));
+      assert.equal(response.status, 200);
+      const data = await response.json();
+      const saved = [...f.rows.values()][0];
+      assert.equal(saved.amount, product.price + 15000);
+      assert.equal(saved.totals.shippingFee, 15000);
+      if (method === 'VNPAY') assert.equal(Number(new URL(data.url).searchParams.get('vnp_Amount')), saved.amount * 100);
+      if (method === 'MOMO') assert.equal(received.amount, saved.amount);
+    }
+  } finally { global.fetch = previousFetch; }
+});
+
+test('Stripe shipping fields cannot replace the address or recipient of a quoted order', async () => {
+  const f = fixture(15000);
+  const created = await (await f.create()).json();
+  f.pay(created.paymentIntent.id);
+  f.intents.get(created.paymentIntent.id).shipping = { name: 'Unquoted recipient', phone: '0909876543', address: { line1: 'Unquoted different address', city: 'Different city', country: 'VN' } };
+  await f.verify(f.request({ payment_intent_id: created.paymentIntent.id }));
+  const saved = f.rows.get(created.order.id);
+  assert.equal(saved.recipientName, 'Recipient');
+  assert.equal(saved.address.line1, 'Example address');
+  assert.equal(saved.amount, product.price + 15000);
 });

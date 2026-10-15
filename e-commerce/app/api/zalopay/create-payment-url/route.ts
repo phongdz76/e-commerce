@@ -53,7 +53,7 @@ export async function POST(request: Request) {
         ? body.checkout_request_id
         : randomUUID();
     const appTime = Date.now();
-    const prepared = await prepareCheckoutRequest(requestId, user.id, "ZALOPAY", cart, delivery, String(appId));
+    const prepared = await prepareCheckoutRequest(requestId, user.id, "ZALOPAY", cart, delivery, String(appId), {}, body.quoteToken);
     const appTransId = prepared.order.paymentIntentId!;
     const existing = prepared.order.paymentUrl || prepared.order.status !== "pending" ? prepared.order : null;
     const resume = async (savedOrder: NonNullable<typeof existing>) => {
@@ -143,7 +143,7 @@ export async function POST(request: Request) {
         app_user: user.id,
         app_trans_id: appTransId,
         app_time: appTime,
-        amount: cart.amount,
+        amount: order.amount,
         description: `SGTech - Order #${order.id.slice(-8).toUpperCase()}`,
         bank_code: "",
         embed_data: embedData,
@@ -151,7 +151,7 @@ export async function POST(request: Request) {
         callback_url: callbackUrl,
         expire_duration_seconds: ZALOPAY_EXPIRY_SECONDS,
         mac: zaloPayMac(
-          `${appId}|${appTransId}|${user.id}|${cart.amount}|${appTime}|${embedData}|${item}`,
+          `${appId}|${appTransId}|${user.id}|${order.amount}|${appTime}|${embedData}|${item}`,
           key1,
         ),
       });
@@ -197,7 +197,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       url: paymentUrl,
       orderId: order.id,
-      amount: cart.amount,
+      amount: order.amount,
     });
   } catch (error) {
     if (error instanceof CheckoutRequestError) return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });

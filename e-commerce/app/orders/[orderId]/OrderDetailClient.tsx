@@ -15,6 +15,11 @@ import { FaBoxOpen, FaClipboardList } from "react-icons/fa";
 import { getCustomerDeliveryInfo, normalizeCustomerDeliveryStatus } from "@/utils/orderShipment";
 import ShipmentTracking from "./ShipmentTracking";
 import OrderStock from "./OrderStock";
+import OrderTotalsBreakdown from "@/app/components/orders/OrderTotalsBreakdown";
+import OrderActivityPanel from "@/app/components/orders/OrderActivityPanel";
+import OrderRefundPanel from "@/app/components/orders/OrderRefundPanel";
+import type { CheckoutTotals } from "@/types/checkout";
+import { orderReference } from "@/utils/orderManagement";
 
 interface OrderProduct {
   id: string;
@@ -41,6 +46,8 @@ interface OrderAddress {
 }
 
 interface OrderDetail {
+  orderVersion?: number;
+  totals?: CheckoutTotals | null;
   id: string;
   amount: number;
   currency: string;
@@ -332,6 +339,7 @@ export default function OrderDetailClient({
           <MdArrowBack size={18} />
           Back to Orders
         </Link>
+        <Link href={"/support?orderId=" + order.id} className="inline-flex min-h-11 items-center text-base font-semibold text-teal-700">Ask about this order</Link>
       </div>
 
       {/* Header card */}
@@ -340,8 +348,8 @@ export default function OrderDetailClient({
           <div>
             <h1 className="text-xl font-bold text-slate-800">
               Order{" "}
-              <span className="font-mono text-base text-slate-500">
-                #{order.id.slice(-8).toUpperCase()}
+              <span className="break-all font-mono text-base text-slate-500">
+                {orderReference(order.id)}
               </span>
             </h1>
             <p className="text-sm text-slate-500 mt-1">
@@ -421,6 +429,7 @@ export default function OrderDetailClient({
             </div>
 
             {/* Total row */}
+            <div className="border-t border-slate-200 px-5 py-4"><OrderTotalsBreakdown totals={order.totals} /></div>
             <div className="flex items-center justify-between px-5 py-4 border-t border-slate-200 bg-slate-50/50">
               <span className="text-sm font-medium text-slate-600">Total</span>
               <span className="text-lg font-bold text-slate-800">
@@ -499,7 +508,9 @@ export default function OrderDetailClient({
           </div>
 
           {/* Delivery */}
-          <OrderStock key={order.id} orderId={order.id} />
+          <OrderStock key={order.id + "-stock-" + order.orderVersion} orderId={order.id} />
+          <OrderRefundPanel key={order.id + "-refund"} orderId={order.id} onChanged={() => void refreshOrder().catch(() => toast.error("Reload this order to see its latest details."))} />
+          <OrderActivityPanel key={order.id + "-activity-" + order.orderVersion} orderId={order.id} />
           <div className="rounded-lg border border-slate-200 bg-white p-5">
             <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-3">
               <MdLocalShipping size={16} className="text-slate-400" />

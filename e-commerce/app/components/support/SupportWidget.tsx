@@ -210,7 +210,7 @@ export default function SupportWidget({ zaloUrl }: SupportWidgetProps) {
               onClick={() => setChannel("chat")}
               className={`flex min-h-12 items-center justify-center gap-2 border-b-2 text-sm transition ${focusStyle} ${channel === "chat" ? "border-teal-600 font-bold text-teal-700" : "border-transparent text-slate-500 hover:text-slate-700"}`}
             >
-              Chat
+              Quick answers
             </button>
             <button
               type="button"
@@ -282,6 +282,7 @@ export default function SupportWidget({ zaloUrl }: SupportWidgetProps) {
               </div>
 
               <div className="shrink-0 border-t border-slate-100 px-4 py-3">
+                {!isZaloDemo && <Link href="/support" onClick={closePanel} className="mb-3 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white">Message the support team</Link>}
                 <div
                   className="mb-3 flex flex-wrap gap-2"
                   aria-label="Common questions"

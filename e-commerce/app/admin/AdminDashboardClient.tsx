@@ -45,7 +45,7 @@ export default function AdminDashboardClient() {
 
   const handleRefresh = () => setRefresh((previous) => previous + 1);
   const metrics = overview ? [
-    { label: "Confirmed online payments", value: formatPrice(overview.confirmedOnlineAmount), detail: overview.confirmedOnlineOrders + " paid online orders · VND · All time", href: "/admin/payments?state=SUCCEEDED", icon: FiDollarSign },
+    { label: "Confirmed online payments", value: formatPrice(overview.confirmedOnlineAmount), detail: overview.confirmedOnlineOrders + " paid online orders · VND · Gross before refunds", href: "/admin/payments?state=SUCCEEDED", icon: FiDollarSign },
     { label: "Pending orders", value: overview.unpaidOrders.toLocaleString("en-US"), detail: "Pending or processing, including COD", href: "/admin/orders?status=PENDING", icon: FiShoppingBag },
     { label: "Active products", value: overview.activeProducts.toLocaleString("en-US"), detail: overview.products + " total catalog products", href: "/admin/products", icon: FiBox },
     { label: "User accounts", value: overview.users.toLocaleString("en-US"), detail: overview.blockedUsers + " blocked accounts", href: "/admin/users", icon: FiUsers },

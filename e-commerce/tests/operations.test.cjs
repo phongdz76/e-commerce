@@ -109,6 +109,7 @@ function fixture() {
     $transaction: async (operation) => operation(db),
   };
   const load = sourceLoader({
+    "@/libs/supportCleanup": { cleanupOrphanSupportImages: async () => 0 },
     "@/libs/prismadb": { __esModule: true, default: db },
     "@/actions/getCurrentUser": { getCurrentUser: async () => state.user },
     "@/libs/adminAudit": {

@@ -1,0 +1,51 @@
+const assert=require('node:assert/strict');
+const {randomUUID}=require('node:crypto');
+const {encode}=require('next-auth/jwt');
+
+async function verifySupportHttp({call,prisma,cookies,users,product,variant,orderFixture,secret,checks}) {
+  const owner=cookies[1],admin=cookies[0];
+  const json=(cookie,payload)=>({cookie,method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const send=(cookie,text,extra={})=>call('/api/support',json(cookie,{action:'SEND',text,requestId:randomUUID(),...extra}));
+  const adminPath='/api/admin/support/'+users[1].id;
+  assert.equal((await call('/api/support')).status,401);assert.equal((await call('/api/admin/support',{cookie:owner})).status,403);
+  assert.equal((await (await call('/api/support',{cookie:owner})).json()).conversation,null);
+  const first={action:'SEND',text:'<img src=x onerror=window.__supportXss=1> Please help with this product.',requestId:randomUUID(),context:{kind:'PRODUCT',id:product.id,variantId:variant.id,title:'Forged product',href:'https://bad.example'}};
+  const duplicate=await Promise.all(Array.from({length:6},()=>call('/api/support',json(owner,first))));assert.ok(duplicate.every(r=>r.status===200));
+  assert.equal(await prisma.supportMessage.count({where:{conversationId:users[1].id}}),1);assert.equal((await prisma.supportConversation.findUnique({where:{id:users[1].id}})).adminUnread,1);
+  assert.equal((await send(owner,'Changed duplicate',{...first,text:'Changed duplicate'})).status,409);
+  assert.equal((await send(cookies[2],'Another user order',{context:{kind:'ORDER',id:orderFixture.paidOrderId}})).status,404);
+  assert.equal((await call(adminPath,{cookie:cookies[2]})).status,403);
+  checks.push('real authenticated support first use, six send replays save once; forged authors/context and foreign order access cannot cross accounts');
+  const png=require('../tests/fixtures/support-image.cjs');
+  const form=new FormData();form.set('image',new Blob([png],{type:'image/png'}),'private-qa.png');form.set('requestId',randomUUID());
+  const upload=await call('/api/support/attachments',{cookie:owner,method:'POST',body:form});assert.equal(upload.status,200);const image=(await upload.json()).id;
+  assert.equal((await send(owner,'Private image for my order',{attachmentId:image,context:{kind:'ORDER',id:orderFixture.paidOrderId}})).status,200);
+  const imagePath='/api/support/attachments/'+image;
+  assert.equal((await call(imagePath)).status,401);assert.equal((await call(imagePath,{cookie:cookies[2]})).status,404);
+  const imageResponse=await call(imagePath,{cookie:owner});assert.equal(imageResponse.status,200);assert.equal(imageResponse.headers.get('content-type'),'image/png');assert.deepEqual(Buffer.from(await imageResponse.arrayBuffer()),png);
+  assert.equal((await send(owner,'Cannot attach it twice',{attachmentId:image})).status,409);
+  checks.push('real multipart image upload, authenticated byte retrieval and single-message binding; another customer cannot read the image');
+  const second=await prisma.user.create({data:{name:'Second QA support admin',email:'qa-support-second@example.invalid',role:'ADMIN',status:'ACTIVE',sessionVersion:0}});
+  const secondCookie='next-auth.session-token='+await encode({secret,maxAge:600,token:{sub:second.id,userId:second.id,sessionVersion:0,authenticatedAt:Date.now()}});
+  assert.equal((await call(adminPath,json(admin,{action:'SEND',requestId:randomUUID(),text:'Unassigned reply'}))).status,409);
+  const initial=await (await call(adminPath,{cookie:admin})).json();
+  const claims=await Promise.all([admin,secondCookie].map(cookie=>call(adminPath,json(cookie,{action:'CLAIM',version:initial.conversation.version,requestId:randomUUID()}))));assert.equal(claims.filter(r=>r.status===200).length,1);assert.equal(claims.filter(r=>r.status===409).length,1);
+  const handler=claims[0].status===200?admin:secondCookie;
+  assert.equal((await call(adminPath,json(handler,{action:'READ',sequence:2}))).status,200);
+  assert.equal((await call(adminPath,json(handler,{action:'SEND',requestId:randomUUID(),text:'Your order is saved. The support team can help with delivery.'}))).status,200);
+  let customer=await (await call('/api/support',{cookie:owner})).json();assert.equal(customer.conversation.unread,1);assert.equal(customer.messages.at(-1).label,'Support team');assert.doesNotMatch(JSON.stringify(customer),/authorId|fingerprint|assignedTo|qa-support-second/);
+  assert.equal((await call('/api/support',json(owner,{action:'READ',sequence:3}))).status,200);assert.equal((await (await call('/api/support',{cookie:owner})).json()).conversation.unread,0);
+  checks.push('two actual admin sessions compete for assignment; only the winner replies; unread/read state persists in both customer and admin APIs');
+  // Additional old history is a fixture, keeping the real per-minute send limit intact.
+  await prisma.supportMessage.createMany({data:Array.from({length:23},(_,i)=>({id:'history-'+randomUUID(),conversationId:users[1].id,authorId:users[1].id,senderRole:'CUSTOMER',sequence:i+4,text:'Earlier QA question '+(i+1),fingerprint:'qa-history-'+i}))});
+  await prisma.supportConversation.update({where:{id:users[1].id},data:{sequence:26,adminUnread:23,lastMessageAt:new Date()}});
+  customer=await (await call('/api/support',{cookie:owner})).json();assert.equal(customer.messages.length,20);assert.equal(customer.messages[0].sequence,7);assert.equal(customer.hasOlder,true);
+  const older=await (await call('/api/support?before=7',{cookie:owner})).json();assert.equal(older.messages.length,6);assert.ok(older.messages[0].context.title.includes(product.name));assert.ok(older.messages[1].context.href.includes(orderFixture.paidOrderId));
+  const current=await (await call(adminPath,{cookie:handler})).json();assert.equal((await call(adminPath,json(handler,{action:'CLOSE',version:current.conversation.version,requestId:randomUUID()}))).status,200);
+  assert.equal((await send(owner,'Draft while closed')).status,409);const closed=await (await call('/api/support',{cookie:owner})).json();assert.equal(closed.conversation.status,'CLOSED');
+  assert.equal((await call('/api/support',json(owner,{action:'REOPEN',version:closed.conversation.version,requestId:randomUUID()}))).status,200);
+  const inbox=await (await call('/api/admin/support?filter=UNREAD',{cookie:admin})).json();assert.ok(inbox.conversations.some(row=>row.id===users[1].id&&row.unread===23));
+  checks.push('real support history pagination, server context snapshots and closed/reopened conversation retain messages and remain visible in the filtered inbox');
+  return {conversationId:users[1].id,ownerCookie:owner,adminCookie:admin,productId:product.id,variantId:variant.id,imageId:image};
+}
+module.exports={verifySupportHttp};

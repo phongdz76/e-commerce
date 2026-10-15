@@ -108,6 +108,8 @@ export async function reacquireRetryStock(orderId: string) {
 export async function reviewPaidReleasedStock(orderId: string) {
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order?.stockReservation || order.stockReservation.state !== "RELEASED" || !["paid", "complete", "done"].includes(order.status)) return;
+  if (order.management?.state === "CANCELLED" && order.refundInfo && ["APPROVED", "SENDING", "PROCESSING", "REVIEW", "SUCCEEDED"].includes(order.refundInfo.state) &&
+      order.refundInfo.amount === order.amount && order.refundInfo.paymentReference === (order.paidPaymentAttemptId || order.paymentIntentId)) return;
   const id = createHash("sha256").update("stock-payment:" + order.id).digest("hex");
   await prisma.paymentException.upsert({ where: { id }, update: {}, create: { id, orderId: order.id,
     attemptId: order.paidPaymentAttemptId || order.paymentIntentId || "", reason: "STOCK_RELEASED_PAYMENT",
@@ -126,9 +128,11 @@ export async function cancelUnpaidCodStock(orderId: string, actorId: string, ver
       throw new CheckoutRequestError("This order has changed or packing has started. Reload before cancelling.", 409, "ORDER_CANCEL_LOCKED");
     }
     await releaseOrderStock(tx, order, actorId, reason, options.system);
-    const changed = await tx.order.updateMany({ where: { id: orderId, status: "pending", deliveryStatus: "pending", paymentMethod: "COD" }, data: { status: "cancelled", deliveryStatus: "cancelled" } });
+    const changed = await tx.order.updateMany({ where: { id: orderId, status: "pending", deliveryStatus: "pending", paymentMethod: "COD" }, data: { status: "cancelled", deliveryStatus: "cancelled",
+      management: { set: { state: "CANCELLED", version: (order.management?.version || 0) + 1, updatedAt: new Date() } } } });
     if (changed.count !== 1) throw Object.assign(new Error("Order changed"), { code: "P2034" });
     await tx.paymentAttempt.updateMany({ where: { orderId, state: "COD_PENDING" }, data: { state: "ABANDONED", nextCheckAt: null } });
+    await tx.auditLog.create({ data: { id: movementId(order.id, order.id, "ORDER_CANCELLED", version), actorId, entityType: "ORDER", entityId: orderId, action: "ORDER_CANCELLED", status: "SUCCEEDED", details: { reason, source: options.system ? "SYSTEM" : "ACCOUNT" } } });
   });
 }
 

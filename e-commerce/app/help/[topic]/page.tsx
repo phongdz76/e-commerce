@@ -82,6 +82,7 @@ export default async function HelpPage({ params }: { params: Promise<{ topic: st
           </div>
           <aside className="self-start rounded-md border border-slate-200 bg-slate-50 p-5">
             <h2 className="text-lg font-bold">Need a hand?</h2>
+            <Link href="/support" className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white">Message the support team</Link>
             <div className="mt-4 space-y-4 text-base">
               <a href="tel:19002004" className="flex items-center gap-3 hover:text-teal-700"><FiPhone className="shrink-0 text-teal-600" />1900 2004</a>
               <a href="mailto:sgtech@gmail.com" className="flex items-center gap-3 break-all hover:text-teal-700"><FiMail className="shrink-0 text-teal-600" />sgtech@gmail.com</a>

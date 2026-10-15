@@ -183,6 +183,8 @@ function fixture(method) {
     }
   }
   const mocks = {
+    "@/libs/supportCleanup": { cleanupOrphanSupportImages: async () => 0 },
+    "@/libs/checkoutQuote": require("./fixtures/approved-checkout.cjs"),
     "@/libs/prismadb": { __esModule: true, default: prisma },
     "@/libs/vnpay": vnpay,
     "@/libs/momo": momo,

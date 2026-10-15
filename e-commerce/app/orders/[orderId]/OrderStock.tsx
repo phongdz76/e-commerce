@@ -49,7 +49,7 @@ export default function OrderStock({ orderId }: { orderId: string }) {
       <h3 className="font-semibold">Stock reservation</h3>
       {loading ? <p role="status" className="text-slate-500">Loading reservation...</p> : data && <p>{labels[data.state] || "Stock needs review"}</p>}
       {data?.state === "HELD" && data.expiresAt && <p className="text-slate-500">Awaiting preparation until {formatAdminOrderDate(data.expiresAt)} (Vietnam). Unconfirmed COD orders may be cancelled after this hold expires.</p>}
-      {data?.state === "HELD" && !data.expiresAt && <p className="text-slate-500">Stock stays reserved until dispatch or a verified cancellation. Unconfirmed online payments continue to hold stock.</p>}
+      {data?.state === "HELD" && !data.expiresAt && <p className="text-slate-500">Stock stays reserved until dispatch or a verified cancellation.</p>}
       {data?.state === "RELEASED" && <p className="text-slate-500">If money was received after the release, the store must review this order before shipping.</p>}
       {error && <p role="alert" className="text-rose-700">{error}</p>}
       <button type="button" disabled={loading || saving} onClick={() => setReload((value) => value + 1)} className="min-h-11 font-semibold text-teal-700">Reload reservation</button>

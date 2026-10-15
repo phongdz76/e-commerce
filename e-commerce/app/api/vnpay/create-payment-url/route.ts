@@ -61,6 +61,7 @@ export async function POST(request: Request) {
       delivery,
       tmnCode,
       { bankCode },
+      body.quoteToken,
     );
     return await createVnpayPayment(request, order, attempt, bankCode);
   } catch (error: unknown) {

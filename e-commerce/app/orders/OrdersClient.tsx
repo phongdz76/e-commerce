@@ -14,6 +14,7 @@ import { FaBoxOpen } from "react-icons/fa";
 import Button from "@/app/components/Button";
 import SelectMenu from "@/app/components/inputs/SelectMenu";
 import { API_PATHS } from "@/utils/apiPaths";
+import { orderReference, ORDER_BUSINESS_LABELS } from "@/utils/orderManagement";
 import { CUSTOMER_DELIVERY_LABELS, getCustomerDeliveryInfo, normalizeCustomerDeliveryStatus } from "@/utils/orderShipment";
 
 interface OrderProduct {
@@ -29,6 +30,7 @@ interface OrderProduct {
 }
 
 interface OrderItem {
+  orderState?: import("@/types/orderManagement").OrderBusinessState;
   id: string;
   amount: number;
   currency: string;
@@ -184,8 +186,9 @@ export default function OrdersClient({ currentUser }: OrdersClientProps) {
                 >
                   <td className="px-4 py-3">
                     <Link href={`/orders/${order.id}`} className="font-mono text-sm text-slate-600 hover:text-teal-700">
-                      #{order.id.slice(-8).toUpperCase()}
+                      {orderReference(order.id)}
                     </Link>
+                    {order.orderState && <p className="mt-1 text-xs text-slate-500">Order: {ORDER_BUSINESS_LABELS[order.orderState]}</p>}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -272,7 +275,7 @@ export default function OrdersClient({ currentUser }: OrdersClientProps) {
             >
               <div className="flex items-center justify-between mb-3">
                 <span className="font-mono text-xs text-slate-500">
-                  #{order.id.slice(-8).toUpperCase()}
+                  {orderReference(order.id)}
                 </span>
                 <span className="text-xs text-slate-400">{date}</span>
               </div>

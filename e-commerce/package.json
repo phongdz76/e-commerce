@@ -15,6 +15,7 @@
     "test:content-mongo": "node scripts/check-product-content.cjs",
     "test:operations-mongo": "node scripts/check-operations-mongo.cjs",
     "test:operations-e2e": "node scripts/check-operations-e2e.cjs",
+    "test:support-mongo": "node scripts/check-support-mongo.cjs",
     "typecheck": "tsc --noEmit --incremental false",
     "worker:payments": "node scripts/payment-worker.cjs",
     "seed:catalog": "node scripts/seed-catalog.cjs",

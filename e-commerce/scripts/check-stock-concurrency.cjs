@@ -31,7 +31,8 @@ async function main() {
   const checks = [];
   try {
     // Create collections ahead of transactions, including their real unique-reference index.
-    for (const name of ["User", "Category", "Brand", "Product", "ProductVariant", "Order", "PaymentAttempt", "CheckoutRequest", "AuditLog", "PaymentException"]) await prisma.$runCommandRaw({ create: name });
+    for (const name of ["User", "Category", "Brand", "Product", "ProductVariant", "Order", "PaymentAttempt", "CheckoutRequest", "AuditLog", "PaymentException", "ShippingPolicy"]) await prisma.$runCommandRaw({ create: name });
+    await prisma.shippingPolicy.create({ data: { id: "default", version: 1, label: "QA stock pricing", enabled: true, fee: 0, freeShippingThreshold: null, nationwide: true, provinceCodes: [] } });
     await prisma.$runCommandRaw({ createIndexes: "Order", indexes: [{ key: { paymentIntentId: 1 }, name: "Order_paymentIntentId_key", unique: true }] });
     const users = await Promise.all([0, 1].map((index) => prisma.user.create({ data: { name: "Stock QA " + index, email: "stock-qa-" + index + "@example.invalid" } })));
     const category = await prisma.category.create({ data: { name: "Phone", slug: "stock-qa" } });
@@ -46,6 +47,12 @@ async function main() {
     const input = [{ id: product.id, variantId: variant.id, quantity: 1, price: variant.price }];
     const delivery = { recipientName: "Stock QA", recipientPhone: "0900000000", address: { line1: "QA address", city: "QA city", country: "VN", postal_code: "", state: "" } };
     const cart = await items.getOrderItems(input);
+    const prepare = checkout.prepareCheckoutRequest;
+    checkout.prepareCheckoutRequest = async (key, userId, method, selectedCart, selectedDelivery, merchant, options) => {
+      const address = { ...(selectedDelivery || delivery), address: { ...(selectedDelivery || delivery).address, provinceCode: "79" } };
+      const quote = await load("libs/checkoutQuote.ts").createCheckoutQuote(userId, selectedCart, address);
+      return prepare(key, userId, method, selectedCart, address, merchant, options, quote.token);
+    };
     const clearHold = async (order) => stock.withStockTransaction(async (tx) => { const current = await tx.order.findUnique({ where: { id: order.id } }); await stock.releaseOrderStock(tx, current, current.userId, "Disposable fixture cleanup before the next isolated check."); });
     for (let index = 0; index < 10; index++) {
       const contenders = await Promise.allSettled(users.map((user) => checkout.prepareCheckoutRequest(randomUUID(), user.id, "COD", cart, delivery)));

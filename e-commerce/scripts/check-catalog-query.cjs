@@ -91,6 +91,22 @@ async function main() {
     const suggestions = await catalog.getCatalogSuggestions('dien'); assert.ok(suggestions.length <= 4); assert.equal(suggestions[0].inventory, undefined);
     assert.equal(first.products[0].inventory, undefined); assert.equal(first.products[0].reserved, undefined); assert.equal(first.products[0].variants, undefined);
     checks.push('bounded public suggestions and page DTOs do not expose internal balances or full catalog');
+    const { reviewCart } = load('libs/reviewCart.ts');
+    const { getOrderItems } = load('libs/orderItems.ts');
+    const legacy = { id: mixed.product.id, quantity: 2, price: 90000, selectedImg: image };
+    const refreshed = await reviewCart([legacy, { ...legacy, variantId: mixed.variant.id },
+      { id: newCategoryProduct.product.id, variantId: newCategoryProduct.variant.id, quantity: 2, price: 1 },
+      { id: unknown.product.id, variantId: unknown.variant.id, quantity: 1, price: 100000 }]);
+    assert.deepEqual(refreshed.lines.map(line => line.issues), [['OPTION_REQUIRED'], ['OUT_OF_STOCK'], ['PRICE_CHANGED'], ['STOCK_NOT_COUNTED']]);
+    assert.equal(refreshed.lines[2].current.price, 100000);
+    assert.equal(refreshed.lines[2].current.quantity, 2);
+    assert.equal((await reviewCart([refreshed.lines[2].current])).canCheckout, true);
+    await assert.rejects(getOrderItems([legacy]), error => error.code === 'SKU_UNAVAILABLE');
+    await prisma.productVariant.updateMany({ where: { productId: mixed.product.id, id: { not: mixed.variant.id } }, data: { isActive: false } });
+    assert.deepEqual((await reviewCart([legacy])).lines[0].issues, ['OPTION_REQUIRED']);
+    await assert.rejects(getOrderItems([legacy]), error => error.code === 'SKU_UNAVAILABLE');
+    assert.equal((await prisma.productVariant.findUnique({ where: { id: mixed.variant.id } })).inventory.reserved, 1);
+    checks.push('cart reviews isolate invalid rows, preserve ambiguous legacy choices, propose current prices and never reserve stock');
     fs.writeFileSync(path.join(appDirectory, '.artifacts/catalog-mongo-results.json'), JSON.stringify({ checks, disposableDatabase: true, applicationDatabaseWrites: 0 }, null, 2));
     console.log('Catalog MongoDB passed: ' + checks.length + ' check groups.');
   } finally {
