@@ -47,7 +47,11 @@ class CDP {
   async wait(expression) {
     const start = Date.now();
     while (Date.now() - start < 45000) {
-      if (await this.evaluate(expression)) return;
+      try {
+        if (await this.evaluate("document.readyState !== 'loading' && !!document.body && (" + expression + ")")) return;
+      } catch (error) {
+        if (!/Execution context was destroyed|Cannot find context with specified id/.test(error.message)) throw error;
+      }
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
     throw new Error("Timed out waiting for UI");

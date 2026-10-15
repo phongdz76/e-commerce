@@ -76,4 +76,5 @@ jobs:
         with:
           name: sgtech-verification-${{ github.sha }}
           path: e-commerce/.artifacts/*results.json
+          include-hidden-files: true
           if-no-files-found: ignore
