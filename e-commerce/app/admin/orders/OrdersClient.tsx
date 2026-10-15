@@ -16,6 +16,7 @@ import {
   getAdminOrderReference,
 } from "@/utils/adminOrders";
 import type { AdminOrderList } from "@/types";
+import { ORDER_BUSINESS_LABELS } from "@/utils/orderManagement";
 import AdminPagination from "@/app/admin/components/AdminPagination";
 import OrderStatusBadge from "@/app/admin/orders/OrderStatusBadge";
 import DeliveryStatusBadge from "@/app/admin/orders/DeliveryStatusBadge";
@@ -32,6 +33,8 @@ export default function OrdersClient({ view = "orders" }: { view?: "orders" | "s
   const method = searchParams?.get("method") || "ALL";
   const delivery = searchParams?.get("delivery") || "ALL";
   const search = searchParams?.get("search") || "";
+  const from = searchParams?.get("from") || "";
+  const to = searchParams?.get("to") || "";
   const pageValue = searchParams?.get("page") || "1";
   const [data, setData] = useState<AdminOrderList | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,7 +48,7 @@ export default function OrdersClient({ view = "orders" }: { view?: "orders" | "s
       setError("");
       try {
         const response = await axios.get<AdminOrderList>(API_PATHS.ADMIN.ORDERS, {
-          params: { status, method, delivery, search, page: pageValue },
+          params: { status, method, delivery, search, from, to, page: pageValue },
         });
         if (active) {
           setData(response.data);
@@ -67,24 +70,24 @@ export default function OrdersClient({ view = "orders" }: { view?: "orders" | "s
     return () => {
       active = false;
     };
-  }, [status, method, delivery, search, pageValue, refresh]);
+  }, [status, method, delivery, search, from, to, pageValue, refresh]);
 
   const handleFilters = (changes: Record<string, string>) => {
-    const params = new URLSearchParams({ status, method, delivery, search, page: "1", ...changes });
+    const params = new URLSearchParams({ status, method, delivery, search, from, to, page: "1", ...changes });
     router.push(basePath + "?" + params.toString(), { scroll: false });
   };
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    handleFilters({ search: String(formData.get("search") || "").trim() });
+    handleFilters({ search: String(formData.get("search") || "").trim(), from: String(formData.get("from") || ""), to: String(formData.get("to") || "") });
   };
 
   const handleClear = () => {
     router.push(basePath, { scroll: false });
   };
 
-  const inputClassName = "rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20";
+  const inputClassName = "rounded-md border border-slate-300 bg-white px-3 py-2 text-sm transition-colors focus:border-teal-600 focus:!outline-none focus-visible:!outline-none focus:!ring-0 focus-visible:!ring-0";
 
   return (
     <div className="space-y-6">
@@ -138,7 +141,7 @@ export default function OrdersClient({ view = "orders" }: { view?: "orders" | "s
               name="search"
               defaultValue={search}
               maxLength={80}
-              placeholder="Customer, recipient, phone or full order ID"
+              placeholder="Customer, phone, order reference or full ID"
               className={`${inputClassName} min-w-0 w-full`}
             />
             <button type="submit" aria-label="Search orders" className="rounded-md bg-slate-700 px-3 text-white hover:bg-slate-800">
@@ -147,7 +150,7 @@ export default function OrdersClient({ view = "orders" }: { view?: "orders" | "s
           </div>
         </div>
         <div className="space-y-1.5">
-          <label htmlFor="order-status" className="block text-sm font-medium">Order status</label>
+          <label htmlFor="order-status" className="block text-sm font-medium">Payment status</label>
           <select id="order-status" value={status} onChange={(event) => handleFilters({ status: event.target.value })} className={inputClassName}>
             {ADMIN_ORDER_FILTERS.map((filter) => (
               <option key={filter.value} value={filter.value}>{filter.label}</option>
@@ -171,6 +174,9 @@ export default function OrdersClient({ view = "orders" }: { view?: "orders" | "s
             ))}
           </select>
         </div>
+        <label className="space-y-1.5 text-sm font-medium">From (Vietnam)<input key={from} type="date" name="from" defaultValue={from} className={inputClassName + " block"} /></label>
+        <label className="space-y-1.5 text-sm font-medium">To (Vietnam)<input key={to} type="date" name="to" defaultValue={to} className={inputClassName + " block"} /></label>
+        <button type="submit" className="min-h-10 rounded-md bg-slate-700 px-3 py-2 text-sm text-white">Apply filters</button>
         <button type="reset" onClick={handleClear} className="rounded-md border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">Clear filters</button>
       </form>
 
@@ -218,6 +224,7 @@ export default function OrdersClient({ view = "orders" }: { view?: "orders" | "s
                   <tr key={order.id} className="hover:bg-slate-50">
                     <td className="px-5 py-4">
                       <Link href={`/admin/orders/${order.id}`} className="font-semibold text-teal-700 hover:underline">{getAdminOrderReference(order.id)}</Link>
+                      {order.orderState && <p className="mt-1 text-xs text-slate-500">Order: {ORDER_BUSINESS_LABELS[order.orderState]}</p>}
                       <p className="mt-1 whitespace-nowrap text-xs text-slate-500">{formatAdminOrderDate(order.createDate)}</p>
                     </td>
                     <td className="max-w-64 px-5 py-4">

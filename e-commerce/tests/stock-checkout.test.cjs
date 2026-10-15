@@ -31,6 +31,7 @@ function fixture() {
     cancel: async (id) => { state.cancelCalls++; const intent = intents.get(id); intent.status = "canceled"; if (state.cancelResponseLost) { state.cancelResponseLost = false; throw new Error("private-timeout-after-cancel"); } return structuredClone(intent); },
   } };
   const mocks = { "@/libs/prismadb": { __esModule: true, default: prisma }, "@/actions/getCurrentUser": { getCurrentUser: async () => state.user },
+    "@/libs/checkoutQuote": require("./fixtures/approved-checkout.cjs"),
     "@/libs/stripe": { getStripe: () => stripe }, "./stripe": { getStripe: () => stripe }, "next/server": { NextResponse: { json: Response.json } } };
   const cache = new Map();
   function load(file) {
@@ -105,8 +106,12 @@ test("changed client prices require confirmation and quote refresh uses server m
   const f = fixture(); const stale = [{ ...f.input[0], price: 1, name: "Forged" }];
   await assert.rejects(f.items.getOrderItems(stale), (error) => error.code === "CHECKOUT_PRICE_CHANGED");
   const response = await f.quote({ items: stale }); assert.equal(response.status, 200);
-  const body = await response.json(); assert.equal(body.amount, f.variant.price); assert.equal(body.items[0].name, f.product.name);
-  assert.equal(body.items[0].sku, f.variant.sku); assert.equal(f.variant.inventory.reserved, 0); assert.equal(f.orders.size, 0);
+  const body = await response.json(); assert.equal(body.amount, null); assert.equal(body.canCheckout, false);
+  assert.deepEqual(body.lines[0].issues, ["PRICE_CHANGED"]);
+  assert.equal(body.lines[0].current.price, f.variant.price); assert.equal(body.lines[0].current.name, f.product.name);
+  assert.equal(body.lines[0].current.sku, f.variant.sku); assert.equal(f.variant.inventory.reserved, 0); assert.equal(f.orders.size, 0);
+  const accepted = await f.quote({ items: [body.lines[0].current] });
+  assert.equal((await accepted.json()).amount, f.variant.price);
 });
 
 test("stock APIs enforce ownership and never expose reservation lines, fingerprints or internal keys", async () => {

@@ -74,6 +74,8 @@ export interface AdminOverview {
 
 export interface AdminOrderSummary {
   id: string;
+  reference?: string;
+  orderState?: import("./orderManagement").OrderBusinessState;
   amount: number;
   currency: string;
   status: string;
@@ -102,6 +104,7 @@ export interface AdminSalesProduct {
 }
 
 export interface AdminOrderDetail extends AdminOrderSummary {
+  totals?: import("./checkout").CheckoutTotals | null;
   address: {
     line1: string;
     line2: string | null;

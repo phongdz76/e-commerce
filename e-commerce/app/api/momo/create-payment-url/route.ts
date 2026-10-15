@@ -29,16 +29,6 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    if (
-      !Number.isSafeInteger(cart.amount) ||
-      cart.amount < 1000 ||
-      cart.amount > 50000000
-    ) {
-      return NextResponse.json(
-        { error: "MoMo payments must be between 1,000 and 50,000,000 VND." },
-        { status: 400 },
-      );
-    }
     if (cart.items.length > 50) {
       return NextResponse.json(
         { error: "MoMo supports up to 50 different products per payment." },
@@ -66,6 +56,8 @@ export async function POST(request: Request) {
       cart,
       delivery,
       partnerCode,
+      {},
+      body.quoteToken,
     );
     return await createMomoPayment(request, order, attempt);
   } catch (error: unknown) {

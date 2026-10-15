@@ -67,6 +67,7 @@ jobs:
       - run: npm run test:stock-mongo
       - run: npm run test:catalog-mongo
       - run: npm run test:content-mongo
+      - run: npm run test:support-mongo
       - run: npm run test:operations-mongo
       - run: npm run test:operations-e2e
       - name: Upload verification evidence

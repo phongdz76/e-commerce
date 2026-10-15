@@ -35,6 +35,9 @@ export async function POST(request: Request) {
       "COD",
       cart,
       delivery,
+      null,
+      {},
+      body.quoteToken,
     );
     await prisma.paymentAttempt.updateMany({
       where: { id: attempt.id, state: "CREATED" },

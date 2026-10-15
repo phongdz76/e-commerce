@@ -9,6 +9,7 @@ import {
 } from "@/utils/adminOrders";
 import OrderStatusBadge from "@/app/admin/orders/OrderStatusBadge";
 import DeliveryStatusBadge from "@/app/admin/orders/DeliveryStatusBadge";
+import { ORDER_BUSINESS_LABELS } from "@/utils/orderManagement";
 
 export default function OrderSummaryCard({
   order, showDeliveryAddress = false,
@@ -24,6 +25,7 @@ export default function OrderSummaryCard({
             Order {getAdminOrderReference(order.id)}
           </Link>
           <p className="mt-1 text-xs text-slate-500">{formatAdminOrderDate(order.createDate)}</p>
+          {order.orderState && <p className="mt-1 text-xs text-slate-500">Order: {ORDER_BUSINESS_LABELS[order.orderState]}</p>}
         </div>
         <OrderStatusBadge status={order.status} />
       </div>

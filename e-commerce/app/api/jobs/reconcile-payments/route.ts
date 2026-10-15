@@ -8,6 +8,8 @@ import {
 import { reconcilePendingPayments } from "@/libs/reconcilePayment";
 import { cleanupExpiredAuthRateLimits } from "@/libs/authRateLimit";
 import { expireUnconfirmedCodStock } from "@/libs/orderStock";
+import { checkPendingRefunds } from "@/libs/orderRefund";
+import { cleanupOrphanSupportImages } from "@/libs/supportCleanup";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -34,10 +36,14 @@ export async function GET(request: Request) {
     const expiredAuthBucketsRemoved = await cleanupExpiredAuthRateLimits();
     const results = await reconcilePendingPayments();
     const expiredCodHolds = await expireUnconfirmedCodStock();
+    const refundsChecked = await checkPendingRefunds();
+    const orphanSupportImagesRemoved = await cleanupOrphanSupportImages();
     const metrics = {
       processed: results.length,
       expiredAuthBucketsRemoved,
       expiredCodHolds,
+      refundsChecked,
+      orphanSupportImagesRemoved,
     };
     if (!(await finishOperationalJob(token, metrics)))
       throw new Error("Operational lease was lost");
@@ -47,6 +53,8 @@ export async function GET(request: Request) {
         results,
         expiredAuthBucketsRemoved,
         expiredCodHolds,
+        refundsChecked,
+        orphanSupportImagesRemoved,
       },
       { headers: { "Cache-Control": "private, no-store" } },
     );

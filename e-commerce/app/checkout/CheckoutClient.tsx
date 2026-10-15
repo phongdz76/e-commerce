@@ -17,6 +17,7 @@ import StripePaymentElement, {
 } from "./StripePaymentElement";
 import { safeUser } from "@/types";
 import { API_PATHS } from "../../utils/apiPaths";
+import type { CheckoutPreparation } from "@/types/checkout";
 
 const stripeKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 let stripePromise: Promise<Stripe | null> | null = null;
@@ -70,6 +71,8 @@ export default function CheckoutClient({
   const [stripeReturnStatus, setStripeReturnStatus] = useState("loading");
   const [returnRetry, setReturnRetry] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState("COD");
+  const [preparedCheckout, setPreparedCheckout] = useState<CheckoutPreparation | null>(null);
+  const handleQuoteChange = useCallback((value: CheckoutPreparation | null) => setPreparedCheckout(value), []);
   const selectedPaymentMethod = useRef("COD");
   const [stripeContext, setStripeContext] = useState<StripePaymentContext>({
     stripe: null,
@@ -272,6 +275,7 @@ export default function CheckoutClient({
 
     if (
       paymentMethod === "STRIPE" &&
+      preparedCheckout &&
       stripeKey &&
       cartProducts &&
       cartProducts.length > 0 &&
@@ -293,6 +297,8 @@ export default function CheckoutClient({
           items: cartProducts,
           payment_intent_id: paymentIntent,
           checkout_request_id: getCheckoutRequestId(currentCartString),
+          ...preparedCheckout.delivery,
+          quoteToken: preparedCheckout.quote.token,
         }),
       })
         .then(async (res) => {
@@ -360,6 +366,7 @@ export default function CheckoutClient({
     paymentSuccess,
     isPaymentReturn,
     paymentMethod,
+    preparedCheckout,
   ]);
 
   const options: StripeElementsOptions = {
@@ -420,6 +427,7 @@ export default function CheckoutClient({
       );
     }
 
+    if (!preparedCheckout) return <p className="text-sm text-slate-500">Get a delivery quote to prepare card payment.</p>;
     if (clientSecret && !loading) {
       return (
         <Elements
@@ -454,6 +462,7 @@ export default function CheckoutClient({
             currentUser={currentUser}
             stripeOrderId={recentOrderId}
             availablePaymentMethods={availablePaymentMethods}
+            onQuoteChange={handleQuoteChange}
           />
         )}
       {isPaymentReturn && !paymentSuccess && (

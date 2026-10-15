@@ -52,7 +52,7 @@ const HomeBanner = () => {
     },
     {
       id: 2,
-      image: "/Image/Banner2.png",
+      image: "/Image/Banner6.png",
       title: "Special Promotion",
       description: "Up to 50% off on all products",
       buttonText: "Shop Now",
@@ -60,7 +60,7 @@ const HomeBanner = () => {
     },
     {
       id: 3,
-      image: "/Image/Banner3.png",
+      image: "/Image/Banner8.jpg",
       title: "Customer Service",
       description: "We are always ready to support you 24/7",
       buttonText: "Contact Us",
@@ -68,7 +68,7 @@ const HomeBanner = () => {
     },
     {
       id: 4,
-      image: "/Image/Banner4.jpg",
+      image: "/Image/Banner7.png",
       title: "Apple Collection",
       description: "Latest and trending Apple products",
       buttonText: "Shop Now",

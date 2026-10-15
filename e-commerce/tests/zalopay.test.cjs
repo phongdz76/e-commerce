@@ -64,7 +64,7 @@ const payload = {
   fullName: "Recipient",
   checkout_request_id: "stable-id",
 };
-function fixture() {
+function fixture(shippingFee = 0) {
   const rows = new Map();
   const requests = [];
   const state = {
@@ -175,6 +175,7 @@ function fixture() {
   prisma.paymentAttempt = model(attempts);
   installStockDatabase(prisma, products, [rows, checkoutRequests, attempts]);
   const mocks = {
+    "@/libs/checkoutQuote": require("./fixtures/approved-checkout.cjs").withFee(shippingFee),
     "@/actions/getCurrentUser": { getCurrentUser: async () => state.user },
     "@/libs/prismadb": { __esModule: true, default: prisma },
     "@/libs/orderDelivery": orderDelivery,
@@ -231,6 +232,16 @@ function fixture() {
 test("ZaloPay references use Vietnam date around UTC midnight", () => {
   assert.equal(zalo.zaloPayDate(new Date("2026-10-11T18:00:00Z")), "261012");
   assert.equal(zalo.zaloPayDate(new Date("2026-12-31T18:00:00Z")), "270101");
+});
+
+test("ZaloPay create, MAC, response and stored attempt use the delivery-inclusive total", async () => {
+  const f = fixture(15000);
+  const response = await f.create(); assert.equal(response.status, 200);
+  const body = await response.json(), order = f.first();
+  const request = f.requests.find(row => row.operation === 'create').data;
+  assert.equal(request.amount, product.price + 15000);
+  assert.equal(body.amount, request.amount); assert.equal(order.amount, request.amount);
+  assert.equal(request.mac, mac(`${request.app_id}|${request.app_trans_id}|${request.app_user}|${request.amount}|${request.app_time}|${request.embed_data}|${request.item}`, 'fixture-key1'));
 });
 test("MAC validation checks exact data and rejects malformed signatures", () => {
   assert.equal(zalo.verifyZaloPayMac("data", mac("data", "key"), "key"), true);
@@ -653,7 +664,7 @@ for (const [paymentMethod, outcome] of [
         },
       },
     };
-    if (outcome === "return-back") global.fetch = async () => Response.json([]);
+    global.fetch = async () => Response.json([{ code: 79, name: "Ho Chi Minh City" }]);
     let resolvePayment;
     const waiting = new Promise((resolve) => {
       resolvePayment = resolve;
@@ -675,6 +686,7 @@ for (const [paymentMethod, outcome] of [
         __esModule: true,
         default: {
           post: async (url, body) => {
+            if (url === "/api/checkout/quote") return { data: { token: "signed-fixture-quote", expiresAt: new Date(Date.now() + 600000).toISOString(), totals: { subtotal: product.price, shippingFee: 0, discountTotal: 0, grandTotal: product.price, shippingPolicyLabel: "QA delivery" } } };
             calls.push({ url, body });
             return waiting;
           },
@@ -708,11 +720,17 @@ for (const [paymentMethod, outcome] of [
         },
       };
       let tree = Form(formProps);
+      for (const effect of h.effects) cleanups.push(effect());
+      await new Promise((resolve) => setImmediate(resolve));
+      h.reset(); tree = Form(formProps);
       findElement(tree, (e) => e.props?.id === "deliveryCity").props.onChange({
-        target: { value: "Ho Chi Minh City" },
+        target: { value: "79" },
       });
       h.reset();
       tree = Form(formProps);
+      findElement(tree, (e) => e.type === "button" && e.props.children === "Get delivery quote").props.onClick();
+      await new Promise((resolve) => setImmediate(resolve));
+      h.reset(); tree = Form(formProps);
       if (outcome === "return-back") {
         for (const effect of h.effects) cleanups.push(effect());
         await new Promise((resolve) => setImmediate(resolve));
@@ -790,6 +808,8 @@ for (const [paymentMethod, outcome] of [
 }
 
 test("inline Stripe checkout retains the cart until the server confirms receipt of payment", async () => {
+  const previousFetch = global.fetch;
+  global.fetch = async () => Response.json([{ code: 79, name: "Ho Chi Minh City" }]);
   const previousWindow = global.window;
   global.window = { location: { origin: "http://localhost:3000" } };
   try {
@@ -814,7 +834,8 @@ test("inline Stripe checkout retains the cart until the server confirms receipt 
         axios: {
           __esModule: true,
           default: {
-            post: async () => {
+            post: async (url) => {
+              if (url === "/api/checkout/quote") return { data: { token: "signed-fixture-quote", expiresAt: new Date(Date.now() + 600000).toISOString(), totals: { subtotal: product.price, shippingFee: 0, discountTotal: 0, grandTotal: product.price, shippingPolicyLabel: "QA delivery" } } };
               if (status === "offline") throw new Error("Verification offline");
               return {
                 data: {
@@ -857,11 +878,17 @@ test("inline Stripe checkout retains the cart until the server confirms receipt 
         },
       };
       let tree = Form(formProps);
+      for (const effect of h.effects) effect();
+      await new Promise((resolve) => setImmediate(resolve));
+      h.reset(); tree = Form(formProps);
       findElement(tree, (e) => e.props?.id === "deliveryCity").props.onChange({
-        target: { value: "Ho Chi Minh City" },
+        target: { value: "79" },
       });
       h.reset();
       tree = Form(formProps);
+      findElement(tree, (e) => e.type === "button" && e.props.children === "Get delivery quote").props.onClick();
+      await new Promise((resolve) => setImmediate(resolve));
+      h.reset(); tree = Form(formProps);
       findElement(tree, (element) => element.type === "form").props.onSubmit({
         preventDefault() {},
       });
@@ -871,6 +898,7 @@ test("inline Stripe checkout retains the cart until the server confirms receipt 
     }
   } finally {
     global.window = previousWindow;
+    global.fetch = previousFetch;
   }
 });
 

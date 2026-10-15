@@ -6,7 +6,7 @@ const { CDP } = require("../tests/fixtures/browser-cdp.cjs");
 const pause = (milliseconds) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-async function verifyOperationsBrowser({ origin, cookie, artifactDirectory }) {
+async function verifyOperationsBrowser({ origin, cookie, artifactDirectory, cartFixture, orderFixture, supportFixture }) {
   const chrome =
     process.env.CHROME_BIN ||
     (process.platform === "win32"
@@ -194,6 +194,49 @@ async function verifyOperationsBrowser({ origin, cookie, artifactDirectory }) {
       conflictKeepsReason: true,
       interceptedProviderWrites: true,
     });
+    if (cartFixture) {
+      await page.send("Fetch.disable");
+      let failQuote = true;
+      page.listeners.set("Fetch.requestPaused", ({ requestId }) => {
+        if (failQuote) {
+          failQuote = false;
+          void page.send("Fetch.fulfillRequest", { requestId, responseCode: 503,
+            responseHeaders: [{ name: "Content-Type", value: "application/json" }],
+            body: Buffer.from(JSON.stringify({ error: "Unable to refresh your cart. Its previous contents have been kept." })).toString("base64") });
+        } else void page.send("Fetch.continueRequest", { requestId });
+      });
+      await page.send("Fetch.enable", { patterns: [{ urlPattern: origin + "/api/cart/quote" }] });
+      for (const width of [320, 1440]) {
+        await page.send("Emulation.setDeviceMetricsOverride", { width, height: 1000, deviceScaleFactor: 1, mobile: false });
+        await page.evaluate(`localStorage.setItem('CartItems', ${JSON.stringify(JSON.stringify([cartFixture, { ...cartFixture, id: "f".repeat(24), variantId: "e".repeat(24), name: "Unavailable QA item" }]))})`);
+        await page.send("Page.navigate", { url: origin + "/cart" });
+        await page.wait("document.body.innerText.includes('Shopping Cart') && document.body.innerText.includes('Unavailable QA item')");
+        const refresh = "Array.from(document.querySelectorAll('button')).find(button=>button.innerText==='Check prices and stock').click()";
+        await page.evaluate(refresh);
+        if (width === 320) {
+          await page.wait("document.body.innerText.includes('previous contents have been kept')");
+          assert.equal(await page.evaluate("JSON.parse(localStorage.getItem('CartItems')).length"), 2);
+          await page.evaluate(refresh);
+        }
+        await page.wait("document.body.innerText.includes('current unit price') && document.body.innerText.includes('no longer available')");
+        assert.equal(await page.evaluate("JSON.parse(localStorage.getItem('CartItems'))[0].price"), 1);
+        assert.equal(await page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1"), true);
+        const capture = await page.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true });
+        fs.writeFileSync(path.join(artifactDirectory, `p1-cart-${width}.png`), Buffer.from(capture.data, "base64"));
+        await page.evaluate("Array.from(document.querySelectorAll('button')).find(button=>button.innerText.startsWith('Accept ')).click()");
+        await page.wait("document.body.innerText.includes('Change applied')");
+        const saved = await page.evaluate("JSON.parse(localStorage.getItem('CartItems'))");
+        assert.equal(saved.version, 1); assert.equal(saved.items.length, 2);
+        assert.equal(saved.items[0].price, 10000); assert.equal(saved.items[0].quantity, 1);
+        await page.evaluate("document.querySelector('button[aria-label=\"Remove Unavailable QA item from cart\"]').click()");
+        assert.equal(await page.evaluate("JSON.parse(localStorage.getItem('CartItems')).items.length"), 1);
+        checks.push({ width, cartFits: true, legacyRecovered: true, failedRefreshKeepsCart: true, explicitPriceAndQuantityAcceptance: true, unavailableRowKeptUntilRemoved: true });
+      }
+      await page.send("Fetch.disable");
+      await require("./check-checkout-browser.cjs").verifyCheckoutBrowser({ page, origin, artifactDirectory, checks });
+    }
+    if (orderFixture) await require("./check-order-lifecycle-browser.cjs").verifyOrderLifecycleBrowser({ page, origin, artifactDirectory, checks, fixture: orderFixture });
+    if (supportFixture) await require("./check-support-browser.cjs").verifySupportBrowser({ page, origin, artifactDirectory, checks, fixture: supportFixture });
     assert.deepEqual(exceptions, []);
     fs.writeFileSync(
       path.join(artifactDirectory, "p0-browser-results.json"),

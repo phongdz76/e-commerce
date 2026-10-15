@@ -17,7 +17,7 @@ import { formatAdminOrderAmount, formatAdminOrderDate, getAdminOrderReference } 
 import { getAdminErrorMessage } from "@/utils/adminError";
 import type { AdminCodQueue, AdminCodQueueRow } from "@/types/adminCodQueue";
 
-const inputClassName = "min-h-11 w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100";
+const inputClassName = "min-h-11 w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm transition-colors focus:border-teal-600 focus:!outline-none focus-visible:!outline-none focus:!ring-0 focus-visible:!ring-0";
 
 function CodStageBadge({ order }: { order: AdminCodQueueRow }) {
   const info = getCodQueueStageInfo(order.stage);

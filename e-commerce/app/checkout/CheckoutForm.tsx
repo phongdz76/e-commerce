@@ -19,6 +19,7 @@ import { safeUser } from "@/types";
 import axios from "axios";
 import { API_PATHS } from "../../utils/apiPaths";
 import { PROVINCES_API } from "../../utils/externalApiPaths";
+import type { CheckoutDelivery, CheckoutQuote, CheckoutPreparation } from "@/types/checkout";
 
 const PHONE_REGEX = /^\+?[0-9]{9,15}$/;
 type LocationLevel = "province" | "district" | "ward";
@@ -78,6 +79,7 @@ interface CheckoutFormProps {
   currentUser: safeUser | null;
   stripeOrderId?: string | null;
   availablePaymentMethods?: Record<string, boolean>;
+  onQuoteChange?: (value: CheckoutPreparation | null) => void;
 }
 
 export interface CheckoutReceipt {
@@ -94,6 +96,7 @@ export default function CheckoutForm({
   currentUser,
   stripeOrderId,
   availablePaymentMethods,
+  onQuoteChange,
 }: CheckoutFormProps) {
   const {
     cartTotalQtyAmount,
@@ -141,7 +144,45 @@ export default function CheckoutForm({
   const checkoutRequest = useRef<{ fingerprint: string; id: string } | null>(
     null,
   );
-  const formattedPrice = formatPrice(cartTotalQtyAmount);
+  const selectedSavedProvince = provinces.find(option => String(option.code) === deliveryCity);
+  const deliveryInput: CheckoutDelivery = {
+    fullName: fullName.trim(),
+    phone: (isEditingDeliveryInfo ? phoneNumber : currentUser?.phoneNumber || phoneNumber).replace(/\s+/g, ""),
+    address: isEditingDeliveryInfo ? [houseNumber, ward?.name, district?.name, province?.name].filter(Boolean).join(", ").trim() : currentUser?.address?.trim() || "",
+    city: (isEditingDeliveryInfo ? province?.name : selectedSavedProvince?.name) || "",
+    provinceCode: String((isEditingDeliveryInfo ? province?.code : selectedSavedProvince?.code) || ""),
+    ...(isEditingDeliveryInfo && district ? { districtCode: String(district.code) } : {}),
+    ...(isEditingDeliveryInfo && ward ? { wardCode: String(ward.code) } : {}),
+  };
+  const quoteFingerprint = JSON.stringify([cartProducts, deliveryInput]);
+  const [quoteRecord, setQuoteRecord] = useState<{ fingerprint: string; quote: CheckoutQuote } | null>(null);
+  const [quoting, setQuoting] = useState(false);
+  const [quoteError, setQuoteError] = useState("");
+  const quoteRequest = useRef(0);
+  const quote = quoteRecord?.fingerprint === quoteFingerprint ? quoteRecord.quote : null;
+  const cardDeliveryLocked = paymentMethod === "STRIPE" && Boolean(quote);
+  const formattedPrice = formatPrice(quote?.totals.grandTotal ?? cartTotalQtyAmount);
+  useEffect(() => { quoteRequest.current++; }, [quoteFingerprint]);
+  useEffect(() => {
+    onQuoteChange?.(quote ? { quote, delivery: JSON.parse(quoteFingerprint)[1] } : null);
+  }, [quote, quoteFingerprint, onQuoteChange]);
+
+  async function getDeliveryQuote() {
+    if (quoting || cardDeliveryLocked) return;
+    if (!deliveryInput.fullName || !PHONE_REGEX.test(deliveryInput.phone) || !deliveryInput.address || !deliveryInput.provinceCode ||
+        (isEditingDeliveryInfo && (!district || !ward || !houseNumber.trim()))) {
+      setQuoteError("Complete the recipient, phone and delivery address, including the province or city, before requesting a quote."); return;
+    }
+    const request = ++quoteRequest.current;
+    setQuoting(true); setQuoteError("");
+    try {
+      const response = await axios.post<CheckoutQuote>(API_PATHS.ORDER.CHECKOUT_QUOTE, { items: cartProducts, ...deliveryInput });
+      if (request === quoteRequest.current) setQuoteRecord({ fingerprint: quoteFingerprint, quote: response.data });
+    } catch (failure) {
+      const message = axios.isAxiosError(failure) ? failure.response?.data?.error : null;
+      if (request === quoteRequest.current) { setQuoteRecord(null); setQuoteError(typeof message === "string" ? message : "Unable to get delivery pricing. Your cart and address have been kept."); }
+    } finally { setQuoting(false); }
+  }
 
   useEffect(() => {
     if (paymentMethod !== "MOMO") return;
@@ -344,6 +385,7 @@ export default function CheckoutForm({
     if (submitting.current) {
       return;
     }
+    if (!quote) { toast.error("Get a delivery quote and review the total before ordering."); return; }
     if (availablePaymentMethods?.[paymentMethod] === false) {
       toast.error(
         "This payment method is currently unavailable. Please choose another method.",
@@ -362,7 +404,7 @@ export default function CheckoutForm({
     const finalAddress = isEditingDeliveryInfo
       ? getFinalAddress()
       : currentUser?.address || "";
-    const finalCity = isEditingDeliveryInfo ? province?.name || "" : deliveryCity.trim();
+    const finalCity = deliveryInput.city;
     const finalPhone = isEditingDeliveryInfo
       ? normalizedPhone
       : (currentUser?.phoneNumber || normalizedPhone).replace(/\s+/g, "");
@@ -492,6 +534,10 @@ export default function CheckoutForm({
           phone: finalPhone,
           fullName: fullName.trim(),
           city: finalCity,
+          provinceCode: deliveryInput.provinceCode,
+          districtCode: deliveryInput.districtCode,
+          wardCode: deliveryInput.wardCode,
+          quoteToken: quote.token,
         });
 
         if (response.data.alreadyPaid) {
@@ -548,6 +594,10 @@ export default function CheckoutForm({
           phone: finalPhone,
           fullName: fullName.trim(),
           city: finalCity,
+          provinceCode: deliveryInput.provinceCode,
+          districtCode: deliveryInput.districtCode,
+          wardCode: deliveryInput.wardCode,
+          quoteToken: quote.token,
         });
 
         if (response.data.alreadyPaid) {
@@ -600,6 +650,9 @@ export default function CheckoutForm({
         phone: finalPhone,
         fullName: fullName.trim(),
         city: finalCity,
+        provinceCode: deliveryInput.provinceCode,
+        districtCode: deliveryInput.districtCode,
+        wardCode: deliveryInput.wardCode,
       };
       const fingerprint = JSON.stringify(payload);
       let requestId = crypto.randomUUID();
@@ -623,7 +676,7 @@ export default function CheckoutForm({
       try {
         const response = await axios.post(
           API_PATHS.PAYMENT.ZALOPAY_CREATE_URL,
-          { ...payload, checkout_request_id: requestId },
+          { ...payload, checkout_request_id: requestId, quoteToken: quote.token },
         );
         setZaloPayOrderId(response.data.orderId);
         if (currentUser && shouldSaveDeliveryInfo) {
@@ -682,6 +735,10 @@ export default function CheckoutForm({
           phone: finalPhone,
           fullName: fullName.trim(),
           city: finalCity,
+          provinceCode: deliveryInput.provinceCode,
+          districtCode: deliveryInput.districtCode,
+          wardCode: deliveryInput.wardCode,
+          quoteToken: quote.token,
         });
 
         if (currentUser && shouldSaveDeliveryInfo) {
@@ -743,6 +800,7 @@ export default function CheckoutForm({
       <div className="mb-6">
         <Heading title="Enter your details to complete checkout" />
       </div>
+      <fieldset disabled={isLoading || cardDeliveryLocked} className="min-w-0">
       <h2 className="text-lg font-semibold mt-4 mb-4">Delivery Information</h2>
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
@@ -799,9 +857,10 @@ export default function CheckoutForm({
             {renderFieldError("houseNumber")}
             <label htmlFor="deliveryCity" className="mt-4 block space-y-2 text-sm font-medium">
               <span>Province / City for this delivery</span>
-              <input id="deliveryCity" value={deliveryCity} onChange={(event) => { setDeliveryCity(event.target.value); clearFieldError("deliveryCity"); }} required maxLength={100} autoComplete="address-level1" aria-invalid={Boolean(fieldErrors.deliveryCity)} aria-describedby="deliveryCity-error" className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-4 py-3" />
+              <select id="deliveryCity" value={deliveryCity} disabled={locationLoading.province} onChange={(event) => { setDeliveryCity(event.target.value); clearFieldError("deliveryCity"); }} required autoComplete="address-level1" aria-invalid={Boolean(fieldErrors.deliveryCity)} aria-describedby="deliveryCity-error" className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-4 py-3"><option value="">Select Province / City</option>{provinces.map(option => <option key={option.code} value={option.code}>{option.name}</option>)}</select>
             </label>
             {renderFieldError("deliveryCity")}
+            <LocationStatus level="province" loading={locationLoading.province} error={locationErrors.province} onRetry={() => { void loadLocations("province", PROVINCES_API.GET_ALL); }} />
           </div>
         ) : (
           <>
@@ -1007,6 +1066,10 @@ export default function CheckoutForm({
           </>
         )}
       </div>
+      </fieldset>
+      {cardDeliveryLocked && <p className="mt-3 text-sm text-slate-500">Delivery is locked while card payment is prepared. Select another payment method to safely cancel the card preparation before editing delivery.</p>}
+      {!cardDeliveryLocked && <button type="button" disabled={quoting || isLoading} onClick={() => void getDeliveryQuote()} className="mt-5 min-h-11 rounded-md border border-slate-300 px-4 text-sm font-semibold disabled:opacity-60">{quoting ? "Calculating delivery..." : quote ? "Refresh delivery quote" : "Get delivery quote"}</button>}
+      {quoteError && <p role="alert" className="mt-3 text-sm text-rose-600">{quoteError}</p>}
       <h2 className="text-lg font-semibold mt-6 mb-4">Payment Information</h2>
 
       <div className="flex flex-col gap-3 mb-6">
@@ -1095,8 +1158,11 @@ export default function CheckoutForm({
         </Link>
       )}
 
-      <div className="py-4 text-center text-slate-700 text-xl font-bold">
-        Total: {formattedPrice}
+      <div aria-label="Order totals" className="py-4 text-center text-slate-700 text-xl font-bold">
+        <p className="mb-2 text-sm font-normal">Delivery fee: {quote ? formatPrice(quote.totals.shippingFee) : "Calculated after checking your delivery address"}</p>
+        <p>Total: {formattedPrice}</p>
+        {!quote && <p className="mt-2 text-xs font-normal text-slate-500">Items total shown. Delivery will be included after you get a quote.</p>}
+        {quote && <p className="mt-2 text-xs font-normal text-slate-500">{quote.totals.shippingPolicyLabel}. Quote valid until {new Date(quote.expiresAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Ho_Chi_Minh" })} (Vietnam time). Stock is reserved when you place the order.</p>}
       </div>
       {paymentMethod === "VNPAY" || paymentMethod === "MOMO" ? (
         <p className="mb-3 text-center text-sm text-slate-500">
@@ -1120,7 +1186,7 @@ export default function CheckoutForm({
                     : "Pay Now"
         }
         disabled={
-          isLoading || (paymentMethod === "STRIPE" && (!stripe || !elements))
+          isLoading || quoting || !quote || (paymentMethod === "STRIPE" && (!stripe || !elements))
         }
         onClick={() => {}}
       />

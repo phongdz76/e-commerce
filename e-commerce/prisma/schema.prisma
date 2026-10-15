@@ -94,6 +94,54 @@ model OperationalIncident {
   createdAt DateTime @default(now())
 }
 
+model SupportConversation {
+  id                   String   @id @map("_id") @db.ObjectId
+  ownerId              String   @db.ObjectId
+  status               String   @default("OPEN")
+  version              Int      @default(1)
+  assignedTo           String?  @db.ObjectId
+  sequence             Int      @default(0)
+  customerReadSequence Int      @default(0)
+  adminReadSequence    Int      @default(0)
+  customerUnread       Int      @default(0)
+  adminUnread          Int      @default(0)
+  lastMessageAt        DateTime @default(now())
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([status, lastMessageAt])
+  @@index([assignedTo, status])
+}
+
+model SupportMessage {
+  id             String   @id @map("_id")
+  conversationId String   @db.ObjectId
+  authorId       String   @db.ObjectId
+  senderRole     String
+  sequence       Int
+  text           String
+  fingerprint    String
+  context        Json?
+  attachmentId   String?  @db.ObjectId
+  createdAt      DateTime @default(now())
+
+  @@index([conversationId, sequence])
+}
+
+model SupportAttachment {
+  id             String   @id @map("_id") @db.ObjectId
+  conversationId String   @db.ObjectId
+  uploadedBy     String   @db.ObjectId
+  contentType    String
+  size           Int
+  bytes          Bytes
+  fingerprint    String
+  messageId      String?
+  createdAt      DateTime @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
 enum ProductStatus {
   DRAFT
   ACTIVE
@@ -220,8 +268,45 @@ model Order {
   shippingInfo           ShippingInfo?
   codPaymentInfo         CodPaymentInfo?
   stockReservation       OrderStockReservation?
+  totals                 OrderTotals?
+  management             OrderManagement?
+  refundInfo             OrderRefund?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+type OrderManagement {
+  state     String
+  version   Int
+  updatedAt DateTime
+}
+
+// One full pre-dispatch cancellation/refund per order. Partial returns use a separate future flow.
+type OrderRefund {
+  id                    String
+  state                 String
+  version               Int
+  amount                Float
+  currency              String
+  requestedBy           String   @db.ObjectId
+  reason                String
+  requestedAt           DateTime
+  updatedAt             DateTime
+  approvedBy            String?  @db.ObjectId
+  decisionReason        String?
+  paymentReference      String
+  paymentCreatedAt      DateTime
+  providerTransactionId String?
+  merchantId            String?
+  providerRequestId     String?
+  providerRefundId      String?
+  sentAt                DateTime?
+  lastCheckedAt         DateTime?
+  resultCode            String?
+  leaseToken            String?
+  leaseExpiresAt        DateTime?
+  manualReference       String?
+  manualOccurredAt      DateTime?
 }
 
 type ShippingInfo {
@@ -230,6 +315,42 @@ type ShippingInfo {
   note           String
   version        Int
   updatedAt      DateTime
+}
+
+model ShippingPolicy {
+  id                    String   @id @map("_id")
+  version               Int
+  label                 String
+  enabled               Boolean
+  fee                   Int
+  freeShippingThreshold Int?
+  nationwide            Boolean
+  provinceCodes         String[]
+  updatedAt             DateTime @updatedAt
+}
+
+type OrderTotals {
+  version               Int
+  subtotal              Float
+  shippingFee           Float
+  discountTotal         Float
+  grandTotal            Float
+  shippingPolicyVersion Int
+  shippingPolicyLabel   String
+  shippingBaseFee       Float
+  freeShippingThreshold Float?
+  quotedAt              DateTime
+  lines                 OrderTotalsLine[]
+}
+
+type OrderTotalsLine {
+  variantId    String @db.ObjectId
+  quantity     Int
+  unitPrice    Float
+  subtotal     Float
+  shippingFee  Float
+  discountTotal Float
+  grandTotal   Float
 }
 
 type CodPaymentInfo {
@@ -294,6 +415,9 @@ type Image {
 }
 
 type Address {
+  provinceCode String?
+  districtCode String?
+  wardCode     String?
   city        String
   country     String
   line1       String

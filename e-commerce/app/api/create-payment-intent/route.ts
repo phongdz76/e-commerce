@@ -5,6 +5,8 @@ import { getStripe } from "@/libs/stripe";
 import { syncStripeOrder } from "@/libs/syncStripeOrder";
 import { getOrderItems } from "@/libs/orderItems";
 import { prepareCheckoutRequest, CheckoutRequestError } from "@/libs/checkoutRequest";
+import { getOrderDelivery } from "@/libs/orderDelivery";
+import { verifyCheckoutQuote, checkoutFingerprint } from "@/libs/checkoutQuote";
 
 const receipt = (order: { id: string; amount: number; currency: string; status: string; paymentMethod: string }) => ({ id: order.id, amount: order.amount, currency: order.currency, status: order.status, paymentMethod: order.paymentMethod });
 const fingerprint = (items: { id: string; variantId?: string | null; quantity: number; price: number }[]) => JSON.stringify(items.map((item) => [item.id, item.variantId, item.quantity, item.price]).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
@@ -16,13 +18,18 @@ export async function POST(request: Request) {
     let body;
     try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }
     const cart = await getOrderItems(body?.items);
-    if (!cart) return NextResponse.json({ error: "Please review your cart." }, { status: 400 });
+    const delivery = getOrderDelivery(body);
+    if (!cart || !delivery) return NextResponse.json({ error: "Please review your cart and delivery details." }, { status: 400 });
+    const quote = verifyCheckoutQuote(body.quoteToken, user.id, cart, delivery);
+    const matchesQuote = (saved: import("@prisma/client").Order) => saved.amount === quote.totals.grandTotal && (!saved.totals ||
+      (saved.totals.shippingPolicyVersion === quote.totals.shippingPolicyVersion && saved.address &&
+      checkoutFingerprint({ items: saved.products }, { recipientName: saved.recipientName || "", recipientPhone: saved.recipientPhone || "", address: saved.address }) === quote.fingerprint));
     const stripe = getStripe();
     let order;
     let reference;
     if (body.payment_intent_id) {
       order = await prisma.order.findFirst({ where: { userId: user.id, paymentIntentId: body.payment_intent_id, paymentMethod: "STRIPE" } });
-      if (!order || fingerprint(order.products) !== fingerprint(cart.items)) return NextResponse.json({ error: "The saved payment does not match this cart. Check Your Orders before starting another payment.", code: "INVALID_PAYMENT_REFERENCE" }, { status: 400 });
+      if (!order || fingerprint(order.products) !== fingerprint(cart.items) || !matchesQuote(order)) return NextResponse.json({ error: "The saved payment does not match this cart and delivery quote. Check Your Orders before starting another payment.", code: "INVALID_PAYMENT_REFERENCE" }, { status: 400 });
       const intent = await stripe.paymentIntents.retrieve(order.paymentIntentId!);
       if (intent.status === "succeeded") {
         const paid = await syncStripeOrder(order);
@@ -39,9 +46,9 @@ export async function POST(request: Request) {
       }
       reference = intent.id;
     } else {
-      const candidates = await prisma.order.findMany({ where: { userId: user.id, paymentMethod: "STRIPE", status: { in: ["draft", "pending", "processing", "failed"] }, amount: cart.amount }, orderBy: { createDate: "desc" }, take: 20 });
+      const candidates = await prisma.order.findMany({ where: { userId: user.id, paymentMethod: "STRIPE", status: { in: ["draft", "pending", "processing", "failed"] }, amount: quote.totals.grandTotal }, orderBy: { createDate: "desc" }, take: 20 });
       for (const candidate of candidates) {
-        if (candidate.stockReservation?.state !== "HELD" || !candidate.paymentIntentId?.startsWith("pi_") || fingerprint(candidate.products) !== fingerprint(cart.items)) continue;
+        if (candidate.stockReservation?.state !== "HELD" || !candidate.paymentIntentId?.startsWith("pi_") || fingerprint(candidate.products) !== fingerprint(cart.items) || !matchesQuote(candidate)) continue;
         const pending = await stripe.paymentIntents.retrieve(candidate.paymentIntentId);
         if (["processing", "requires_capture", "requires_action"].includes(pending.status)) {
           await syncStripeOrder(candidate);
@@ -50,7 +57,7 @@ export async function POST(request: Request) {
         if (["requires_payment_method", "requires_confirmation"].includes(pending.status)) { order = candidate; reference = candidate.activePaymentAttemptId || candidate.paymentIntentId; break; }
       }
       if (!order) {
-      const prepared = await prepareCheckoutRequest(body.checkout_request_id, user.id, "STRIPE", cart, null);
+      const prepared = await prepareCheckoutRequest(body.checkout_request_id, user.id, "STRIPE", cart, delivery, null, {}, body.quoteToken);
       order = prepared.order;
       reference = prepared.attempt.id;
       }

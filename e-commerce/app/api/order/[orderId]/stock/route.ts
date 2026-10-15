@@ -13,7 +13,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ord
     if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
     const reservation = order.stockReservation;
     return NextResponse.json({ state: reservation?.state || "LEGACY", version: reservation?.version ?? 0,
-      expiresAt: order.deliveryStatus === "pending" ? reservation?.expiresAt?.toISOString() ?? null : null,
+      expiresAt: order.deliveryStatus === "pending" && order.paymentMethod === "COD" && order.status === "pending" ? reservation?.expiresAt?.toISOString() ?? null : null,
       canCancel: order.deliveryStatus === "pending" &&
         ((reservation?.state === "HELD" && order.paymentMethod === "COD" && order.status === "pending") ||
           (reservation && ["HELD", "RELEASED"].includes(reservation.state) && order.paymentMethod === "STRIPE" && order.paymentIntentId?.startsWith("pi_") && ["draft", "pending", "failed"].includes(order.status))) },

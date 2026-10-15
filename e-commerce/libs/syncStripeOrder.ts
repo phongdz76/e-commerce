@@ -48,12 +48,14 @@ export async function syncStripeOrder<T extends StripeOrder>(order: T) {
     status !== "complete"
   )
     return order;
-  const shipping = intent.shipping?.address;
+  // Quoted orders keep the delivery address used to calculate the agreed fee.
+  const intentShipping = ("totals" in order && order.totals) || ("management" in order && order.management) ? null : intent.shipping;
+  const shipping = intentShipping?.address;
   if (
     order.status !== status ||
     shipping?.line1 ||
-    intent.shipping?.name ||
-    intent.shipping?.phone
+    intentShipping?.name ||
+    intentShipping?.phone
   ) {
     await prisma.order.updateMany({
       where: {
@@ -69,11 +71,11 @@ export async function syncStripeOrder<T extends StripeOrder>(order: T) {
       },
       data: {
         status,
-        ...(intent.shipping?.name
-          ? { recipientName: intent.shipping.name }
+        ...(intentShipping?.name
+          ? { recipientName: intentShipping.name }
           : {}),
-        ...(intent.shipping?.phone
-          ? { recipientPhone: intent.shipping.phone }
+        ...(intentShipping?.phone
+          ? { recipientPhone: intentShipping.phone }
           : {}),
         ...(shipping?.line1
           ? {

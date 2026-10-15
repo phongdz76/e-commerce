@@ -202,3 +202,15 @@ test("display keeps unknown states neutral, uses order currency and Vietnam time
   assert.match(f.display.formatAdminOrderAmount(20, "usd"), /20\.00/);
   assert.match(f.display.formatAdminOrderDate("2026-10-01T20:00:00Z"), /02 Oct 2026/);
 });
+
+test("date filters use inclusive Vietnam days and reference search resolves the full order identity", async () => {
+  const f = fixture();
+  await f.list("?from=2026-10-01&to=2026-10-02");
+  assert.equal(f.queries[0].options.where.createDate.gte.toISOString(), "2026-09-30T17:00:00.000Z");
+  assert.equal(f.queries[0].options.where.createDate.lt.toISOString(), "2026-10-02T17:00:00.000Z");
+  f.queries.length = 0;
+  const id = f.orders[0].id;
+  await f.list("?search=" + f.display.getAdminOrderReference(id));
+  assert.deepEqual(f.queries[0].options.where.OR.at(-1), { id });
+  for (const q of ["?from=2026-02-30", "?from=2026-10-03&to=2026-10-01", "?to=bad-date"]) assert.equal((await f.list(q)).status, 400);
+});

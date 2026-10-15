@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/actions/getCurrentUser";
 import { syncStripeOrder } from "@/libs/syncStripeOrder";
 import { syncZaloPayOrder } from "@/libs/syncZaloPayOrder";
+import { orderBusinessState, orderReference } from "@/utils/orderManagement";
 
 export async function GET() {
   const currentUser = await getCurrentUser();
@@ -45,6 +46,8 @@ export async function GET() {
       .filter((order) => order.status !== "draft" || order.stockReservation?.state === "HELD")
       .map((order) => ({
         id: order.id,
+        reference: orderReference(order.id),
+        orderState: orderBusinessState(order),
         amount: order.amount,
         currency: order.currency,
         status: order.status,

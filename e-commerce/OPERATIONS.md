@@ -47,7 +47,33 @@ The workflow fails when reconciliation or health fails, making the run visible i
 - Recovery is refused beyond 23 hours because Stripe can remove idempotency records after 24 hours. Inspect older requests in the Stripe test dashboard before deciding how to handle them.
 - MoMo stock can be released after a verified terminal-failure query for all relevant submitted attempts; no guessed local expiry is used. Pending, missing, unauthenticated or unknown outcomes keep stock.
 - VNPay still requires its expiry and verified closure. Late payments after release are recorded as payment issues; they cannot consume another order's reserved units.
-- Refund follow-up remains a separate P1 feature. Marking an issue for refund does not send money.
+- Payment-issue decisions remain separate from refund execution. Marking a duplicate/late payment for refund does not send money.
+
+## Paid-order cancellation and refunds
+
+Customers request cancellation from their order; administrators review requests in `/admin/refunds` and open the order to decide. This flow permits full cancellation before carrier handover (`pending`, `preparing`, `ready_to_ship`), including any saved delivery fee. Dispatched/consumed stock requires a return workflow instead. The request freezes shipment while awaiting a decision. Approval atomically cancels the commercial order and releases held stock; the original paid status, amount and payment reference are retained.
+
+After approval, submit the refund to the original sandbox provider from the order. `APPROVED` means no submission has been made; `SENDING`, `PROCESSING` and `REVIEW` do not mean money returned. `SUCCEEDED` requires a matching provider refund result, or a separately recorded manual COD refund receipt. COD receipt entry records evidence of a refund performed outside the app and does not transfer money. Never use it to declare an online refund complete.
+
+Before a new submission, the service checks the original payment/merchant. Stripe verifies the settled intent; MoMo/VNPay need a verified successful payment attempt with its transaction number; ZaloPay queries the original paid transaction. Missing configuration/source evidence leaves approval pending. Provider credentials are the existing sandbox/test credentials; new refund endpoints are fixed to sandbox and refuse redirects.
+
+A submission identity is persisted before the network call. A timeout/crash/lost response must be recovered using **Check refund status**, with the original identity; no second create is issued. Stripe recovery can find the original refund by metadata if its response was lost. A missing or contradictory result remains `REVIEW`, including cases where a process may have stopped before sending. Inspect the provider's sandbox records before further operational action. Do not manufacture a new refund key or mark the record successful to clear the queue. A declined/failed provider operation needs review; the current flow does not offer arbitrary resubmission with a fresh identity.
+
+The existing authenticated payment job queries up to five submitted refunds per run, with five minutes between checks and per-refund leases. It records `refundsChecked`; it never automatically submits approved refunds. Open refund work is visible in the Refunds queue. The existing Operations payment-health probe does not replace reviewing this queue. Dashboards/product reports retain their gross payment basis before refunds; they are not a net receipts ledger.
+
+Provider contracts: [Stripe refunds](https://docs.stripe.com/api/refunds/create), [MoMo refunds and query](https://developers.momo.vn/v3/docs/payment/api/payment-api/refund/), [ZaloPay refund/query](https://developer.zalopay.vn/v2/general/overview.html), [VNPay refund/query](https://sandbox.vnpayment.vn/apis/docs/truy-van-hoan-tien/querydr%26refund.html). Unit/HTTP/browser QA uses provider fixtures and isolated databases. Actual sandbox refund acceptance is still a separate check for each merchant/provider.
+
+## Customer support
+
+Customers use `/support`; administrators use `/admin/support`. Each signed-in account has one saved conversation. Links from products and orders retain verified context. Administrators must accept an open conversation before replying or uploading an image; assignment changes use version checks and an audit record. Closing retains history, and reopening releases the previous assignment. The administrator read cursor belongs to the shared support team, rather than each individual administrator.
+
+Visible conversation/inbox pages poll every ten seconds. This is not a real-time response guarantee. FAQ quick answers are automated and separate from human replies. No staffing schedule or 24/7 availability is promised; ticket linking, configured support hours and notification-center events remain future work. The Zalo contact link does not synchronize messages with this inbox.
+
+Messages are limited to 2,000 characters and 20 sends per minute per account. Private PNG/JPEG/WebP images are limited to 1 MiB each and 20 uploads per rolling 24 hours per account; the server checks image signatures and access ownership. Images are stored as private MongoDB binary data and served through authenticated, non-cacheable endpoints. A failed send keeps the draft, image and request identity for retry. The existing payment job removes at most 50 unattached images older than 24 hours per run and reports `orphanSupportImagesRemoved`; it rechecks attachment binding before deleting.
+
+The first authenticated send/upload initializes only the new `SupportConversation`, `SupportMessage` and `SupportAttachment` collections and their declared indexes before starting a transaction. The application database user needs collection/index creation permission for this initialization. Other database failures are surfaced, not ignored; no existing records are backfilled. Include all three collections and binary image values in backups. The isolated backup drill now verifies 17 collections.
+
+Run `npm run test:support-mongo` for disposable-database first-use, concurrency, ownership, read-cursor, image-binding, cleanup and shared-quota checks. The production-server E2E suite also exercises separate customer/admin browser sessions, retry behavior, private image loading, saved history and close/reopen actions.
 
 ## Backup/restore drill
 

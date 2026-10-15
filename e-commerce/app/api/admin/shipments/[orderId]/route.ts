@@ -6,6 +6,7 @@ import { ADMIN_ORDER_SELECT, toAdminOrderDetail } from "@/libs/adminOrders";
 import { startAdminAudit, finishAdminAudit } from "@/libs/adminAudit";
 import { consumeOrderStock, withStockTransaction } from "@/libs/orderStock";
 import { CheckoutRequestError } from "@/libs/checkoutErrors";
+import { orderManagementVersionWhere } from "@/libs/orderManagement";
 import {
   SHIPMENT_TRANSITIONS,
   getShipmentInput,
@@ -19,6 +20,7 @@ const ORDER_SELECT = {
   userId: true,
   shippingInfo: true,
   stockReservation: true,
+  refundInfo: true,
 } satisfies Prisma.OrderSelect;
 
 export async function GET(request: Request, { params }: RouteContext) {
@@ -245,6 +247,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       status: order.status,
       paymentMethod: order.paymentMethod,
       AND: [
+        orderManagementVersionWhere(order),
         order.deliveryStatus === null
           ? {
               OR: [
@@ -281,17 +284,19 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       };
     }
     const saveShipment = async (db: Prisma.TransactionClient) => {
-    if (order.stockReservation) {
+    if (order.stockReservation || order.management || order.refundInfo) {
       const latest = await db.order.findUnique({ where: { id: order.id }, select: ORDER_SELECT });
       if (!latest || (latest.shippingInfo?.version || 0) !== input.version || latest.status !== order.status || latest.deliveryStatus !== order.deliveryStatus) {
         throw new CheckoutRequestError("Shipment changed. Refresh before trying again.", 409, "SHIPMENT_CHANGED");
       }
+      if (getShipmentLockReason(latest)) throw new CheckoutRequestError("The order changed or a cancellation is open. Reload before shipping.", 409, "SHIPMENT_CHANGED");
       if (input.deliveryStatus === "shipped") await consumeOrderStock(db, latest, currentUser.id);
     }
     const result = await db.order.updateMany({
       where,
       data: {
         deliveryStatus: input.deliveryStatus,
+        ...(order.management ? { management: { set: { ...order.management, version: order.management.version + 1, updatedAt: new Date() } } } : {}),
         shippingInfo: {
           set: {
             carrier: input.carrier,
@@ -306,7 +311,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     if (result.count !== 1) throw new CheckoutRequestError("Shipment changed. Refresh before trying again.", 409, "SHIPMENT_CHANGED");
     return result;
     };
-    const result = order.stockReservation ? await withStockTransaction(saveShipment) : await saveShipment(prisma);
+    const result = order.stockReservation || order.management || order.refundInfo ? await withStockTransaction(saveShipment) : await saveShipment(prisma);
     if (result.count !== 1) {
       await finishAdminAudit(audit.id, "FAILED");
       return NextResponse.json(

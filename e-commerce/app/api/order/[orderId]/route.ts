@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/actions/getCurrentUser";
 import { syncStripeOrder } from "@/libs/syncStripeOrder";
 import { syncZaloPayOrder } from "@/libs/syncZaloPayOrder";
+import { orderBusinessState, orderReference } from "@/utils/orderManagement";
 
 export async function GET(
   request: Request,
@@ -74,7 +75,11 @@ export async function GET(
         : null;
     return NextResponse.json({
       id: order.id,
+      reference: orderReference(order.id),
+      orderState: orderBusinessState(order),
+      orderVersion: order.management?.version || 0,
       amount: order.amount,
+      totals: order.totals ? { ...order.totals, quotedAt: order.totals.quotedAt.toISOString() } : null,
       currency: order.currency,
       status: order.status,
       deliveryStatus: order.deliveryStatus,

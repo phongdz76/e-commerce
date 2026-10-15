@@ -71,8 +71,12 @@ async function main() {
       "OperationalJob",
       "OperationalIncident",
       "AuditLog",
+      "ShippingPolicy",
       "CheckoutRequest",
       "AuthRateLimit",
+      "SupportConversation",
+      "SupportMessage",
+      "SupportAttachment",
     ])
       await prisma.$runCommandRaw({ create: collection });
     await prisma.$runCommandRaw({
@@ -162,6 +166,13 @@ async function main() {
       },
     };
     const expiredIds = [];
+    await prisma.shippingPolicy.create({ data: { id: "default", version: 1, label: "QA operations pricing", enabled: true, fee: 0, freeShippingThreshold: null, nationwide: true, provinceCodes: [] } });
+    const prepare = checkout.prepareCheckoutRequest;
+    checkout.prepareCheckoutRequest = async (key, userId, method, selectedCart, selectedDelivery, merchant, options) => {
+      const address = { ...(selectedDelivery || delivery), address: { ...(selectedDelivery || delivery).address, provinceCode: "79" } };
+      const quote = await load("libs/checkoutQuote.ts").createCheckoutQuote(userId, selectedCart, address);
+      return prepare(key, userId, method, selectedCart, address, merchant, options, quote.token);
+    };
     for (let index = 0; index < 61; index++) {
       const { order } = await checkout.prepareCheckoutRequest(
         randomUUID(),
@@ -400,6 +411,12 @@ async function main() {
     const operations = await load("libs/operations.ts").getOperationsReport();
     assert.equal(operations.counts.overdueOnlineHolds, 0);
     assert.equal(operations.job.status, "SUCCEEDED");
+    const backupMessageId = "backup-message-" + randomUUID();
+    await load("libs/supportStorage.ts").ensureSupportStorage();
+    const backupImageId = randomUUID().replaceAll("-", "").slice(0, 24);
+    await prisma.supportConversation.create({ data: { id: actor.id, ownerId: actor.id, sequence: 1, adminUnread: 1, assignedTo: null } });
+    await prisma.supportAttachment.create({ data: { id: backupImageId, conversationId: actor.id, uploadedBy: actor.id, contentType: "image/png", size: 8, bytes: new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]), fingerprint: "private-backup-fixture", messageId: backupMessageId } });
+    await prisma.supportMessage.create({ data: { id: backupMessageId, conversationId: actor.id, authorId: actor.id, senderRole: "CUSTOMER", sequence: 1, text: "Private backup fixture message", fingerprint: "private-backup-fixture", attachmentId: backupImageId } });
     const backup = await verifyBackupRestore({
       sourceUrl: sourceUrl.toString(),
       targetUrl: restoreUrl.toString(),

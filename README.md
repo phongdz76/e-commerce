@@ -7,6 +7,12 @@ Personal portfolio project built with Next.js, TypeScript, NextAuth and Prisma/M
 - Database catalog with products, SKUs, categories and brands; Vietnamese search, filters, sorting and server pagination.
 - SKU-specific specifications, image gallery/zoom, warranty and box contents, with catalog forms for administrators.
 - Browser cart, authenticated checkout, order history and manual shipment tracking.
+- Versioned cart recovery and line-by-line price/stock checks; shoppers confirm changes and reselect ambiguous legacy options before checkout.
+- Signed, time-limited delivery quotes and saved order totals shared by all payment methods, with per-line fee allocation and customer/admin breakdowns.
+- Versioned delivery settings with audited administrator changes. The selected demo policy charges VND 15,000 and waives delivery from a VND 300,000 merchandise subtotal.
+- Order confirmation independent of payment, COD acceptance/rejection, recipient corrections before packing and public/internal order notes with version checks and replay protection.
+- Paid-order cancellation before carrier handover, an admin refund queue, full-refund adapters for Stripe/MoMo/VNPay/ZaloPay and recorded manual COD refund receipts. Uncertain submissions are reconciled using their original refund identity.
+- Saved customer/admin support conversations with private images, product/SKU/order context, paginated history, read receipts and an administrator inbox with assignment and close/reopen actions.
 - Atomic inventory reservations: concurrent buyers cannot reserve the same final unit. Stock adjustments and dispatch/release have audit records.
 - COD collection/remittance records, follow-up queues, sales reports and CSV export.
 - VNPay, MoMo, ZaloPay sandbox and Stripe test integrations with verified callbacks, idempotent checkout and payment reconciliation.
@@ -45,6 +51,7 @@ MongoDB integration tests create and remove databases with dedicated QA names. T
 npm run test:stock-mongo
 npm run test:catalog-mongo
 npm run test:content-mongo
+npm run test:support-mongo
 npm run test:operations-mongo
 npm run test:operations-e2e
 ```
@@ -57,4 +64,4 @@ See [the operations runbook](e-commerce/OPERATIONS.md) for scheduler authenticat
 
 ## Remaining work
 
-Cart reconciliation and legacy carts; structured order totals/shipping quotes; complete COD confirmation and paid-order cancellation; refunds/returns; transactional notification outbox; reviews, wishlists, promotions and further reporting. A refunds follow-up screen does not execute a refund. Production use with real money requires a separate merchant and operational acceptance process.
+Canonical delivery-region validation, delivery-area changes with fee approval and delivery estimates from a reliable source; richer order lifecycle/policy snapshots; actual provider refund UAT, duplicate/late-payment refund handling and returns/partial refunds; transactional notification outbox; support tickets and configurable support hours; reviews, wishlists, promotions and further reporting. Payment-issue review decisions and cancellation approval alone do not confirm money returned. Production use with real money requires a separate merchant and operational acceptance process.

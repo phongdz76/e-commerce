@@ -1,3 +1,5 @@
+import { orderReference } from "@/utils/orderManagement";
+
 export const ADMIN_ORDER_FILTERS = [
   { value: "ALL", label: "All statuses", statuses: [] },
   { value: "PENDING", label: "Pending & processing", statuses: ["pending", "processing"] },
@@ -89,5 +91,5 @@ export function formatAdminOrderAmount(amount: number, currency: string) {
 }
 
 export function getAdminOrderReference(id: string) {
-  return `#${id.slice(-8).toUpperCase()}`;
+  return orderReference(id);
 }

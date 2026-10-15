@@ -11,7 +11,7 @@ function matches(row, where = {}) {
       if ("isSet" in value) return (row[field] !== undefined) === value.isSet;
       if ("in" in value) return value.in.includes(row[field]);
       if ("notIn" in value) return !value.notIn.includes(row[field]);
-      if ("lte" in value) return row[field] <= value.lte;
+      if ("lte" in value) return row[field] != null && row[field] <= value.lte;
       if ("not" in value) return row[field] !== value.not;
     }
     return row[field] === value;

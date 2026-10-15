@@ -1,6 +1,7 @@
 export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export const API_PATHS = {
+  SUPPORT: { THREAD: "/api/support", UPLOAD: "/api/support/attachments" },
   CATALOG: { SUGGESTIONS: "/api/catalog/suggestions" },
   AUTH: {
     REGISTER: "/api/register",
@@ -21,16 +22,23 @@ export const API_PATHS = {
     ZALOPAY_STATUS: "/api/zalopay/status",
   },
   ORDER: {
+    CHECKOUT_QUOTE: "/api/checkout/quote",
     CART_QUOTE: "/api/cart/quote",
     GET_ALL: "/api/order",
     GET_BY_ID: (id: string) => `/api/order/${id}`,
     SHIPMENT: (id: string) => `/api/order/${id}/shipment`,
     STOCK: (id: string) => `/api/order/${id}/stock`,
+    ACTIVITY: (id: string) => `/api/order/${id}/activity`,
+    REFUND: (id: string) => `/api/order/${id}/refund`,
     CANCEL: (id: string) => `/api/order/${id}/cancel`,
     CREATE_COD: "/api/order/create-cod",
     RETRY_PAYMENT: (id: string) => `/api/order/${id}/retry-payment`,
   },
   ADMIN: {
+    SUPPORT: "/api/admin/support",
+    SUPPORT_THREAD: (id: string) => `/api/admin/support/${id}`,
+    REFUNDS: "/api/admin/refunds",
+    SHIPPING_POLICY: "/api/admin/shipping-policy",
     OPERATIONS: "/api/admin/operations",
     ONLINE_HOLDS: "/api/admin/operations/holds",
     RECOVER_CARD_HOLD: (id: string) => `/api/admin/operations/holds/${id}/recover-card`,
@@ -41,6 +49,8 @@ export const API_PATHS = {
     SHIPMENT: (id: string) => `/api/admin/shipments/${id}`,
     ORDERS: "/api/admin/orders",
     ORDER: (id: string) => `/api/admin/orders/${id}`,
+    ORDER_MANAGE: (id: string) => `/api/admin/orders/${id}/manage`,
+    ORDER_REFUND: (id: string) => `/api/admin/orders/${id}/refund`,
     COD_PAYMENT: (id: string) => `/api/admin/orders/${id}/cod-payment`,
     PRODUCTS: "/api/admin/products",
     PRODUCT: (id: string) => `/api/admin/products/${id}`,

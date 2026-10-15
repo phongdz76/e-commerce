@@ -15,9 +15,11 @@ export const ADMIN_NAVIGATION = [
     { label: "Orders", href: "/admin/orders", icon: FiShoppingBag },
     { label: "COD follow-up", href: "/admin/cod", icon: FiCreditCard },
     { label: "Shipments", href: "/admin/shipments", icon: FiTruck },
+    { label: "Delivery settings", href: "/admin/shipping-settings", icon: FiTruck },
     { label: "Payments", href: "/admin/payments", icon: FiCreditCard },
     { label: "Payment issues", href: "/admin/payment-exceptions", icon: FiAlertCircle },
     { label: "Refunds", href: "/admin/refunds", icon: FiCornerUpLeft },
+    { label: "Support inbox", href: "/admin/support", icon: FiUsers },
   ] },
   { title: "Accounts & Activity", items: [
     { label: "User accounts", href: "/admin/users", icon: FiUsers },
