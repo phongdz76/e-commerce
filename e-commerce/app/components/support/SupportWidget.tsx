@@ -110,16 +110,16 @@ export default function SupportWidget() {
           role="dialog"
           aria-labelledby={`${panelId}-title`}
           tabIndex={-1}
-          className="absolute bottom-[120px] right-0 flex max-h-[calc(100dvh-160px)] w-[calc(100vw-2rem)] max-w-[340px] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg outline-none sm:bottom-0 sm:right-16 sm:max-h-[calc(100dvh-3rem)]"
+          className="absolute bottom-[130px] right-0 flex max-h-[calc(100dvh-160px)] w-[calc(100vw-2rem)] max-w-[390px] flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xl outline-none transition-all sm:bottom-0 sm:right-18 sm:max-h-[min(650px,calc(100dvh-3rem))]"
         >
-          <header className="flex shrink-0 items-center gap-3 border-b border-slate-200 px-4 py-3">
+          <header className="flex shrink-0 items-center gap-3 border-b border-slate-100 bg-white px-4 py-3">
             <span
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white ${channel === "zalo" ? "bg-[#0068ff]" : "bg-[#00b7bd]"}`}
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-sm ${channel === "zalo" ? "bg-[#0068ff]" : "bg-[#00b7bd]"}`}
             >
               {channel === "zalo" ? (
-                <SiZalo size={25} aria-hidden="true" />
+                <SiZalo size={26} aria-hidden="true" />
               ) : (
-                <IoChatbubbleEllipsesSharp size={20} aria-hidden="true" />
+                <IoChatbubbleEllipsesSharp size={22} aria-hidden="true" />
               )}
             </span>
             <div className="min-w-0 flex-1">
@@ -137,38 +137,62 @@ export default function SupportWidget() {
               type="button"
               aria-label="Close support"
               onClick={closePanel}
-              className={`-mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded text-slate-400 transition hover:bg-slate-50 hover:text-slate-700 ${focusStyle}`}
+              className={`-mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 ${focusStyle}`}
             >
-              <FiX size={20} aria-hidden="true" />
+              <FiX size={18} aria-hidden="true" />
             </button>
           </header>
 
           <nav
             aria-label="Support channels"
-            className="grid shrink-0 grid-cols-3 border-b border-slate-100 px-3"
+            className="shrink-0 border-b border-slate-100 bg-slate-50/70 p-2.5"
           >
-            <button
-              type="button"
-              aria-pressed={channel === "chat"}
-              onClick={() => setChannel("chat")}
-              className={`flex min-h-12 items-center justify-center gap-2 border-b-2 text-sm transition ${focusStyle} ${channel === "chat" ? "border-teal-600 font-bold text-teal-700" : "border-transparent text-slate-500 hover:text-slate-700"}`}
-            >
-              Quick answers
-            </button>
-            <button type="button" aria-pressed={channel === "team"} onClick={() => { setTeamVisited(true); setChannel("team"); }} className={`min-h-12 border-b-2 px-1 text-sm ${focusStyle} ${channel === "team" ? "border-teal-600 font-bold text-teal-700" : "border-transparent text-slate-500"}`}>Support team</button>
-            <button
-              type="button"
-              aria-pressed={channel === "zalo"}
-              onClick={() => setChannel("zalo")}
-              className={`flex min-h-12 items-center justify-center gap-2 border-b-2 text-sm transition ${focusStyle} ${channel === "zalo" ? "border-blue-600 font-bold text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}
-            >
-              Zalo
-              {!zaloUrl && (
-                <span className="text-[10px] font-normal text-slate-400">
-                  Demo
-                </span>
-              )}
-            </button>
+            <div className="flex items-center gap-1.5 rounded-xl bg-slate-200/60 p-1">
+              <button
+                type="button"
+                aria-pressed={channel === "chat"}
+                onClick={() => setChannel("chat")}
+                className={`flex-1 flex items-center justify-center py-2 px-2 text-xs font-semibold rounded-lg transition-all ${focusStyle} ${
+                  channel === "chat"
+                    ? "bg-white text-teal-700 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/40"
+                }`}
+              >
+                Quick answers
+              </button>
+              <button
+                type="button"
+                aria-pressed={channel === "team"}
+                onClick={() => {
+                  setTeamVisited(true);
+                  setChannel("team");
+                }}
+                className={`flex-1 flex items-center justify-center py-2 px-2 text-xs font-semibold rounded-lg transition-all ${focusStyle} ${
+                  channel === "team"
+                    ? "bg-white text-teal-700 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/40"
+                }`}
+              >
+                Support team
+              </button>
+              <button
+                type="button"
+                aria-pressed={channel === "zalo"}
+                onClick={() => setChannel("zalo")}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2 text-xs font-semibold rounded-lg transition-all ${focusStyle} ${
+                  channel === "zalo"
+                    ? "bg-white text-[#0068ff] shadow-sm"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/40"
+                }`}
+              >
+                <span>Zalo</span>
+                {!zaloUrl && (
+                  <span className="rounded bg-blue-100/90 px-1 py-0.5 text-[9px] font-bold leading-none text-blue-600">
+                    Demo
+                  </span>
+                )}
+              </button>
+            </div>
           </nav>
 
           {teamVisited && <div style={channel !== "team" ? { display: "none" } : undefined} className="min-h-0 overflow-y-auto"><SupportChatPanel enabled={channel === "team"} /></div>}
@@ -184,7 +208,7 @@ export default function SupportWidget() {
                 }
                 aria-live="polite"
                 aria-relevant="additions"
-                className="h-64 min-h-0 overflow-y-auto overscroll-contain bg-slate-50 px-4 py-4"
+                className="h-64 min-h-0 overflow-y-auto overscroll-contain bg-slate-50/60 px-4 py-4"
               >
                 <p
                   className={`mb-4 text-center text-[11px] ${isZaloDemo ? "text-blue-600" : "text-slate-500"}`}
@@ -200,7 +224,11 @@ export default function SupportWidget() {
                       className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
                     >
                       <div
-                        className={`max-w-[90%] rounded-lg px-3 py-2 text-[13px] leading-6 ${message.role === "user" ? `rounded-br-none text-white ${isZaloDemo ? "bg-blue-600" : "bg-teal-700"}` : "rounded-bl-none border border-slate-200 bg-white text-slate-600"}`}
+                        className={`max-w-[88%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed shadow-xs ${
+                          message.role === "user"
+                            ? `rounded-br-xs text-white ${isZaloDemo ? "bg-blue-600" : "bg-teal-700"}`
+                            : "rounded-bl-xs border border-slate-200/80 bg-white text-slate-700"
+                        }`}
                       >
                         <span className="sr-only">
                           {message.role === "user"
@@ -226,29 +254,44 @@ export default function SupportWidget() {
                 </div>
               </div>
 
-              <div className="shrink-0 border-t border-slate-100 px-4 py-3">
-                {!isZaloDemo && <Link href="/support" onClick={closePanel} className="mb-3 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white">Message the support team</Link>}
-                <div
-                  className="mb-3 flex flex-wrap gap-2"
-                  aria-label="Common questions"
-                >
-                  {topics.map((topic) => (
-                    <button
-                      key={topic.label}
-                      type="button"
-                      onClick={() => ask(topic.label)}
-                      className={`rounded border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 ${focusStyle}`}
+              <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3">
+                {!isZaloDemo && (
+                  <Link
+                    href="/support"
+                    onClick={closePanel}
+                    className="mb-3 flex min-h-10 w-full items-center justify-center rounded-xl bg-teal-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-teal-800"
+                  >
+                    Message the support team
+                  </Link>
+                )}
+                {topics.length > 0 && (
+                  <div className="mb-3">
+                    <p className="mb-1.5 text-[11px] font-medium text-slate-400">
+                      Suggested questions:
+                    </p>
+                    <div
+                      className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto pr-0.5"
+                      aria-label="Common questions"
                     >
-                      {topic.label}
-                    </button>
-                  ))}
-                </div>
+                      {topics.map((topic) => (
+                        <button
+                          key={topic.label}
+                          type="button"
+                          onClick={() => ask(topic.label)}
+                          className={`rounded-full border border-slate-200 bg-slate-50/80 px-2.5 py-1 text-xs text-slate-600 transition hover:border-teal-400 hover:bg-teal-50 hover:text-teal-700 ${focusStyle}`}
+                        >
+                          {topic.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <form
                   onSubmit={(event) => {
                     event.preventDefault();
                     ask(draft);
                   }}
-                  className="flex items-center gap-2 rounded border border-slate-300 bg-white px-3 py-1 focus-within:border-teal-600"
+                  className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1 transition focus-within:border-teal-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-teal-500/20"
                 >
                   <label htmlFor={`${panelId}-message`} className="sr-only">
                     {isZaloDemo
@@ -266,7 +309,7 @@ export default function SupportWidget() {
                         : "Ask a question..."
                     }
                     autoComplete="off"
-                    className="h-11 min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                    className="h-10 min-w-0 flex-1 bg-transparent text-xs sm:text-sm text-slate-700 outline-none placeholder:text-slate-400"
                   />
                   <button
                     type="submit"
@@ -274,9 +317,13 @@ export default function SupportWidget() {
                       isZaloDemo ? "Send demo message" : "Ask a question"
                     }
                     disabled={!draft.trim()}
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded text-white transition ${isZaloDemo ? "bg-blue-600 hover:bg-blue-700" : "bg-teal-700 hover:bg-teal-800"} disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 ${focusStyle}`}
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white transition ${
+                      isZaloDemo
+                        ? "bg-blue-600 hover:bg-blue-700"
+                        : "bg-teal-700 hover:bg-teal-800"
+                    } disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 ${focusStyle}`}
                   >
-                    <FiSend size={17} aria-hidden="true" />
+                    <FiSend size={15} aria-hidden="true" />
                   </button>
                 </form>
               </div>
