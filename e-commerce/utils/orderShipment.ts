@@ -32,15 +32,18 @@ export function normalizeCustomerDeliveryStatus(value: string | null): CustomerD
 
 export function getCustomerDeliveryInfo(value: string | null) {
   const status = normalizeCustomerDeliveryStatus(value);
-  const className = status === "delivered"
-    ? "border-teal-200 bg-teal-50 text-teal-800"
-    : ["delivery_failed", "returned", "cancelled"].includes(status)
-      ? "border-rose-200 bg-rose-50 text-rose-700"
-      : ["preparing", "ready_to_ship", "shipped", "in_transit"].includes(status)
-        ? "border-blue-200 bg-blue-50 text-blue-700"
-        : status === "pending"
-          ? "border-amber-200 bg-amber-50 text-amber-700"
-          : "border-slate-200 bg-slate-50 text-slate-600";
+
+  let className = "border-slate-200 bg-slate-50 text-slate-600";
+  if (status === "delivered") {
+    className = "border-teal-200 bg-teal-50 text-teal-800";
+  } else if (["delivery_failed", "returned", "cancelled"].includes(status)) {
+    className = "border-rose-200 bg-rose-50 text-rose-700";
+  } else if (["preparing", "ready_to_ship", "shipped", "in_transit"].includes(status)) {
+    className = "border-blue-200 bg-blue-50 text-blue-700";
+  } else if (status === "pending") {
+    className = "border-amber-200 bg-amber-50 text-amber-700";
+  }
+
   return { label: CUSTOMER_DELIVERY_LABELS[status], className };
 }
 

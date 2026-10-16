@@ -3,8 +3,17 @@ export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 export const API_PATHS = {
   CUSTOMER_SERVICE: "/api/customer-service",
   NOTIFICATIONS: "/api/notifications",
-  SUPPORT: { THREAD: "/api/support", UPLOAD: "/api/support/attachments", TICKETS: "/api/support/requests", TICKET: (id: string) => `/api/support/requests/${id}`, TICKET_OPTIONS: "/api/support/requests/options", HOURS: "/api/support/hours" },
-  CATALOG: { SUGGESTIONS: "/api/catalog/suggestions" },
+  SUPPORT: {
+    THREAD: "/api/support",
+    UPLOAD: "/api/support/attachments",
+    TICKETS: "/api/support/requests",
+    TICKET: (id: string) => `/api/support/requests/${id}`,
+    TICKET_OPTIONS: "/api/support/requests/options",
+    HOURS: "/api/support/hours",
+  },
+  CATALOG: {
+    SUGGESTIONS: "/api/catalog/suggestions",
+  },
   AUTH: {
     REGISTER: "/api/register",
     FORGOT_PASSWORD: "/api/forgot-password",
