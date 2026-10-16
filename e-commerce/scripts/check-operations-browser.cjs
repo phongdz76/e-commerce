@@ -6,7 +6,7 @@ const { CDP } = require("../tests/fixtures/browser-cdp.cjs");
 const pause = (milliseconds) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-async function verifyOperationsBrowser({ origin, cookie, artifactDirectory, cartFixture, orderFixture, supportFixture, ticketFixture, contentFixture }) {
+async function verifyOperationsBrowser({ origin, cookie, artifactDirectory, cartFixture, orderFixture, supportFixture, ticketFixture, contentFixture, returnFixture, browserScope = "all" }) {
   const chrome =
     process.env.CHROME_BIN ||
     (process.platform === "win32"
@@ -239,12 +239,14 @@ async function verifyOperationsBrowser({ origin, cookie, artifactDirectory, cart
     if (supportFixture) await require("./check-support-browser.cjs").verifySupportBrowser({ page, origin, artifactDirectory, checks, fixture: supportFixture });
     if (ticketFixture) await require('./check-support-tickets-browser.cjs').verifySupportTicketsBrowser({page,origin,artifactDirectory,checks,fixture:ticketFixture});
     if (contentFixture) await require('./check-customer-service-browser.cjs').verifyCustomerServiceBrowser({page,origin,artifactDirectory,checks,fixture:contentFixture});
+    if (returnFixture) await require('./check-returns-browser.cjs').verifyReturnsBrowser({page,origin,artifactDirectory,checks,fixture:returnFixture});
     assert.deepEqual(exceptions, []);
     fs.writeFileSync(
-      path.join(artifactDirectory, "p0-browser-results.json"),
+      path.join(artifactDirectory, browserScope === "returns" ? "p1-returns-browser-results.json" : "p0-browser-results.json"),
       JSON.stringify(
         {
           checks,
+          browserScope,
           applicationDatabaseWrites: 0,
           liveMoneyTransactions: 0,
           runtimeExceptions: exceptions,

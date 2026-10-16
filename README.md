@@ -16,6 +16,7 @@ Personal portfolio project built with Next.js, TypeScript, NextAuth and Prisma/M
 - Support messages inside the floating widget, with drafts retained while closed, and saved in-app notifications for customers/administrators through a header bell and paginated notification pages.
 - Saved order, verified-payment, shipment, cancellation and refund notifications, with a separate transactional email queue and audited manual retries. Event emails are disabled by default.
 - Support requests with account-owned order/product/SKU context, private images, request references and status tracking. Administrators use the shared conversation assignment, private ticket notes and in-app request notifications.
+- Return intake for delivered order lines with quantity allocation, private images, saved policy snapshots and shared support tickets/chat. Assigned administrators record instructions, receipt and inspection; eligible goods can be restocked once with an audited stock movement. Refund/exchange resolution remains pending separately.
 - Draft/preview/publication of weekly support hours in Vietnam time, shared by help, footer and the support widget. Requests and messages remain available outside published hours.
 - Administrator drafts, previews and immutable published versions of contacts, FAQs and shipping/return/warranty policies, shared by help pages, footer and widget. New orders save their applicable policy content; archived versions remain available after later edits.
 - Atomic inventory reservations: concurrent buyers cannot reserve the same final unit. Stock adjustments and dispatch/release have audit records.
@@ -58,6 +59,8 @@ npm run test:catalog-mongo
 npm run test:content-mongo
 npm run test:support-mongo
 npm run test:support-tickets-mongo
+npm run test:returns-mongo
+npm run test:returns-e2e
 npm run test:customer-service-mongo
 npm run test:email-mongo
 npm run test:operations-mongo
@@ -72,4 +75,4 @@ See [the operations runbook](e-commerce/OPERATIONS.md) for scheduler authenticat
 
 ## Remaining work
 
-Canonical delivery-region validation, delivery-area changes with fee approval and delivery estimates from a reliable source; richer order lifecycle; actual provider refund UAT, duplicate/late-payment refund handling and returns/partial refunds; acceptance of the configured external email sender; return/warranty case management; reviews, wishlists, promotions and further reporting. A support enquiry does not approve a return, warranty claim or refund. Payment-issue review decisions and cancellation approval alone do not confirm money returned. Production use with real money requires a separate merchant and operational acceptance process.
+Canonical delivery-region validation, delivery-area changes with fee approval and delivery estimates from a reliable source; richer order lifecycle; actual provider refund UAT, duplicate/late-payment refund handling and partial refunds; exchange fulfillment and financial resolution of received returns; acceptance of the configured external email sender; warranty case management; reviews, wishlists, promotions and further reporting. A support enquiry does not approve a return, warranty claim or refund. Return receipt/restocking, payment-issue decisions and cancellation approval alone do not confirm money returned. Production use with real money requires a separate merchant and operational acceptance process.

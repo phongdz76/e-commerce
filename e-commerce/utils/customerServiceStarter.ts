@@ -1,7 +1,15 @@
 import type { ServiceContent } from "@/types/customerService";
 export function starterServiceContent(): ServiceContent {
   return {
-    contact: { storeName: "SGTech", phone: "19002004", email: "sgtech@gmail.com", address: "387 Bình Thành, Bình Tân, Ho Chi Minh City", zaloUrl: "", mapUrl: "" },
+    contact: {
+      storeName: "SGTech",
+      phone: "19002004",
+      email: "sgtech@gmail.com",
+      address: "387 Bình Thành, Quận Bình Tân, TP. Hồ Chí Minh",
+      zaloUrl: "",
+      mapUrl:
+        "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3919.1239976004895!2d106.58435777451757!3d10.801813958726004!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x31752b83ee842e07%3A0x2acdb55560c394d0!2zMzg3LCA1NyBCw6xuaCBUaMOgbmgsIEtodSBQaOG7kSA1LCBCw6xuaCBUw6JuLCBI4buTIENow60gTWluaCwgVmnhu4d0IE5hbQ!5e0!3m2!1svi!2s!4v1780799335446!5m2!1svi!2s",
+    },
     pages: {
       contact: { title: "Contact us", intro: "Need help choosing a product or checking an order? Send a support request to SGTech.", sections: [{ title: "Product questions", text: "Link the product and selected option in your request so the team can check its details." }, { title: "Order support", text: "Select one of your orders when creating a support request. Messages and replies remain saved to your account." }] },
       shipping: { title: "Shipping & delivery", intro: "Review your delivery address and the current quote before ordering.", sections: [{ title: "Delivery fees", text: "The checkout quote shows the delivery fee and saved total for your selected products and address." }, { title: "Delivery progress", text: "Open Your Orders and select an order to view its recorded shipment status. Contact support for questions about availability or timing." }] },

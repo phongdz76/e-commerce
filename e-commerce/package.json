@@ -17,6 +17,8 @@
     "test:operations-e2e": "node scripts/check-operations-e2e.cjs",
     "test:support-mongo": "node scripts/check-support-mongo.cjs",
     "test:support-tickets-mongo": "node scripts/check-support-tickets-mongo.cjs",
+    "test:returns-mongo": "node scripts/check-returns-mongo.cjs",
+    "test:returns-e2e": "node scripts/check-returns-e2e.cjs",
     "test:customer-service-mongo": "node scripts/check-customer-service-mongo.cjs",
     "test:email-mongo": "node scripts/check-email-mongo.cjs",
     "typecheck": "tsc --noEmit --incremental false",

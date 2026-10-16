@@ -11,7 +11,7 @@ import { notifyOrderEvent } from "@/libs/orderNotifications";
 const stockError = () => new CheckoutRequestError("This option was just sold or reserved by another customer. Review your cart before trying again.", 409, "STOCK_UNAVAILABLE");
 const movementId = (orderId: string, variantId: string, action: string, version: number) => createHash("sha256").update(JSON.stringify([orderId, variantId, action, version])).digest("hex").slice(0, 24);
 
-export async function withStockTransaction<T>(operation: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+export async function withStockTransaction<T>(operation: (tx: Prisma.TransactionClient) => Promise<T>, conflictDelayMs = 100): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     try { return await prisma.$transaction(operation, { maxWait: 5000, timeout: 10000 }); }
     catch (error) {
@@ -19,7 +19,7 @@ export async function withStockTransaction<T>(operation: (tx: Prisma.Transaction
       if (!["P2034", "P2002"].includes(String(code)) || attempt >= 3) throw error;
       // Event fanout extends a successful transaction. Give its confirmed-conflict
       // contender time to commit before the next attempt; never retry uncertain outcomes.
-      await new Promise(resolve => setTimeout(resolve, 100 * 2 ** attempt + Math.floor(Math.random() * 50)));
+      await new Promise(resolve => setTimeout(resolve, conflictDelayMs * 2 ** attempt + Math.floor(Math.random() * 50)));
     }
   }
 }

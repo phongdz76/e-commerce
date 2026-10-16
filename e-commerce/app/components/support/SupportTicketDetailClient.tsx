@@ -197,6 +197,7 @@ export default function SupportTicketDetailClient({
 
       {ticket && (
         <>
+          {ticket.returnCaseId && <Link href={`${adminId ? "/admin" : ""}/returns/${ticket.returnCaseId}`} className="inline-flex min-h-11 items-center font-semibold text-teal-700 hover:underline">View linked return case →</Link>}
           <section
             aria-label="Request status"
             className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xs"

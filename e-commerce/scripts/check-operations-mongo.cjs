@@ -86,6 +86,8 @@ async function main() {
       "SupportSettings",
       "CustomerServiceSettings",
       "CustomerServiceRevision",
+      "ReturnCase",
+      "ReturnCaseEvent",
     ])
       await prisma.$runCommandRaw({ create: collection });
     await prisma.$runCommandRaw({
@@ -441,6 +443,9 @@ async function main() {
     await prisma.customerServiceSettings.create({data:{id:'default',version:3,draft:{...serviceContent,contact:{...serviceContent.contact,storeName:'Private unpublished draft'}},publishedRevisionId:serviceRevision.id}});
     // Populate a saved policy snapshot only in this disposable BSON backup fixture.
     await prisma.order.update({where:{id:expiredIds[0]},data:{servicePolicies:{id:serviceRevision.id,revision:2,publishedAt:serviceRevision.publishedAt.toISOString(),pages:{shipping:serviceContent.pages.shipping,returns:serviceContent.pages.returns,warranty:serviceContent.pages.warranty}}}});
+    await load('libs/returnCaseStorage.ts').ensureReturnCaseStorage();
+    const returnBackup = await prisma.returnCase.create({data:{id:'e'.repeat(24),ownerId:actor.id,orderId:expiredIds[0],lineIndex:0,quantity:1,ticketId:actor.id,reason:'DAMAGED',preference:'REFUND',description:'Private QA return backup fixture.',fingerprint:'qa-return-backup',state:'INSPECTED_OTHER',version:4,item:{productId:'f'.repeat(24),variantId:'1'.repeat(24),sku:'QA-BACKUP',name:'Saved return item',option:'Black',purchasedQuantity:1,unitPrice:10000}}});
+    await prisma.returnCaseEvent.create({data:{id:'f'.repeat(64),caseId:returnBackup.id,actorId:actor.id,action:'INSPECT_OTHER',state:'INSPECTED_OTHER',text:'QA inspection kept these goods outside sellable stock.'}});
     const backup = await verifyBackupRestore({
       sourceUrl: sourceUrl.toString(),
       targetUrl: restoreUrl.toString(),

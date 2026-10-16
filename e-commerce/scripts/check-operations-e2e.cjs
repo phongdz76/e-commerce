@@ -366,7 +366,12 @@ async function main() {
     await require("./check-email-http.cjs").verifyEmailHttp({call,prisma,cookies,cronSecret,checks});
     const ticketFixture=await require('./check-support-tickets-http.cjs').verifySupportTicketsHttp({call,prisma,cookies,users,product,variant,orderFixture,checks});
     const contentFixture=await require('./check-customer-service-http.cjs').verifyCustomerServiceHttp({call,prisma,cookies,users,variant,body,checks});
+    const returnFixture=await require('./check-returns-http.cjs').verifyReturnsHttp({call,prisma,cookies,users,product,checks});
+    fs.writeFileSync(path.join(artifacts, 'p1-returns-http-results.json'), JSON.stringify({ checks: [...checks], applicationDatabaseWrites: 0, providerNetworkCalls: 0 }, null, 2));
     if (process.env.QA_BROWSER === "true") {
+      const browserScope = process.env.QA_BROWSER_SCOPE || "all";
+      assert.ok(["all", "returns"].includes(browserScope), "Unknown browser scope");
+      const fullBrowser = browserScope === "all";
       const {
         verifyOperationsBrowser,
       } = require("./check-operations-browser.cjs");
@@ -374,11 +379,13 @@ async function main() {
         origin,
         cookie: cookies[0],
         artifactDirectory: artifacts,
-        orderFixture,
-        supportFixture,
-        ticketFixture,
-        contentFixture,
-        cartFixture: { id: product.id, variantId: variant.id, name: "Private HTTP QA phone", description: "QA", category: "QA phones", brand: "QA brand", selectedImg: variant.image, quantity: 2, price: 1 },
+        orderFixture: fullBrowser ? orderFixture : undefined,
+        supportFixture: fullBrowser ? supportFixture : undefined,
+        ticketFixture: fullBrowser ? ticketFixture : undefined,
+        contentFixture: fullBrowser ? contentFixture : undefined,
+        returnFixture,
+        browserScope,
+        cartFixture: fullBrowser ? { id: product.id, variantId: variant.id, name: "Private HTTP QA phone", description: "QA", category: "QA phones", brand: "QA brand", selectedImg: variant.image, quantity: 2, price: 1 } : undefined,
       });
       checks.push(`Browser passed ${count} responsive/error/recovery groups.`);
     }
@@ -473,6 +480,7 @@ async function main() {
         {
           checks,
           databaseIsolated: true,
+          browserScope: process.env.QA_BROWSER === "true" ? process.env.QA_BROWSER_SCOPE || "all" : "none",
           applicationDatabaseWrites: 0,
           providerNetworkCalls: 0,
           liveMoneyTransactions: 0,

@@ -511,6 +511,14 @@ export default function OrderDetailClient({
           </div>
 
           {/* Delivery */}
+          <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-5">
+            <h3 className="font-semibold">Returns & exchanges</h3>
+            <p className="text-sm text-slate-500">Request a review for delivered items or follow your existing return requests.</p>
+            <div className="flex flex-wrap gap-4 text-sm font-semibold text-teal-700">
+              {order.deliveryStatus === "delivered" && <Link href={`/returns/new?orderId=${order.id}`} className="inline-flex min-h-11 items-center hover:underline">Request a return</Link>}
+              <Link href={`/returns?orderId=${order.id}`} className="inline-flex min-h-11 items-center hover:underline">View return requests</Link>
+            </div>
+          </div>
           <OrderStock key={order.id + "-stock-" + order.orderVersion} orderId={order.id} />
           <OrderRefundPanel key={order.id + "-refund"} orderId={order.id} onChanged={() => void refreshOrder().catch(() => toast.error("Reload this order to see its latest details."))} />
           <OrderActivityPanel key={order.id + "-activity-" + order.orderVersion} orderId={order.id} />

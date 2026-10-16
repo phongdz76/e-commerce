@@ -22,6 +22,9 @@ const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(valu
 const changed = () => new CheckoutRequestError("This return or its order changed. Refresh before retrying; your draft has been kept.", 409, "RETURN_CHANGED");
 const missing = () => new CheckoutRequestError("Return case or order not found", 404, "RETURN_NOT_FOUND");
 const conflict = () => Object.assign(new Error("Concurrent return allocation"), { code: "P2034" });
+// Ticket, message and notification fanout keep the winning transaction open
+// longer than a stock-only write. Keep four attempts but allow it time to commit.
+const RETURN_CONFLICT_DELAY_MS = 500;
 const eligible = (order: Order) => order.deliveryStatus === "delivered" && order.stockReservation?.state === "CONSUMED" && order.management?.state !== "CANCELLED";
 function allowed(row: ReturnCase | null, viewer: SupportViewer): asserts row is ReturnCase { if (!row || viewer.role !== "ADMIN" && row.ownerId !== viewer.id) throw missing(); }
 function itemAt(order: Order, index: number): ReturnItem | null {
@@ -80,7 +83,7 @@ export async function createReturnCase(viewer: SupportViewer, input: ReturnCreat
     await tx.auditLog.create({ data: { id: hash(["return-created", id]).slice(0, 24), actorId: actor.id, entityType: "RETURN_CASE", entityId: id, action: "RETURN_CREATED", status: "SUCCEEDED", details: { orderId: order.id, lineIndex: input.lineIndex, quantity: input.quantity } } });
     await notify(tx, row, "created", actor, "Return request received");
     return { id, replayed: false };
-  });
+  }, RETURN_CONFLICT_DELAY_MS);
 }
 function view(row: ReturnCase, assigned: boolean): ReturnCaseView {
   return { id: row.id, reference: returnReference(row.id), orderId: row.orderId, orderReference: orderReference(row.orderId), ticketId: row.ticketId, lineIndex: row.lineIndex, quantity: row.quantity, reason: row.reason, preference: row.preference, description: row.description, state: row.state, version: row.version, item: row.item as unknown as ReturnItem, policy: parseServicePolicySnapshot(row.policy), createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), canManage: assigned, actions: [] };
@@ -95,7 +98,7 @@ export async function getReturnCase(id: string, viewer: SupportViewer, page = 1)
   const [conversation, events, ticket] = await Promise.all([prisma.supportConversation.findUnique({ where: { id: row.ownerId } }), prisma.returnCaseEvent.findMany({ where: { caseId: id }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], skip: (page - 1) * 20, take: 21 }), prisma.supportTicket.findUnique({ where: { id: row.ticketId } })]);
   const admin = viewer.role === "ADMIN", canManage = admin && conversation?.status === "OPEN" && conversation.assignedTo === viewer.id;
   const initial = ticket ? await prisma.supportMessage.findUnique({ where: { id: ticket.initialMessageId } }) : null;
-  return { case: { ...view(row, !!canManage), actions: admin && !canManage ? [] : returnActions(row.state, admin) }, imageUrl: initial?.conversationId === row.ownerId && initial.attachmentId ? "/api/support/attachments/" + initial.attachmentId : null, page, hasOlder: events.length > 20, events: events.slice(0, 20).map(event => ({ id: event.id, action: event.action, state: event.state, text: event.text, reference: event.reference || null, createdAt: event.createdAt.toISOString() })) };
+  return { case: { ...view(row, !!canManage), actions: admin && !canManage ? [] : returnActions(row.state, admin) }, conversationId: row.ownerId, imageUrl: initial?.conversationId === row.ownerId && initial.attachmentId ? "/api/support/attachments/" + initial.attachmentId : null, page, hasOlder: events.length > 20, events: events.slice(0, 20).map(event => ({ id: event.id, action: event.action, state: event.state, text: event.text, reference: event.reference || null, createdAt: event.createdAt.toISOString() })) };
 }
 async function restock(tx: Prisma.TransactionClient, row: ReturnCase, actorId: string, auditId: string, text: string) {
   const item = row.item as unknown as ReturnItem, variant = await tx.productVariant.findUnique({ where: { id: item.variantId }, include: { product: true } }), balance = readInventoryBalance(variant?.inventory);
@@ -135,5 +138,5 @@ export async function changeReturnCase(id: string, viewer: SupportViewer, input:
     await tx.auditLog.create({ data: { id: auditId, actorId: viewer.id, entityType: "RETURN_CASE", entityId: id, action: "RETURN_" + input.action, status: "SUCCEEDED", details: { fingerprint, previousState: row.state, state } } });
     await notify(tx, row, auditId, viewer, input.action === "RESTOCK" ? "Returned goods restocked; resolution pending" : input.action === "RECEIVE" ? "Returned goods received" : input.action === "ACCEPT" ? "Return approved for sending goods back" : input.action === "REJECT" ? "Return request declined" : "Return case updated");
     return { success: true, replayed: false };
-  });
+  }, RETURN_CONFLICT_DELAY_MS);
 }

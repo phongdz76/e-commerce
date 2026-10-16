@@ -357,6 +357,7 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
             <CodPaymentClient key={order.id} orderId={order.id} onRecorded={handleCodRecorded} />
           )}
           <OrderStock key={order.id} orderId={order.id} />
+          <Link href={`/admin/returns?orderId=${order.id}`} className="inline-flex min-h-11 items-center text-sm font-semibold text-teal-700 hover:underline">View return requests for this order</Link>
           {order.paymentMethod !== "COD" && <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-xs">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h2 className="font-semibold text-slate-800">Payment history</h2>
