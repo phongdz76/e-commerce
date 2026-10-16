@@ -3,13 +3,17 @@
 import Link from "next/link";
 import { useCustomerService } from "@/app/providers/CustomerServiceProvider";
 
+interface ServiceContactProps {
+  map?: boolean;
+  compact?: boolean;
+  dark?: boolean;
+}
+
 export default function ServiceContact({
   map = false,
   compact = false,
-}: {
-  map?: boolean;
-  compact?: boolean;
-}) {
+  dark = false,
+}: ServiceContactProps) {
   const { publication, error, loading } = useCustomerService();
 
   if (error) {
@@ -32,14 +36,22 @@ export default function ServiceContact({
 
   if (map) {
     if (!contact.address && !contact.mapUrl) {
-      return <p className="text-sm text-slate-500">Store location details have not been published.</p>;
+      return null;
     }
 
     return (
-      <section aria-label="Store location" className="space-y-3">
-        <h2 className="text-lg font-bold text-slate-800">{contact.storeName} · Location</h2>
+      <section aria-label="Store location" className="space-y-3 mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center">
+            <span className="text-2xl font-bold text-white">SG</span>
+            <span className="text-2xl font-bold text-teal-400">Tech</span>
+          </div>
+          <span className="text-2xl font-bold text-white">Location</span>
+        </div>
         {contact.address && (
-          <p className="whitespace-pre-wrap break-words text-slate-700">{contact.address}</p>
+          <p className="text-slate-300 flex items-center gap-2">
+            <span>{contact.address}</span>
+          </p>
         )}
         {contact.mapUrl && (
           <iframe
@@ -48,8 +60,9 @@ export default function ServiceContact({
             height="300"
             title={`${contact.storeName} location map`}
             loading="lazy"
-            referrerPolicy="no-referrer"
+            referrerPolicy="no-referrer-when-downgrade"
             className="rounded-lg border-0"
+            style={{ border: 0, borderRadius: "0.5rem" }}
           />
         )}
       </section>
@@ -84,7 +97,11 @@ export default function ServiceContact({
       {contact.phone && (
         <a
           href={"tel:" + contact.phone.replace(/[ ()-]/g, "")}
-          className="inline-flex min-h-8 items-center rounded-md bg-slate-100 px-2.5 py-1 text-slate-700 transition hover:bg-slate-200"
+          className={
+            dark
+              ? "hover:text-teal-400 transition-colors"
+              : "inline-flex min-h-8 items-center rounded-md bg-slate-100 px-2.5 py-1 text-slate-700 transition hover:bg-slate-200"
+          }
         >
           Call: {contact.phone}
         </a>
@@ -93,7 +110,11 @@ export default function ServiceContact({
       {contact.email && (
         <a
           href={"mailto:" + encodeURIComponent(contact.email)}
-          className="inline-flex min-h-8 items-center rounded-md bg-slate-100 px-2.5 py-1 text-slate-700 transition hover:bg-slate-200"
+          className={
+            dark
+              ? "hover:text-teal-400 transition-colors"
+              : "inline-flex min-h-8 items-center rounded-md bg-slate-100 px-2.5 py-1 text-slate-700 transition hover:bg-slate-200"
+          }
         >
           Email: {contact.email}
         </a>
@@ -104,14 +125,20 @@ export default function ServiceContact({
           href={contact.zaloUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex min-h-8 items-center rounded-md bg-blue-50 px-2.5 py-1 text-blue-600 transition hover:bg-blue-100"
+          className={
+            dark
+              ? "hover:text-teal-400 transition-colors"
+              : "inline-flex min-h-8 items-center rounded-md bg-blue-50 px-2.5 py-1 text-blue-600 transition hover:bg-blue-100"
+          }
         >
           Open Zalo
         </a>
       )}
 
       {!compact && contact.address && (
-        <p className="whitespace-pre-wrap break-words text-slate-600">{contact.address}</p>
+        <p className={dark ? "text-slate-300" : "whitespace-pre-wrap break-words text-slate-600"}>
+          {contact.address}
+        </p>
       )}
     </div>
   );
