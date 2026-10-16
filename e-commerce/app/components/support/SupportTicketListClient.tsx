@@ -8,6 +8,7 @@ import { TICKET_CATEGORIES, TICKET_STATES } from "@/utils/supportTickets";
 import { formatAdminOrderDate } from "@/utils/adminOrders";
 import type { SupportTicketList } from "@/types/supportTicket";
 import Pagination from "@/app/components/Pagination";
+import { createRequestScope } from "@/utils/requestScope";
 
 export default function SupportTicketListClient({
   admin = false,
@@ -19,56 +20,73 @@ export default function SupportTicketListClient({
   const [data, setData] = useState<SupportTicketList | null>(null);
   const [state, setState] = useState("ALL");
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const generation = useRef(0);
-  const fetching = useRef(false);
 
-  const invalidate = useCallback(() => {
-    generation.current++;
-  }, []);
+  const fetching = useRef(createRequestScope());
 
-  const load = useCallback(async () => {
-    const request = ++generation.current;
-    fetching.current = true;
-    try {
-      const response = await axios.get<SupportTicketList>(
-        admin ? API_PATHS.ADMIN.SUPPORT_TICKETS : API_PATHS.SUPPORT.TICKETS,
-        {
-          params: {
-            state,
-            page,
-            ...(admin && conversationId ? { conversationId } : {}),
-          },
-          timeout: 15000,
-        }
-      );
-      if (request === generation.current) {
+  const loadTickets = useCallback(
+    async (showLoading = false) => {
+      const request = fetching.current.begin(showLoading);
+      if (!request) {
+        return;
+      }
+
+      if (showLoading) {
+        setIsLoading(true);
+      }
+
+      try {
+        const response = await axios.get<SupportTicketList>(
+          admin ? API_PATHS.ADMIN.SUPPORT_TICKETS : API_PATHS.SUPPORT.TICKETS,
+          {
+            params: {
+              state,
+              page,
+              ...(admin && conversationId ? { conversationId } : {}),
+            },
+            timeout: 15000,
+            signal: request.signal,
+          }
+        );
+
+        if (request.signal.aborted) return;
         setData(response.data);
         setError("");
-      }
-    } catch {
-      if (request === generation.current) {
+      } catch {
+        if (request.signal.aborted) return;
         setError("Unable to load support requests. Refresh to retry.");
+      } finally {
+        if (fetching.current.finish(request)) setIsLoading(false);
       }
-    } finally {
-      if (request === generation.current) {
-        setLoading(false);
-        fetching.current = false;
-      }
-    }
-  }, [admin, state, page, conversationId]);
+    },
+    [admin, state, page, conversationId]
+  );
 
   useEffect(() => {
-    void Promise.resolve().then(load);
+    let active = true;
+    const requests = fetching.current;
+
+    const fetchInitial = async () => {
+      if (active) {
+        await loadTickets(true);
+      }
+    };
+
+    void fetchInitial();
+
     const timer = setInterval(() => {
-      if (!document.hidden && !fetching.current) void load();
+      if (!document.hidden && active) {
+        void loadTickets(false);
+      }
     }, 10000);
+
     return () => {
-      invalidate();
+      active = false;
+      requests.cancel();
       clearInterval(timer);
     };
-  }, [load, invalidate]);
+  }, [loadTickets]);
 
   const root = admin ? "/admin/support-requests/" : "/support/requests/";
 
@@ -76,7 +94,7 @@ export default function SupportTicketListClient({
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">
+          <h1 className="text-2xl font-bold text-slate-800">
             {admin ? "Support requests" : "Your support requests"}
           </h1>
           <p className="mt-2 text-sm text-slate-500">
@@ -95,14 +113,14 @@ export default function SupportTicketListClient({
 
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <label className="flex items-center gap-2">
-          <span className="text-slate-600 font-medium">Show</span>
+          <span className="font-medium text-slate-600">Show</span>
           <select
             aria-label="Support request filter"
             value={state}
             onChange={(event) => {
               setState(event.target.value);
               setPage(1);
-              setLoading(true);
+              setIsLoading(true);
             }}
             className="rounded-lg border border-slate-300 bg-white p-2 text-slate-700"
           >
@@ -117,11 +135,8 @@ export default function SupportTicketListClient({
         </label>
         <button
           type="button"
-          disabled={loading}
-          onClick={() => {
-            setLoading(true);
-            void load();
-          }}
+          disabled={isLoading}
+          onClick={() => void loadTickets(true)}
           className="min-h-11 font-semibold text-teal-700 hover:text-teal-800 disabled:opacity-50"
         >
           Refresh requests
@@ -134,7 +149,8 @@ export default function SupportTicketListClient({
         </Link>
       </div>
 
-      {loading && <p role="status" className="text-sm text-slate-500">Loading support requests…</p>}
+      {isLoading && <p role="status" className="text-sm text-slate-500">Loading support requests…</p>}
+
       {error && (
         <p role="alert" className="rounded-md bg-rose-50 p-3 text-sm text-rose-700">
           {error}
@@ -183,10 +199,10 @@ export default function SupportTicketListClient({
             totalPages={data.totalPages}
             totalItems={data.total}
             pageSize={10}
-            isLoading={loading}
+            isLoading={isLoading}
             onPageChange={(nextPage) => {
               setPage(nextPage);
-              setLoading(true);
+              setIsLoading(true);
             }}
           />
         </>

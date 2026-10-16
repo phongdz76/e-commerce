@@ -1,15 +1,98 @@
 "use client";
+
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { API_PATHS } from "@/utils/apiPaths";
 import type { ServicePublication } from "@/types/customerService";
-const Context = createContext<{ publication: ServicePublication | null; error: boolean; loading: boolean }>({ publication: null, error: false, loading: true });
-export const useCustomerService = () => useContext(Context);
+
+interface CustomerServiceContextValue {
+  publication: ServicePublication | null;
+  error: boolean;
+  loading: boolean;
+}
+
+const CustomerServiceContext = createContext<CustomerServiceContextValue>({
+  publication: null,
+  error: false,
+  loading: true,
+});
+
+export const useCustomerService = () => useContext(CustomerServiceContext);
+
 export default function CustomerServiceProvider({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname(), [publication, setPublication] = useState<ServicePublication | null>(null), [error, setError] = useState(false), [loading, setLoading] = useState(true);
-  const generation = useRef(0), fetching = useRef(false);
-  const invalidate = useCallback(() => { generation.current++; fetching.current = false; }, []);
-  const load = useCallback(async () => { if (fetching.current) return; fetching.current = true; const request = ++generation.current; try { const response = await fetch(API_PATHS.CUSTOMER_SERVICE, { cache: "no-store", signal: AbortSignal.timeout(15000) }); if (!response.ok) throw Error(); const data: ServicePublication = await response.json(); if (request === generation.current) { setPublication(data); setError(false); } } catch { if (request === generation.current) setError(true); } finally { if (request === generation.current) { fetching.current = false; setLoading(false); } } }, []);
-  useEffect(() => { void Promise.resolve().then(load); const refresh = () => { if (!document.hidden) void load(); }; const timer = setInterval(refresh, 60000); window.addEventListener("sgtech-service-published", refresh); document.addEventListener("visibilitychange", refresh); return () => { invalidate(); clearInterval(timer); window.removeEventListener("sgtech-service-published", refresh); document.removeEventListener("visibilitychange", refresh); }; }, [load, invalidate, pathname]);
-  return <Context.Provider value={{ publication, error, loading }}>{children}</Context.Provider>;
+  const pathname = usePathname();
+
+  const [publication, setPublication] = useState<ServicePublication | null>(null);
+  const [error, setError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetching = useRef(false);
+
+  const loadService = useCallback(async () => {
+    if (fetching.current) {
+      return;
+    }
+    fetching.current = true;
+
+    try {
+      const response = await fetch(API_PATHS.CUSTOMER_SERVICE, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(15000),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to load customer service content");
+      }
+
+      const data: ServicePublication = await response.json();
+      setPublication(data);
+      setError(false);
+    } catch {
+      setError(true);
+    } finally {
+      fetching.current = false;
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const fetchInitial = async () => {
+      if (active) {
+        await loadService();
+      }
+    };
+
+    void fetchInitial();
+
+    const handleRefresh = () => {
+      if (!document.hidden && active) {
+        void loadService();
+      }
+    };
+
+    const timer = setInterval(handleRefresh, 60000);
+    window.addEventListener("sgtech-service-published", handleRefresh);
+    document.addEventListener("visibilitychange", handleRefresh);
+
+    return () => {
+      active = false;
+      clearInterval(timer);
+      window.removeEventListener("sgtech-service-published", handleRefresh);
+      document.removeEventListener("visibilitychange", handleRefresh);
+    };
+  }, [loadService, pathname]);
+
+  return (
+    <CustomerServiceContext.Provider
+      value={{
+        publication,
+        error,
+        loading: isLoading,
+      }}
+    >
+      {children}
+    </CustomerServiceContext.Provider>
+  );
 }
