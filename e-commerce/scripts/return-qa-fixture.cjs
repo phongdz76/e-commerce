@@ -9,6 +9,16 @@ async function seedReturnOrder(db, ownerId, productId) {
   } });
   const order = await db.order.create({ data: {
     userId: ownerId, status: 'paid', amount: 200000, currency: 'vnd', deliveryStatus: 'delivered', paymentMethod: 'COD',
+    recipientName: 'Return QA recipient',
+    recipientPhone: '0900000000',
+    address: {
+      line1: 'Private QA street',
+      line2: '',
+      city: 'QA city',
+      state: '',
+      country: 'VN',
+      postal_code: '',
+    },
     paymentIntentId: 'COD_RETURN_QA_' + randomUUID(), management: { state: 'CONFIRMED', version: 1, updatedAt: new Date() },
     stockReservation: { state: 'CONSUMED', version: 2, updatedAt: new Date(), expiresAt: null, lines: [{ variantId: variant.id, sku: variant.sku, quantity: 2 }] },
     products: [{ id: productId, variantId: variant.id, sku: variant.sku, name: 'Purchased return QA phone', description: 'Isolated delivered fixture', category: 'QA phones', brand: 'QA brand', selectedImg: variant.image, quantity: 2, price: variant.price }],

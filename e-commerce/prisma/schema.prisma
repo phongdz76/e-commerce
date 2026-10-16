@@ -186,6 +186,7 @@ model ReturnCase {
   fingerprint      String
   item             Json
   policy           Json?
+  exchange         Json?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -202,6 +203,7 @@ model ReturnCaseEvent {
   state     String
   text      String
   reference String?
+  exchange  Json?
   createdAt DateTime @default(now())
 
   @@index([caseId, createdAt])

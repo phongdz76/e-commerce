@@ -91,6 +91,15 @@ async function main() {
     assert.doesNotMatch(JSON.stringify(result), /fingerprint|actorId|uploadedBy|@example/);
     assert.match(result.imageUrl, /\/api\/support\/attachments\//);
     checks.push('customer history and image reference retain snapshots while omitting internal identity/fingerprints');
+    stage = 'exchange stock, consent, dispatch and delivery';
+    await require('./check-return-exchange-mongo.cjs').verifyReturnExchangeMongo({
+      db,
+      second,
+      load,
+      otherLoad,
+      product,
+      checks,
+    });
     fs.mkdirSync(path.resolve(__dirname, '../.artifacts'), { recursive: true });
     fs.writeFileSync(path.resolve(__dirname, '../.artifacts/returns-mongo-results.json'), JSON.stringify({ checks, applicationDatabaseWrites: 0, externalEmails: 0, providerNetworkCalls: 0 }, null, 2));
     console.log('Returns MongoDB passed: ' + checks.length + ' groups.');

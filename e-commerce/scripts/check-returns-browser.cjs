@@ -98,6 +98,78 @@ async function verifyReturnsBrowser({ page, origin, artifactDirectory, checks, f
     await customer.evaluate(`Array.from(document.querySelectorAll('[aria-label="Saved notifications"] li button')).find(el=>el.innerText.includes(${JSON.stringify(reference)})).click()`);
     await customer.wait(`location.pathname==='/returns/${id}'&&!!document.querySelector('[aria-label="Return summary"]')`);
     checks.push({ adminRecordsApprovalReceiptInspection: true, unsuitableGoodsHaveNoRestockAction: true, adminAndCustomerDetailsFit320And1440: true, customerReloadAndFilterPersist: true, returnNotificationsLinkToCase: true });
+    stage = 'replacement offer, customer consent and shipment';
+    await navigate(page, '/admin/returns/' + id, `!!document.querySelector('[aria-label="Return action"]')&&!document.body.innerText.includes('Loading return request')`);
+    await select(page, 'Return action', 'EXCHANGE_RESERVE');
+    await page.wait(`Array.from(document.querySelector('[aria-label="Replacement SKU"]')?.options||[]).some(option=>option.value===${JSON.stringify(fixture.variantId)})`);
+    await select(page, 'Replacement SKU', fixture.variantId);
+    await fill(page, 'Return action note', 'Please review the reserved replacement SKU and saved delivery destination.');
+    await page.evaluate(`document.querySelector('[aria-label="Confirm return action"]').click()`);
+    await click(page, 'Save return step');
+    await page.wait(`document.querySelector('[aria-label="Replacement exchange"]')?.innerText.includes('awaiting your approval')`);
+    for (const width of [320, 1440]) {
+      await page.send('Emulation.setDeviceMetricsOverride', { width, height: 1000, deviceScaleFactor: 1, mobile: false });
+      await screenshot(page, 'p1-exchange-offer-admin-' + width);
+    }
+    await navigate(customer, '/returns/' + id, `document.querySelector('[aria-label="Replacement exchange"]')?.innerText.includes('awaiting your approval')`);
+    await select(customer, 'Return action', 'EXCHANGE_ACCEPT');
+    await fill(customer, 'Return action note', 'I accept this replacement SKU, quantity and saved delivery destination.');
+    await customer.evaluate(`document.querySelector('[aria-label="Confirm return action"]').click()`);
+    stage = 'changed offer requires fresh customer confirmation';
+    const changedOfferSuccess = await page.evaluate(async (url, variantId) => {
+      for (const action of ['EXCHANGE_RELEASE', 'EXCHANGE_RESERVE']) {
+        const currentRes = await fetch(url);
+        const current = await currentRes.json();
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action,
+            version: current.case.version,
+            requestId: crypto.randomUUID(),
+            confirmed: true,
+            text: 'QA changed offer requires the customer to review and confirm again.',
+            variantId,
+          }),
+        });
+        if (response.status !== 200) {
+          return false;
+        }
+      }
+      return true;
+    }, '/api/admin/returns/' + id, fixture.variantId);
+    assert.equal(changedOfferSuccess, true);
+    await click(customer, 'Refresh return');
+    await customer.wait(`document.body.innerText.includes('changed while you were editing')&&!document.body.innerText.includes('Loading return request')`);
+    assert.equal(await customer.evaluate(`Array.from(document.querySelectorAll('button')).find(el=>el.innerText==='Save return step').disabled`), true);
+    await select(customer, 'Return action', '');
+    await select(customer, 'Return action', 'EXCHANGE_ACCEPT');
+    assert.equal(await customer.evaluate(`document.querySelector('[aria-label="Confirm return action"]').checked`), false);
+    await customer.evaluate(`document.querySelector('[aria-label="Confirm return action"]').click()`);
+    await click(customer, 'Save return step');
+    await customer.wait(`document.querySelector('[aria-label="Replacement exchange"]')?.innerText.includes('awaiting dispatch')`);
+    await navigate(page, '/admin/returns/' + id, `document.querySelector('[aria-label="Replacement exchange"]')?.innerText.includes('awaiting dispatch')`);
+    await select(page, 'Return action', 'EXCHANGE_SHIP');
+    await fill(page, 'Replacement carrier', 'Browser QA carrier');
+    await fill(page, 'Return receipt reference', 'BROWSER-REPLACEMENT-TRACK');
+    await fill(page, 'Return action note', 'Handed over the approved replacement to the recorded carrier.');
+    await page.evaluate(`document.querySelector('[aria-label="Confirm return action"]').click()`);
+    await click(page, 'Save return step');
+    await page.wait(`document.querySelector('[aria-label="Replacement exchange"]')?.innerText.includes('Replacement dispatched')`);
+    await navigate(customer, '/returns/' + id, `document.querySelector('[aria-label="Replacement exchange"]')?.innerText.includes('Replacement dispatched')`);
+    for (const width of [320, 1440]) {
+      await customer.send('Emulation.setDeviceMetricsOverride', { width, height: 1000, deviceScaleFactor: 1, mobile: false });
+      await screenshot(customer, 'p1-exchange-shipped-customer-' + width);
+    }
+    await select(customer, 'Return action', 'EXCHANGE_RECEIVE');
+    await fill(customer, 'Return action note', 'I received and checked the agreed replacement goods.');
+    await customer.evaluate(`document.querySelector('[aria-label="Confirm return action"]').click()`);
+    await click(customer, 'Save return step');
+    await customer.wait(`document.querySelector('[aria-label="Return summary"]')?.innerText.includes('Exchange completed')`);
+    await customer.send('Page.reload');
+    await customer.wait(`document.querySelector('[aria-label="Return summary"]')?.innerText.includes('Exchange completed')`);
+    assert.equal(await customer.evaluate(`!!document.querySelector('form[aria-label="Update return"]')`), false);
+    checks.push({ replacementChoicesUseRealStock: true, adminOfferAndCustomerAcceptancePersist: true, changedOfferRequiresFreshConfirmation: true, manualCarrierTrackingAndDispatchPersist: true, exchangeFits320And1440: true, customerReceiptCompletesCaseAfterReload: true });
     assert.deepEqual(exceptions, []);
   } catch (error) {
     console.error('Return browser QA failed at:', stage, error.message);
