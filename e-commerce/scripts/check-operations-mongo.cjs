@@ -446,6 +446,44 @@ async function main() {
     await load('libs/returnCaseStorage.ts').ensureReturnCaseStorage();
     const returnBackup = await prisma.returnCase.create({data:{id:'e'.repeat(24),ownerId:actor.id,orderId:expiredIds[0],lineIndex:0,quantity:1,ticketId:actor.id,reason:'DAMAGED',preference:'REFUND',description:'Private QA return backup fixture.',fingerprint:'qa-return-backup',state:'INSPECTED_OTHER',version:4,item:{productId:'f'.repeat(24),variantId:'1'.repeat(24),sku:'QA-BACKUP',name:'Saved return item',option:'Black',purchasedQuantity:1,unitPrice:10000}}});
     await prisma.returnCaseEvent.create({data:{id:'f'.repeat(64),caseId:returnBackup.id,actorId:actor.id,action:'INSPECT_OTHER',state:'INSPECTED_OTHER',text:'QA inspection kept these goods outside sellable stock.'}});
+    const exchangeBackup = {
+      offerId: 'a'.repeat(24),
+      state: 'OFFERED',
+      productId: 'f'.repeat(24),
+      variantId: '1'.repeat(24),
+      sku: 'QA-REPLACEMENT-BACKUP',
+      name: 'Saved replacement',
+      option: 'Blue',
+      quantity: 1,
+      unitPrice: 10000,
+      currency: 'vnd',
+      destination: {
+        name: 'QA recipient',
+        phone: '0900000000',
+        address: 'Private QA destination',
+      },
+      offeredAt: new Date().toISOString(),
+      acceptedAt: null,
+      shippedAt: null,
+      deliveredAt: null,
+      carrier: null,
+      trackingNumber: null,
+    };
+    await prisma.returnCase.update({
+      where: { id: returnBackup.id },
+      data: { exchange: exchangeBackup },
+    });
+    await prisma.returnCaseEvent.create({
+      data: {
+        id: 'a'.repeat(64),
+        caseId: returnBackup.id,
+        actorId: actor.id,
+        action: 'EXCHANGE_RESERVE',
+        state: 'INSPECTED_OTHER',
+        text: 'QA replacement snapshot and reservation identity preserved in backup.',
+        exchange: exchangeBackup,
+      },
+    });
     const backup = await verifyBackupRestore({
       sourceUrl: sourceUrl.toString(),
       targetUrl: restoreUrl.toString(),

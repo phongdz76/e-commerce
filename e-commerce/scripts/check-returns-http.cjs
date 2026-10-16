@@ -47,8 +47,40 @@ async function verifyReturnsHttp({ call, prisma, cookies, users, product, checks
   assert.equal((await prisma.order.findUnique({ where: { id: order.id } })).status, 'paid');
   assert.equal((await prisma.order.findUnique({ where: { id: order.id } })).refundInfo, null);
   assert.equal((await call(root, post(owner, { ...input, requestId: randomUUID(), quantity: 2 }))).status, 409);
-  for (const route of ['/returns', '/returns/new?orderId=' + order.id, '/returns/' + id, '/admin/returns', '/admin/returns/' + id]) assert.equal((await call(route, { cookie: route.startsWith('/admin') ? admin : owner })).status, 200);
-  checks.push('real receive/inspection never restock early; recorded restock replays once, preserves payment, rejects over-allocation and all return pages render');
-  return { caseId: id, orderId: order.id, variantId: variant.id, ownerId: users[2].id, ownerCookie: owner, adminCookie: admin };
+  const routesToVerify = [
+    '/returns',
+    '/returns/new?orderId=' + order.id,
+    '/returns/' + id,
+    '/admin/returns',
+    '/admin/returns/' + id,
+  ];
+  for (const route of routesToVerify) {
+    const routeRes = await call(route, {
+      cookie: route.startsWith('/admin') ? admin : owner,
+    });
+    assert.equal(routeRes.status, 200);
+  }
+
+  checks.push(
+    'real receive/inspection never restock early; recorded restock replays once, preserves payment, rejects over-allocation and all return pages render',
+  );
+
+  await require('./check-return-exchange-http.cjs').verifyReturnExchangeHttp({
+    call,
+    prisma,
+    cookies,
+    users,
+    product,
+    checks,
+  });
+
+  return {
+    caseId: id,
+    orderId: order.id,
+    variantId: variant.id,
+    ownerId: users[2].id,
+    ownerCookie: owner,
+    adminCookie: admin,
+  };
 }
 module.exports = { verifyReturnsHttp };

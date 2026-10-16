@@ -1,5 +1,13 @@
 export type InventoryAction = "INITIALIZE" | "RECEIVE" | "REMOVE" | "COUNT";
-export type InventoryMovementAction = InventoryAction | "STOCK_RESERVED" | "STOCK_RELEASED" | "STOCK_DISPATCHED" | "RETURN_RESTOCKED";
+export type InventoryMovementAction =
+  | InventoryAction
+  | "STOCK_RESERVED"
+  | "STOCK_RELEASED"
+  | "STOCK_DISPATCHED"
+  | "RETURN_RESTOCKED"
+  | "EXCHANGE_STOCK_RESERVED"
+  | "EXCHANGE_STOCK_RELEASED"
+  | "EXCHANGE_STOCK_DISPATCHED";
 
 export interface InventoryBalance {
   onHand: number;

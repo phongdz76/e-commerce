@@ -53,6 +53,7 @@ export const API_PATHS = {
   ADMIN: {
     RETURNS: "/api/admin/returns",
     RETURN: (id: string) => `/api/admin/returns/${id}`,
+    RETURN_EXCHANGE_OPTIONS: (id: string) => `/api/admin/returns/${id}/exchange-options`,
     CUSTOMER_SERVICE: "/api/admin/customer-service",
     SUPPORT_TICKETS: "/api/admin/support-requests",
     SUPPORT_TICKET: (id: string) => `/api/admin/support-requests/${id}`,

@@ -69,6 +69,10 @@ export default function SupportHours({ enabled = true }: { enabled?: boolean }) 
     };
   }, [enabled]);
 
+  if (!enabled || (!isLoading && !hasFailed && data?.status === "UNCONFIGURED")) {
+    return null;
+  }
+
   return (
     <div aria-label="Published support hours" className="space-y-2 text-sm text-slate-600">
       <p>
@@ -76,8 +80,6 @@ export default function SupportHours({ enabled = true }: { enabled?: boolean }) 
           ? "Support hours are temporarily unavailable. You can still send a request."
           : isLoading || !data
           ? "Checking published support hours…"
-          : data.status === "UNCONFIGURED"
-          ? "Support hours have not been published. You can send messages at any time."
           : data.status === "IN_HOURS"
           ? "Within published support hours. Replies depend on team availability."
           : "Outside published support hours. Your messages will still be saved."}
