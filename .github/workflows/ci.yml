@@ -69,9 +69,11 @@ jobs:
       - run: npm run test:content-mongo
       - run: npm run test:support-mongo
       - run: npm run test:support-tickets-mongo
+      - run: npm run test:returns-mongo
       - run: npm run test:customer-service-mongo
       - run: npm run test:email-mongo
       - run: npm run test:operations-mongo
+      - run: npm run test:returns-e2e
       - run: npm run test:operations-e2e
       - name: Upload verification evidence
         if: always()

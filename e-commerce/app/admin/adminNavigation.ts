@@ -19,6 +19,7 @@ export const ADMIN_NAVIGATION = [
     { label: "Payments", href: "/admin/payments", icon: FiCreditCard },
     { label: "Payment issues", href: "/admin/payment-exceptions", icon: FiAlertCircle },
     { label: "Refunds", href: "/admin/refunds", icon: FiCornerUpLeft },
+    { label: "Returns", href: "/admin/returns", icon: FiCornerUpLeft },
     { label: "Support inbox", href: "/admin/support", icon: FiUsers },
     { label: "Support requests", href: "/admin/support-requests", icon: FiUsers },
     { label: "Support hours", href: "/admin/support-hours", icon: FiActivity },

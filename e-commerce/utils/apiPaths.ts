@@ -3,6 +3,11 @@ export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 export const API_PATHS = {
   CUSTOMER_SERVICE: "/api/customer-service",
   NOTIFICATIONS: "/api/notifications",
+  RETURNS: {
+    LIST: "/api/returns",
+    DETAIL: (id: string) => `/api/returns/${id}`,
+    OPTIONS: "/api/returns/options",
+  },
   SUPPORT: {
     THREAD: "/api/support",
     UPLOAD: "/api/support/attachments",
@@ -46,6 +51,8 @@ export const API_PATHS = {
     RETRY_PAYMENT: (id: string) => `/api/order/${id}/retry-payment`,
   },
   ADMIN: {
+    RETURNS: "/api/admin/returns",
+    RETURN: (id: string) => `/api/admin/returns/${id}`,
     CUSTOMER_SERVICE: "/api/admin/customer-service",
     SUPPORT_TICKETS: "/api/admin/support-requests",
     SUPPORT_TICKET: (id: string) => `/api/admin/support-requests/${id}`,

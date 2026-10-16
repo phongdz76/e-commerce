@@ -8,6 +8,7 @@ import { TICKET_CATEGORIES } from "@/utils/supportTickets";
 import { SUPPORT_IMAGE_LIMIT } from "@/utils/support";
 import type { SupportContext } from "@/types/support";
 import SupportHours from "./SupportHours";
+import Link from "next/link";
 
 export default function SupportTicketCreateClient({
   initialContext = null,
@@ -162,6 +163,7 @@ export default function SupportTicketCreateClient({
       </div>
 
       <SupportHours />
+      {category === "RETURN" && <p className="rounded-lg bg-teal-50 p-3 text-sm text-teal-900">For delivered goods, <Link href={"/returns/new" + (context?.kind === "ORDER" ? `?orderId=${context.id}` : "")} className="font-semibold underline">open a return case</Link> to record quantities and follow receipt/inspection. This support form remains available for general questions.</p>}
 
       <form
         onSubmit={handleSubmit}

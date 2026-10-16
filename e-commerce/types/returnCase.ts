@@ -5,6 +5,6 @@ export type ReturnCaseView = {
   reason: string; preference: string; description: string; state: string; version: number; item: ReturnItem;
   policy: ServicePolicySnapshot | null; createdAt: string; updatedAt: string; canManage: boolean; actions: string[];
 };
-export type ReturnCaseDetail = { case: ReturnCaseView; events: { id: string; action: string; state: string; text: string; reference: string | null; createdAt: string }[]; page: number; hasOlder: boolean; imageUrl: string | null };
+export type ReturnCaseDetail = { case: ReturnCaseView; conversationId: string; events: { id: string; action: string; state: string; text: string; reference: string | null; createdAt: string }[]; page: number; hasOlder: boolean; imageUrl: string | null };
 export type ReturnCaseList = { items: ReturnCaseView[]; page: number; total: number; totalPages: number };
 export type ReturnOptions = { orderId: string; reference: string; eligible: boolean; message: string; policy: ServicePolicySnapshot | null; items: (ReturnItem & { lineIndex: number; available: number })[] };

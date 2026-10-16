@@ -132,6 +132,7 @@ export default function UserMenu({
                   Your support requests
                 </Link>
                 <hr />
+                <Link href="/returns" onClick={toggleOpen} className="block px-4 py-3 hover:bg-slate-50">Your return requests</Link>
                 <button
                   type="button"
                   className="w-full px-4 py-3 text-left hover:bg-slate-50"
