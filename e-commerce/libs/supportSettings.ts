@@ -28,7 +28,7 @@ export async function updateSupportHours(actorId: string, input: { action: "SAVE
     if (!schedule) throw new CheckoutRequestError("Save a valid seven-day schedule before publishing.", 400, "SUPPORT_SCHEDULE_INVALID");
     const result = await tx.supportSettings.updateMany({ where: { id: "default", version: row.version }, data: { version: row.version + 1, ...(input.action === "SAVE" ? { draft: schedule as Prisma.InputJsonValue } : { published: schedule as Prisma.InputJsonValue, publishedAt: new Date() }) } });
     if (result.count !== 1) throw changed();
-    await tx.auditLog.create({ data: { id, actorId, entityType: "SUPPORT_SETTINGS", entityId: "default", action: "SUPPORT_HOURS_" + input.action, status: "SUCCEEDED", details: { fingerprint, version: row.version + 1, schedule } } });
+    await tx.auditLog.create({ data: { id, actorId, entityType: "SUPPORT_SETTINGS", entityId: "default", action: "SUPPORT_HOURS_" + input.action, status: "SUCCEEDED", details: { fingerprint, version: row.version + 1, schedule: schedule as Prisma.InputJsonValue } } });
     return { success: true, replayed: false };
   });
 }
