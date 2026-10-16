@@ -35,9 +35,19 @@ class CDP {
       this.socket.send(JSON.stringify({ id, method, params }));
     });
   }
-  async evaluate(expression) {
+  async evaluate(expression, ...args) {
+    if (typeof expression !== "string" && typeof expression !== "function") {
+      throw new TypeError("Browser evaluation needs a JavaScript expression or function.");
+    }
+    if (typeof expression === "string" && args.length) {
+      throw new TypeError("Browser evaluation arguments require a function.");
+    }
+    // CDP accepts source text; JSON.stringify would otherwise omit a function.
+    const source = typeof expression === "function"
+      ? `(${expression.toString()})(...${JSON.stringify(args)})`
+      : expression;
     const result = await this.send("Runtime.evaluate", {
-      expression,
+      expression: source,
       returnByValue: true,
       awaitPromise: true,
     });
