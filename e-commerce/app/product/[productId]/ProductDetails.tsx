@@ -12,10 +12,12 @@ import { MdCheckCircle } from "react-icons/md";
 import { FiChevronDown } from "react-icons/fi";
 import Link from "next/link";
 import type { CatalogProduct } from "@/utils/productFilters";
+import WishlistButton, { WishlistSignIn } from "@/app/components/products/WishlistButton";
 
 interface ProductDetailsProps {
   product: CatalogProduct;
   initialVariantId?: string;
+  signedIn?: boolean;
 }
 
 export interface CartProductProps {
@@ -48,7 +50,7 @@ const Horizontal = () => (
   </div>
 );
 
-export default function ProductDetails({ product, initialVariantId }: ProductDetailsProps) {
+export default function ProductDetails({ product, initialVariantId, signedIn = false }: ProductDetailsProps) {
   const { handleAddProductToCart, cartProducts } = useCart().context;
   const firstVariant = product.variants?.find(variant => variant.id === initialVariantId) || product.variants?.find((variant) => variant.available > 0) || product.variants?.[0];
   const [cartProduct, setCartProduct] = useState<CartProductProps>({
@@ -103,7 +105,7 @@ export default function ProductDetails({ product, initialVariantId }: ProductDet
     }));
   }, [cartProduct.quantity, available]);
 
-  const productRating =
+  const productRating = product.averageRating ??
     product.reviews.reduce((acc, item) => acc + item.rating, 0) /
     Math.max(product.reviews.length, 1);
 
@@ -123,8 +125,9 @@ export default function ProductDetails({ product, initialVariantId }: ProductDet
         <h1 className="text-2xl md:text-3xl font-bold leading-snug">{product.name}</h1>
         <div className="flex items-center gap-2">
           <Rating value={productRating} readOnly />
-          <div>{product.reviews.length} reviews</div>
+          <Link href="#reviews" className="hover:underline">{product.reviewCount ?? product.reviews.length} reviews</Link>
         </div>
+        <div className="mt-2">{signedIn ? <WishlistButton productId={product.id} /> : <WishlistSignIn productId={product.id} />}</div>
         <div className="mt-4 font-semibold text-2xl">
           {formatPrice(cartProduct.price)}
         </div>
