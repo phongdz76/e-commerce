@@ -18,6 +18,9 @@ Personal portfolio project built with Next.js, TypeScript, NextAuth and Prisma/M
 - Support requests with account-owned order/product/SKU context, private images, request references and status tracking. Administrators use the shared conversation assignment, private ticket notes and in-app request notifications.
 - Return intake for delivered order lines with quantity allocation, private images, saved policy snapshots and shared support tickets/chat. Assigned administrators record instructions, receipt and inspection; eligible goods can be restocked once with an audited stock movement. Refund/exchange resolution remains pending separately.
 - Equal-value replacements after return inspection: reserve an available SKU of the same product and original unit price, obtain customer approval of the saved SKU/destination, record carrier handover and confirm receipt/delivery. Decline/release before dispatch restores the reservation; confirmed delivery completes the case and resolves its linked ticket without changing the original payment.
+- Replacement delivery incidents reported by customers or administrators, with assigned administrator follow-up, retained shipment evidence and a saved resolution history.
+- Verified-purchase product reviews after confirmed delivery and stock dispatch, one review per customer/product, paginated history and ratings shared by product details, catalog cards and related products.
+- Account-owned wishlists with add/remove actions, pagination and current catalog prices; unavailable products remain removable without revealing unpublished details.
 - Draft/preview/publication of weekly support hours in Vietnam time, shared by help, footer and the support widget. Requests and messages remain available outside published hours.
 - Administrator drafts, previews and immutable published versions of contacts, FAQs and shipping/return/warranty policies, shared by help pages, footer and widget. New orders save their applicable policy content; archived versions remain available after later edits.
 - Atomic inventory reservations: concurrent buyers cannot reserve the same final unit. Stock adjustments and dispatch/release have audit records.
@@ -58,6 +61,8 @@ MongoDB integration tests create and remove databases with dedicated QA names. T
 npm run test:stock-mongo
 npm run test:catalog-mongo
 npm run test:content-mongo
+npm run test:engagement-mongo
+npm run test:engagement-e2e
 npm run test:support-mongo
 npm run test:support-tickets-mongo
 npm run test:returns-mongo
@@ -76,4 +81,4 @@ See [the operations runbook](e-commerce/OPERATIONS.md) for scheduler authenticat
 
 ## Remaining work
 
-Canonical delivery-region validation, delivery-area changes with fee approval and delivery estimates from a reliable source; richer order lifecycle; actual provider refund UAT, duplicate/late-payment refund handling and partial refunds; exchanges with price differences, replacement shipping exceptions and financial resolution of received returns; acceptance of the configured external email sender; warranty case management; reviews, wishlists, promotions and further reporting. A support enquiry does not approve a return, warranty claim or refund. Return receipt/restocking, payment-issue decisions and cancellation approval alone do not confirm money returned. Production use with real money requires a separate merchant and operational acceptance process.
+Canonical delivery-region validation, delivery-area changes with fee approval and delivery estimates from a reliable source; richer order lifecycle; actual provider refund UAT, duplicate/late-payment refund handling and partial refunds; exchanges with price differences, lost/returned replacement financial resolution and financial resolution of received returns; acceptance of the configured external email sender; warranty case management; review moderation/editing, promotions and further reporting. A support enquiry does not approve a return, warranty claim or refund. Return receipt/restocking, payment-issue decisions and cancellation approval alone do not confirm money returned. Production use with real money requires a separate merchant and operational acceptance process.

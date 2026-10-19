@@ -176,6 +176,10 @@ Nếu hiện **Out of Stock**, không thể coi sản phẩm là mua được ch
 
 Các liên kết **Shipping & delivery**, **Returns & exchanges**, **Ask about warranty** mở chính sách hoặc tạo yêu cầu hỗ trợ có ngữ cảnh sản phẩm. Hỏi bảo hành không tự tạo một hồ sơ tiếp nhận sửa chữa.
 
+**Lưu sản phẩm yêu thích:** đăng nhập, mở trang chi tiết và bấm **Save to wishlist**. Vào menu tài khoản → **Your wishlist** (`/wishlist`) để xem lại, chuyển trang hoặc bấm **Remove**. **Remove from wishlist** trên trang chi tiết cũng bỏ lưu sản phẩm. Danh sách được lưu theo tài khoản; giá lấy từ catalog hiện tại. Sản phẩm bị ẩn/xóa hiện là không khả dụng và vẫn có thể bỏ lưu. Lưu yêu thích chưa giữ tồn kho.
+
+**Đánh giá sau mua:** trong **Customer reviews**, khách có đơn chứa sản phẩm đã giao và đã ghi nhận xuất kho sẽ thấy **Write a review**. Chọn 1–5 sao, viết 10–1.000 ký tự và bấm **Submit review**. Mỗi tài khoản gửi một đánh giá cho mỗi sản phẩm; khi lưu thành công sẽ thấy **Your review is saved** và nhãn **Verified purchase**. Nếu gửi lỗi, nội dung còn trong form để thử lại. Tên hiển thị và nội dung đánh giá công khai; mã đơn và thông tin tài khoản không hiển thị. Có phân trang và **Refresh reviews**; số sao/số đánh giá trên danh mục cũng lấy từ các đánh giá đã lưu. Chưa có sửa/kiểm duyệt hoặc ảnh đánh giá.
+
 ### 2.6. Giỏ hàng — `/cart`
 
 1. Bấm biểu tượng giỏ hàng.
@@ -853,7 +857,7 @@ Ví dụ note đề nghị: `Đề nghị đổi 1 SKU SG-DEMO-WHT cùng sản p
 
 **Release replacement reservation:** dùng trước khi gửi để hủy giữ SKU đề nghị. Nếu cần đổi đề nghị, giải phóng đề nghị hiện tại rồi kiểm tra thông tin nguồn và tạo đề nghị mới. Không có hết hạn tự động; phải theo dõi các lượng giữ đang chờ.
 
-Không dùng Release cho hàng đã SHIPPED. Các ngoại lệ thất lạc/giao thất bại/hàng đổi bị trả và hậu mãi tiếp theo chưa có đủ luồng riêng.
+Không dùng Release cho hàng đã SHIPPED. Khi giao hàng đổi gặp sự cố, khách hoặc admin chọn **Report a replacement delivery issue**, mô tả sự cố trong ghi chú công khai và nhập tham chiếu nếu có, rồi xác nhận lưu. Phần **Replacement exchange** hiện **Replacement delivery needs attention**, giữ nguyên carrier/tracking và địa chỉ đã duyệt. Admin đang nhận xử lý hội thoại chọn **Resolve issue and continue delivery**, ghi kết quả xử lý và xác nhận để tiếp tục giao; lịch sử vẫn giữ sự cố trước đó. Nếu đã nhận được hàng, khách có thể xác nhận nhận ngay cả khi sự cố còn mở. Ghi nhận/xử lý sự cố không tự nhập lại tồn hay hoàn tiền. Quyết toán hàng thất lạc, hàng đổi bị trả và hậu mãi tiếp theo còn cần luồng riêng.
 
 Đổi cùng giá không đổi sản phẩm/tổng tiền/thanh toán gốc của đơn, không tự tạo thêm một khoản thu hay hoàn. Nếu giá SKU hiện khác giá gốc, không sửa giá đơn cũ để ép qua điều kiện.
 
@@ -2563,12 +2567,12 @@ Không dùng các bước tưởng tượng để thao tác những chức năng
 
 | Phần | Trạng thái cần biết |
 |---|---|
-| Review có sao/ảnh xác minh đã mua, bình luận/hỏi đáp sản phẩm | Chưa có luồng hoàn chỉnh để gửi/lưu/kiểm duyệt như tính năng đang dùng được |
+| Ảnh đánh giá, sửa/kiểm duyệt đánh giá, bình luận/hỏi đáp sản phẩm | Chưa có; đánh giá sao và nội dung xác minh đã mua đã gửi/lưu được |
 | Hồ sơ bảo hành thực tế | Hiện có nội dung và phiếu hỏi; chưa đủ quy trình nhận/sửa/đổi/trả có tiến trình |
 | Hoàn tiền một phần sau trả hàng | Chưa hoàn thiện |
 | Đổi hàng khác giá / thu-hoàn chênh lệch | Chưa hoàn thiện |
-| Hàng đổi thất lạc, giao thất bại, trả/bảo hành tiếp hàng đổi | Cần luồng ngoại lệ/hậu mãi riêng |
-| Sổ nhiều địa chỉ, giỏ đồng bộ thiết bị, mua lại, yêu thích, so sánh, báo có hàng | Chưa triển khai đầy đủ |
+| Quyết toán hàng đổi thất lạc, trả/bảo hành tiếp hàng đổi | Đã ghi nhận sự cố và tiếp tục giao; còn cần luồng quyết toán/hậu mãi riêng |
+| Sổ nhiều địa chỉ, giỏ đồng bộ thiết bị, mua lại, so sánh, báo có hàng | Chưa triển khai đầy đủ; danh sách yêu thích theo tài khoản đã có |
 | Voucher, combo, quà tặng, sale có lịch | Chưa có luồng hoàn chỉnh |
 | Quản trị banner/trang chủ | Chưa có module CMS đầy đủ cho banner; CMS hiện tập trung liên hệ/FAQ/chính sách |
 | Cảnh báo tồn thấp tự động | Chưa có cấu hình/luồng cảnh báo hoàn chỉnh |
