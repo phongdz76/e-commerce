@@ -53,6 +53,7 @@ function fixture() {
   const product = { id: 'a'.repeat(24), name: 'QA product', slug: 'qa-product', description: 'A product description', status: 'ACTIVE', categoryId: category.id, brandId: brand.id, category, brand, variants: [variant], updatedAt: date };
   const state = { user: { id: 'e'.repeat(24), role: 'ADMIN' }, writes: [], audits: [] };
   const db = {
+    productReview: { groupBy: async () => [] },
     category: { findUnique: async () => category, findMany: async () => [category], count: async () => 1, updateMany: async options => { state.writes.push(options); Object.assign(category, options.data); return { count: 1 }; } },
     brand: { findUnique: async () => brand },
     product: { findUnique: async () => product, findFirst: async () => product, update: async options => { state.writes.push(options); Object.assign(variant, options.data.variants.update[0].data); product.updatedAt = options.data.updatedAt; return product; }, create: async options => { state.writes.push(options); return product; } },

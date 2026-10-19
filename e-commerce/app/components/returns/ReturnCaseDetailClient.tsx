@@ -306,7 +306,16 @@ export default function ReturnCaseDetailClient({
                 </p>
               )}
 
-              {row.exchange.state === "SHIPPED" && (
+              {row.exchange.deliveryIssue && (
+                <div role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                  <p className="font-semibold">Delivery issue reported {formatAdminOrderDate(row.exchange.deliveryIssue.reportedAt)}</p>
+                  <p className="mt-1 whitespace-pre-wrap break-words">{row.exchange.deliveryIssue.description}</p>
+                  {row.exchange.deliveryIssue.reference && <p className="mt-1 break-words">Reference: {row.exchange.deliveryIssue.reference}</p>}
+                  <p className="mt-2">Support will follow up on this shipment. Confirm receipt when the replacement reaches you.</p>
+                </div>
+              )}
+
+              {["SHIPPED", "DELIVERY_ISSUE"].includes(row.exchange.state) && (
                 <p className="text-sm">
                   Confirm receipt only after you have received and checked the replacement. A tracking reference alone does not confirm delivery.
                 </p>

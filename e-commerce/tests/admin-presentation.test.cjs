@@ -127,7 +127,7 @@ test("storefront names, prices, options and availability come from the current d
   const queries = [];
   const getStorefrontProduct = load("libs/storefrontProductNames.ts", {
     "@/utils/products": { products: original },
-    "@/libs/prismadb": { __esModule: true, default: { product: { findFirst: async (options) => {
+    "@/libs/prismadb": { __esModule: true, default: { productReview: { groupBy: async () => [] }, product: { findFirst: async (options) => {
       queries.push(options);
       return { id: original[0].id, name, description: "Database description", category: { name: "Phone", slug: "phone" }, brand: { name: "Brand", slug: "brand" },
         variants: [{ id: "b".repeat(24), sku: "DB-SKU", name: "Black", price: 2000, inStock: true,

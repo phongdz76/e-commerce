@@ -5,6 +5,7 @@ export const EXCHANGE_STATES: Record<string, string> = {
   OFFERED: "Replacement reserved, awaiting your approval",
   ACCEPTED: "Replacement approved, awaiting dispatch",
   SHIPPED: "Replacement dispatched",
+  DELIVERY_ISSUE: "Replacement delivery needs attention",
   DELIVERED: "Replacement delivered",
   RELEASED: "Replacement reservation released",
 };
@@ -17,6 +18,8 @@ export const EXCHANGE_ACTIONS: Record<string, string> = {
   EXCHANGE_SHIP: "Record replacement dispatch",
   EXCHANGE_DELIVER: "Record replacement delivery evidence",
   EXCHANGE_RECEIVE: "Confirm replacement received",
+  EXCHANGE_REPORT_ISSUE: "Report a replacement delivery issue",
+  EXCHANGE_RESUME: "Resolve issue and continue delivery",
 };
 
 export const RETURN_REASONS: Record<string, string> = {
@@ -109,7 +112,13 @@ export function returnActions(
   }
 
   if (exchangeState === "SHIPPED") {
-    return admin ? ["EXCHANGE_DELIVER"] : ["EXCHANGE_RECEIVE"];
+    return admin
+      ? ["EXCHANGE_DELIVER", "EXCHANGE_REPORT_ISSUE"]
+      : ["EXCHANGE_RECEIVE", "EXCHANGE_REPORT_ISSUE"];
+  }
+
+  if (exchangeState === "DELIVERY_ISSUE") {
+    return admin ? ["EXCHANGE_RESUME", "EXCHANGE_DELIVER"] : ["EXCHANGE_RECEIVE"];
   }
 
   if (state === "EXCHANGED" || exchangeState === "DELIVERED") {
@@ -271,7 +280,7 @@ export function parseReturnAction(value: unknown) {
     requestId: body.requestId as string,
     text: (body.text as string).trim(),
     reference:
-      typeof body.reference === "string" ? body.reference.trim() : null,
+      typeof body.reference === "string" ? body.reference.trim() || null : null,
     ...(body.action === "EXCHANGE_RESERVE"
       ? { variantId: (body.variantId as string).toLowerCase() }
       : {}),
@@ -322,6 +331,12 @@ export function parseReturnExchange(value: unknown): ReturnExchange | null {
     body.carrier === null || isValidTextField(body.carrier, 80);
   const isTrackingNumberValid =
     body.trackingNumber === null || isValidTextField(body.trackingNumber, 120);
+  const issue = body.deliveryIssue as Record<string, unknown> | null | undefined;
+  const isIssueValid = issue == null || (
+    typeof issue === "object" && !Array.isArray(issue) &&
+    isValidDateField(issue.reportedAt) && isValidNote(issue.description) &&
+    (issue.reference === null || isValidTextField(issue.reference, 120))
+  );
 
   if (
     !isOfferIdValid ||
@@ -338,20 +353,23 @@ export function parseReturnExchange(value: unknown): ReturnExchange | null {
     !isOfferedAtValid ||
     !areNullableDatesValid ||
     !isCarrierValid ||
-    !isTrackingNumberValid
+    !isTrackingNumberValid ||
+    !isIssueValid ||
+    (body.state === "DELIVERY_ISSUE" && !issue) ||
+    (body.state !== "DELIVERY_ISSUE" && issue != null)
   ) {
     return null;
   }
 
   if (
-    ["ACCEPTED", "SHIPPED", "DELIVERED"].includes(body.state as string) &&
+    ["ACCEPTED", "SHIPPED", "DELIVERY_ISSUE", "DELIVERED"].includes(body.state as string) &&
     !body.acceptedAt
   ) {
     return null;
   }
 
   if (
-    ["SHIPPED", "DELIVERED"].includes(body.state as string) &&
+    ["SHIPPED", "DELIVERY_ISSUE", "DELIVERED"].includes(body.state as string) &&
     (!body.shippedAt || !body.carrier || !body.trackingNumber)
   ) {
     return null;
@@ -383,6 +401,11 @@ export function parseReturnExchange(value: unknown): ReturnExchange | null {
     deliveredAt: body.deliveredAt as string | null,
     carrier: body.carrier as string | null,
     trackingNumber: body.trackingNumber as string | null,
+    deliveryIssue: issue ? {
+      reportedAt: issue.reportedAt as string,
+      description: issue.description as string,
+      reference: issue.reference as string | null,
+    } : null,
   };
 }
 

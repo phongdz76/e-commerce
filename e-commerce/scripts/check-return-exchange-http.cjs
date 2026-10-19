@@ -106,6 +106,18 @@ async function verifyReturnExchangeHttp({ call, prisma, cookies, users, product,
   const updatedCase = await prisma.returnCase.findUnique({ where: { id } });
   assert.equal(updatedCase.exchange.state, 'SHIPPED');
 
+  const issue = await input('EXCHANGE_REPORT_ISSUE', { text: 'Carrier could not deliver the replacement; please arrange another attempt.' });
+  for (let i = 0; i < 2; i++) assert.equal((await call(customerEndpoint, json(owner, issue))).status, 200);
+  const issueDetail = await (await call(customerEndpoint, { cookie: owner })).json();
+  assert.equal(issueDetail.case.exchange.state, 'DELIVERY_ISSUE');
+  assert.equal(issueDetail.case.exchange.deliveryIssue.description, issue.text);
+  assert.equal((await act('EXCHANGE_RESUME', owner)).status, 403);
+  assert.equal((await act('EXCHANGE_RESUME')).status, 200);
+  const resumed = await prisma.returnCase.findUnique({ where: { id } });
+  assert.equal(resumed.exchange.state, 'SHIPPED');
+  assert.equal(resumed.exchange.deliveryIssue, null);
+  checks.push('replacement delivery issue is saved once, preserves tracking and stock, and requires an administrator to resume delivery');
+
   const receipt = await input('EXCHANGE_RECEIVE');
   for (let i = 0; i < 2; i++) {
     const res = await call(customerEndpoint, json(owner, receipt));

@@ -823,6 +823,8 @@ export async function changeReturnCase(
       EXCHANGE_SHIP: "Replacement dispatched",
       EXCHANGE_DELIVER: "Exchange delivery recorded",
       EXCHANGE_RECEIVE: "Exchange receipt confirmed",
+      EXCHANGE_REPORT_ISSUE: "Replacement delivery issue reported",
+      EXCHANGE_RESUME: "Replacement delivery issue resolved; delivery continues",
     };
 
     const notificationTitle =

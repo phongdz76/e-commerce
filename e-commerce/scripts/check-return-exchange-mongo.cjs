@@ -217,6 +217,31 @@ async function verifyReturnExchangeMongo({ db, second, load, otherLoad, product,
     'six dispatch retries consume the accepted reservation once, honor saved SKU/price despite catalog edits and never release shipped goods as a hold',
   );
 
+  const issue = await command(id, 'EXCHANGE_REPORT_ISSUE', {
+    text: 'The carrier could not complete replacement delivery; support follow-up is required.',
+    reference: null,
+  });
+  const failedIssueDb = db.$extends({ query: { notification: { create: async () => { throw Error('QA incident notification failure'); } } } });
+  const failedIssueService = sourceLoader({ '@/libs/prismadb': { __esModule: true, default: failedIssueDb } })('libs/returnCases.ts');
+  await assert.rejects(failedIssueService.changeReturnCase(id, owner, issue));
+  assert.equal((await db.returnCase.findUnique({ where: { id } })).exchange.state, 'SHIPPED');
+  const reports = await Promise.allSettled(Array.from({ length: 6 }, (_, i) =>
+    (i % 2 ? service : otherService).changeReturnCase(id, owner, issue)));
+  assert.ok(reports.every(result => result.status === 'fulfilled'));
+  const incident = await service.getReturnCase(id, owner);
+  assert.equal(incident.case.exchange.state, 'DELIVERY_ISSUE');
+  assert.equal(incident.case.exchange.deliveryIssue.description, issue.text);
+  assert.equal(incident.case.exchange.trackingNumber, 'QA-REPLACEMENT-TRACK');
+  assert.equal(await db.returnCaseEvent.count({ where: { caseId: id, action: 'EXCHANGE_REPORT_ISSUE' } }), 1);
+  await assert.rejects(service.changeReturnCase(id, owner, await command(id, 'EXCHANGE_RESUME')), e => e.code === 'RETURN_ACTION_LOCKED');
+  await service.changeReturnCase(id, handler, await command(id, 'EXCHANGE_RESUME'));
+  const resolvedIncident = await service.getReturnCase(id, owner);
+  assert.equal(resolvedIncident.case.exchange.state, 'SHIPPED');
+  assert.equal(resolvedIncident.case.exchange.deliveryIssue, null);
+  assert.ok(resolvedIncident.events.some(event => event.exchange?.deliveryIssue?.description === issue.text));
+  assert.deepEqual((await db.productVariant.findUnique({ where: { id: target.id } })).inventory, balance);
+  checks.push('replacement delivery incidents roll back with notification failure, six retries save one incident, and assigned resolution preserves shipment evidence, inventory and history');
+
   const receive = await command(id, 'EXCHANGE_RECEIVE');
   const receipts = await Promise.allSettled(
     Array.from({ length: 6 }, (_, i) =>

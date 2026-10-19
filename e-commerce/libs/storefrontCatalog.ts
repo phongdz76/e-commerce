@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { withReviewSummaries } from "@/libs/productReviewSummary";
 import type { Prisma } from "@prisma/client";
 import prisma from "@/libs/prismadb";
 import type {
@@ -518,7 +519,7 @@ export async function getCatalogPage(
     else attributesLimited = true;
   }
   return {
-    products: array(summary.products).map(readProduct),
+    products: await withReviewSummaries(array(summary.products).map(readProduct)),
     filters,
     total,
     catalogTotal,
