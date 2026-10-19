@@ -26,3 +26,12 @@ Thumbs.db
 Desktop.ini
 *.tmp
 *.temp
+
+# Design, mockups, and local development planning assets
+design/
+mockup/
+mockups/
+*.mockup.*
+
+# Local development previews
+e-commerce/public/previews/
