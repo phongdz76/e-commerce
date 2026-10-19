@@ -2,9 +2,10 @@ import prisma from "@/libs/prismadb";
 import { readInventoryBalance } from "@/utils/adminInventory";
 import type { CatalogProduct } from "@/utils/productFilters";
 import type { Prisma } from "@prisma/client";
+import { withReviewSummaries } from "@/libs/productReviewSummary";
 import { getProductSpecificationRows, readSpecificationDefinitions, readProductGallery, readProductContentText } from "@/utils/productContent";
 
-const storefrontWhere = {
+export const storefrontWhere = {
   status: "ACTIVE",
   category: { is: { isVisible: true } },
   brand: { is: { isVisible: true } },
@@ -61,7 +62,15 @@ export async function getStorefrontProduct(productId: string) {
     where: { ...storefrontWhere, id: productId.toLowerCase() },
     include: storefrontInclude,
   });
-  return product?.variants.length ? toStorefrontProduct(product) : null;
+  return product?.variants.length ? (await withReviewSummaries([toStorefrontProduct(product)]))[0] : null;
+}
+
+export async function getStorefrontProductsByIds(ids: string[]) {
+  if (!ids.length) return [];
+  const products = await prisma.product.findMany({
+    where: { ...storefrontWhere, id: { in: ids } }, include: storefrontInclude,
+  });
+  return withReviewSummaries(products.filter(product => product.variants.length).map(toStorefrontProduct));
 }
 
 export async function getRelatedStorefrontProducts(
@@ -78,7 +87,7 @@ export async function getRelatedStorefrontProducts(
     orderBy: [{ createdAt: "desc" }, { id: "asc" }],
     take: 6,
   });
-  return products
+  return withReviewSummaries(products
     .filter((product) => product.variants.length)
-    .map(toStorefrontProduct);
+    .map(toStorefrontProduct));
 }

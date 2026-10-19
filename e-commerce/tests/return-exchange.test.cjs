@@ -3,6 +3,69 @@ const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const { fixture } = require('./fixtures/returns.cjs');
 
+test('delivery issues retain shipment evidence, replay once, require assigned resolution and never move stock or payment', async () => {
+  const f = setup();
+  const id = await f.ready();
+  await f.reserve(id);
+  await f.change(id, 'EXCHANGE_ACCEPT', f.owner);
+  await assert.rejects(f.change(id, 'EXCHANGE_REPORT_ISSUE', f.owner), e => e.code === 'RETURN_ACTION_LOCKED');
+  await f.change(id, 'EXCHANGE_SHIP', f.admin, { carrier: 'QA carrier' });
+  const balance = structuredClone(f.snapshot().inventory);
+  const report = { action: 'EXCHANGE_REPORT_ISSUE', version: f.cases.get(id).version,
+    requestId: randomUUID(), text: 'Carrier could not deliver the replacement to the saved address.', reference: 'QA-CARRIER-ISSUE' };
+  for (let i = 0; i < 2; i++) await f.service.changeReturnCase(id, f.owner, report);
+  let detail = await f.service.getReturnCase(id, f.owner);
+  assert.equal(detail.case.exchange.state, 'DELIVERY_ISSUE');
+  assert.equal(detail.case.exchange.deliveryIssue.description, report.text);
+  assert.equal(detail.case.exchange.trackingNumber, 'QA-RECEIPT-001');
+  assert.deepEqual(detail.case.actions, ['EXCHANGE_RECEIVE']);
+  assert.equal([...f.events.values()].filter(event => event.action === report.action).length, 1);
+  await assert.rejects(f.change(id, 'EXCHANGE_RESUME', f.owner), e => e.code === 'RETURN_ACTION_LOCKED');
+  await assert.rejects(f.change(id, 'EXCHANGE_RESUME', f.admin2), e => e.code === 'RETURN_NOT_ASSIGNED');
+  await assert.rejects(f.change(id, 'EXCHANGE_RELEASE'), e => e.code === 'RETURN_ACTION_LOCKED');
+  await f.change(id, 'EXCHANGE_RESUME');
+  assert.equal(f.cases.get(id).exchange.state, 'SHIPPED');
+  assert.equal(f.cases.get(id).exchange.deliveryIssue, null);
+  await f.change(id, 'EXCHANGE_REPORT_ISSUE', f.admin);
+  await f.change(id, 'EXCHANGE_RECEIVE', f.owner);
+  detail = await f.service.getReturnCase(id, f.owner);
+  assert.equal(detail.case.state, 'EXCHANGED');
+  assert.equal(detail.case.exchange.deliveryIssue, null);
+  assert.ok(detail.events.some(event => event.exchange?.deliveryIssue?.description === report.text));
+  assert.deepEqual(f.snapshot().inventory, balance);
+  assert.equal(f.order.status, 'paid');
+});
+
+test('delivery issue API enforces customer ownership and resolution audience, and failed notification rolls back the issue', async () => {
+  const f = setup();
+  const id = await f.ready();
+  await f.reserve(id); await f.change(id, 'EXCHANGE_ACCEPT', f.owner);
+  await f.change(id, 'EXCHANGE_SHIP', f.admin, { carrier: 'QA carrier' });
+  const original = f.db.notification.create;
+  f.db.notification.create = async () => { throw Error('Notification unavailable'); };
+  await assert.rejects(f.change(id, 'EXCHANGE_REPORT_ISSUE', f.owner));
+  assert.equal(f.cases.get(id).exchange.state, 'SHIPPED');
+  f.db.notification.create = original;
+  const route = f.load('app/api/returns/[caseId]/route.ts');
+  const body = { action: 'EXCHANGE_REPORT_ISSUE', version: f.cases.get(id).version,
+    requestId: randomUUID(), confirmed: true, text: 'The replacement shipment has not arrived as arranged.' };
+  const send = extra => route.POST(new Request('http://local', { method: 'POST', body: JSON.stringify({ ...body, ...extra }) }), { params: Promise.resolve({ caseId: id }) });
+  f.state.user = f.other;
+  assert.equal((await send()).status, 404);
+  f.state.user = f.owner;
+  assert.equal((await send()).status, 200);
+  assert.equal((await send({ action: 'EXCHANGE_RESUME', version: f.cases.get(id).version })).status, 403);
+  const { parseReturnExchange } = f.load('utils/returnCases.ts');
+  const saved = f.cases.get(id).exchange;
+  assert.ok(parseReturnExchange(saved));
+  assert.equal(parseReturnExchange({ ...saved, deliveryIssue: null }), null);
+  assert.equal(parseReturnExchange({ ...saved, deliveryIssue: { ...saved.deliveryIssue, description: 'short' } }), null);
+  assert.equal(parseReturnExchange({ ...saved, shippedAt: null }), null);
+  assert.equal(parseReturnExchange({ ...saved, state: 'SHIPPED' }), null);
+  const input = f.load('utils/returnCases.ts').parseReturnAction({ ...body, reference: '   ' });
+  assert.equal(input.reference, null);
+});
+
 function setup() {
   const f = fixture();
   Object.assign(f.order, {
@@ -96,6 +159,9 @@ test('exchange action parsing requires a SKU, carrier and tracking/delivery evid
   await f.reserve(id);
 
   const offer = f.cases.get(id).exchange;
+  const legacyOffer = { ...offer };
+  delete legacyOffer.deliveryIssue;
+  assert.equal(parseReturnExchange(legacyOffer).deliveryIssue, null);
   assert.equal(parseReturnExchange({ ...offer, state: 'constructor' }), null);
   assert.equal(parseReturnExchange({ ...offer, quantity: -1 }), null);
   assert.equal(parseReturnExchange({ ...offer, state: 'SHIPPED' }), null);

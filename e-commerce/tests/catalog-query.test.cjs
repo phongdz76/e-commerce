@@ -41,6 +41,7 @@ function fixture() {
   const summary = { products: [row], totals: [{ count: 1 }], catalogTotals: [{ count: 1 }], categoryCounts: [{ _id: 'new-category', count: 1 }], brandCounts: [{ _id: 'new-brand', count: 1 }], specifications: [] };
   const state = { offline: false, queries: [] };
   const loaded = sourceLoader({ '@/libs/prismadb': { __esModule: true, default: {
+    productReview: { groupBy: async () => [] },
     category: { findMany: async () => [{ id: 'c'.repeat(24), name: 'New category', slug: 'new-category' }] },
     brand: { findMany: async () => [{ id: 'd'.repeat(24), name: 'Exact brand casing', slug: 'new-brand' }] },
     product: { aggregateRaw: async options => { state.queries.push(options); if (state.offline) throw new Error('private-db-secret'); return [summary]; } },

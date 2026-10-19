@@ -149,6 +149,7 @@ export function returnDetailHandlers(admin: boolean) {
           "EXCHANGE_ACCEPT",
           "EXCHANGE_DECLINE",
           "EXCHANGE_RECEIVE",
+          "EXCHANGE_REPORT_ISSUE",
         ];
 
         if (!admin && !allowedUserActions.includes(input.action)) {

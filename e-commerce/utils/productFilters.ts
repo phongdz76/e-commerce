@@ -6,6 +6,8 @@ export type CatalogProduct = (typeof products)[number] & {
   categoryLabel?: string;
   brandSlug?: string;
   matchedVariantId?: string;
+  reviewCount?: number;
+  averageRating?: number;
   variants?: { id: string; sku: string; name: string; price: number; available: number; image: { color: string; colorCode: string; image: string }; gallery?: ProductGalleryImage[]; specifications?: ProductSpecificationRow[]; warrantyText?: string; packageContents?: string }[];
 };
 export const PRODUCTS_PER_PAGE = 12;

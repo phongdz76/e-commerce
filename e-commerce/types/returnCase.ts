@@ -2,7 +2,7 @@ import type { ServicePolicySnapshot } from "@/types/customerService";
 
 export type ReturnExchange = {
   offerId: string;
-  state: "OFFERED" | "ACCEPTED" | "SHIPPED" | "DELIVERED" | "RELEASED";
+  state: "OFFERED" | "ACCEPTED" | "SHIPPED" | "DELIVERY_ISSUE" | "DELIVERED" | "RELEASED";
   productId: string;
   variantId: string;
   sku: string;
@@ -22,6 +22,7 @@ export type ReturnExchange = {
   deliveredAt: string | null;
   carrier: string | null;
   trackingNumber: string | null;
+  deliveryIssue: { reportedAt: string; description: string; reference: string | null } | null;
 };
 
 export type ReturnExchangeOption = {

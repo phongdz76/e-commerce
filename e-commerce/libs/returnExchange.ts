@@ -334,6 +334,7 @@ export async function applyReturnExchange(
       deliveredAt: null,
       carrier: null,
       trackingNumber: null,
+      deliveryIssue: null,
     };
 
     if (!parseReturnExchange(exchange)) {
@@ -397,6 +398,14 @@ export async function applyReturnExchange(
         carrier: input.carrier,
         trackingNumber: input.reference,
       };
+    } else if (input.action === "EXCHANGE_REPORT_ISSUE") {
+      exchange = {
+        ...exchange,
+        state: "DELIVERY_ISSUE",
+        deliveryIssue: { reportedAt: now, description: input.text, reference: input.reference },
+      };
+    } else if (input.action === "EXCHANGE_RESUME") {
+      exchange = { ...exchange, state: "SHIPPED", deliveryIssue: null };
     } else if (
       input.action === "EXCHANGE_DELIVER" ||
       input.action === "EXCHANGE_RECEIVE"
@@ -405,6 +414,7 @@ export async function applyReturnExchange(
         ...exchange,
         state: "DELIVERED",
         deliveredAt: now,
+        deliveryIssue: null,
       };
       state = "EXCHANGED";
     } else {
@@ -412,5 +422,6 @@ export async function applyReturnExchange(
     }
   }
 
+  if (!parseReturnExchange(exchange)) throw unavailable();
   return { exchange, state };
 }
