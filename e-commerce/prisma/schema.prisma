@@ -36,6 +36,28 @@ enum Role {
   ADMIN
 }
 
+model ProductReview {
+  id         String   @id @map("_id")
+  userId     String   @db.ObjectId
+  productId  String   @db.ObjectId
+  orderId    String   @db.ObjectId
+  rating     Int
+  comment    String
+  authorName String
+  createdAt  DateTime @default(now())
+
+  @@index([productId, createdAt])
+}
+
+model WishlistItem {
+  id        String   @id @map("_id")
+  userId    String   @db.ObjectId
+  productId String   @db.ObjectId
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
 enum UserStatus {
   ACTIVE
   BLOCKED

@@ -3,6 +3,11 @@ export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 export const API_PATHS = {
   CUSTOMER_SERVICE: "/api/customer-service",
   NOTIFICATIONS: "/api/notifications",
+  REVIEWS: (id: string) => `/api/products/${id}/reviews`,
+  WISHLIST: {
+    LIST: "/api/wishlist",
+    ITEM: (id: string) => `/api/wishlist/${id}`,
+  },
   RETURNS: {
     LIST: "/api/returns",
     DETAIL: (id: string) => `/api/returns/${id}`,

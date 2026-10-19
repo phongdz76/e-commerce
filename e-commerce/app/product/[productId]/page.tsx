@@ -8,6 +8,7 @@ import {
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import ProductCard from "@/app/components/products/ProductCard";
+import { getCurrentUser } from "@/actions/getCurrentUser";
 
 interface IPrams {
   productId?: string;
@@ -24,6 +25,7 @@ export default async function ProductPage({
   const { productId } = await params;
   const product = await getStorefrontProduct(productId || "");
   if (!product) notFound();
+  const user = await getCurrentUser();
   const categorySlug = product.categorySlug || "";
   const categoryLabel = product.categoryLabel || product.category;
   const relatedProducts = await getRelatedStorefrontProducts(
@@ -62,9 +64,10 @@ export default async function ProductPage({
           key={product.id + (initialVariantId || "")}
           product={product}
           initialVariantId={initialVariantId}
+          signedIn={Boolean(user)}
         />
         <section id="reviews" className="mt-12 border-t border-slate-200 pt-8">
-          <ListRating product={product} />
+          <ListRating key={product.id} product={product} signedIn={Boolean(user)} />
         </section>
         {relatedProducts.length > 0 && (
           <section className="mt-12" aria-labelledby="related-products-title">

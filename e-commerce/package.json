@@ -13,6 +13,8 @@
     "test:stock-mongo": "node scripts/check-stock-concurrency.cjs",
     "test:catalog-mongo": "node scripts/check-catalog-query.cjs",
     "test:content-mongo": "node scripts/check-product-content.cjs",
+    "test:engagement-mongo": "node scripts/check-product-engagement-mongo.cjs",
+    "test:engagement-e2e": "node scripts/check-product-engagement-e2e.cjs",
     "test:operations-mongo": "node scripts/check-operations-mongo.cjs",
     "test:operations-e2e": "node scripts/check-operations-e2e.cjs",
     "test:support-mongo": "node scripts/check-support-mongo.cjs",

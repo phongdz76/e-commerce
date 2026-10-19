@@ -3,13 +3,32 @@
 import { useId, useRef, useState } from "react";
 import { Rating } from "@mui/material";
 import { MdRateReview } from "react-icons/md";
+import { productRequestError } from "@/app/hooks/useProductResource";
+import toast from "react-hot-toast";
 
-export default function ReviewForm() {
+export default function ReviewForm({ onSubmit }: { onSubmit: (input: { rating: number; comment: string }) => Promise<void> }) {
   const formId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [rating, setRating] = useState<number | null>(null);
   const [comment, setComment] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const busy = useRef(false);
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (busy.current || !rating || comment.trim().length < 10) return;
+    busy.current = true; setSaving(true); setError("");
+    try {
+      await onSubmit({ rating, comment: comment.trim() });
+      setComment(""); setRating(null); closeForm();
+      toast.success("Your review has been saved");
+    } catch (error) {
+      const message = productRequestError(error);
+      setError(message); toast.error(message);
+    } finally { busy.current = false; setSaving(false); }
+  }
 
   const closeForm = () => {
     setIsOpen(false);
@@ -21,6 +40,7 @@ export default function ReviewForm() {
       <button
         ref={triggerRef}
         type="button"
+        disabled={saving}
         aria-expanded={isOpen}
         aria-controls={formId}
         onClick={() => setIsOpen((open) => !open)}
@@ -34,7 +54,7 @@ export default function ReviewForm() {
         id={formId}
         hidden={!isOpen}
         aria-labelledby={`${formId}-title`}
-        onSubmit={(event) => event.preventDefault()}
+        onSubmit={submit}
         className="mt-4 max-w-[650px] rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-6"
       >
         <h3 id={`${formId}-title`} className="text-lg font-semibold text-slate-700">
@@ -45,6 +65,7 @@ export default function ReviewForm() {
           <legend className="mb-2 text-sm font-medium text-slate-700">Your rating</legend>
           <div className="flex flex-wrap items-center gap-3">
             <Rating
+              disabled={saving}
               name={`${formId}-rating`}
               value={rating}
               onChange={(_, value) => setRating(value)}
@@ -62,6 +83,9 @@ export default function ReviewForm() {
             Your review
           </label>
           <textarea
+            required
+            minLength={10}
+            disabled={saving}
             id={`${formId}-comment`}
             value={comment}
             onChange={(event) => setComment(event.target.value)}
@@ -76,17 +100,20 @@ export default function ReviewForm() {
           </p>
         </div>
 
+        {error && <p role="alert" className="mt-3 text-sm text-rose-700">{error}</p>}
+        <p className="mt-3 text-xs text-slate-500">One review per purchased product. Your display name and review will be public.</p>
         <div className="mt-5 flex items-center gap-3 border-t border-slate-200 pt-5">
           <button
             type="submit"
-            disabled
+            disabled={saving || !rating || comment.trim().length < 10}
             className="inline-flex h-11 flex-1 items-center justify-center whitespace-nowrap rounded-lg bg-teal-700 px-5 text-sm font-medium text-white transition disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 sm:flex-none"
           >
-            Submit review
+            {saving ? "Saving…" : "Submit review"}
           </button>
           <button
             type="button"
             onClick={closeForm}
+            disabled={saving}
             className="inline-flex h-11 flex-1 items-center justify-center rounded-lg px-5 text-sm font-medium text-slate-600 transition hover:bg-slate-200/60 hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 sm:flex-none"
           >
             Cancel

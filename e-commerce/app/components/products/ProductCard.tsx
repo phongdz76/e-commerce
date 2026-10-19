@@ -11,7 +11,8 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ data }: ProductCardProps) {
-  const productRating =
+  const reviewCount = data.reviewCount ?? data.reviews.length;
+  const productRating = data.averageRating ??
     data.reviews.reduce((acc, item) => acc + item.rating, 0) /
     Math.max(data.reviews.length, 1);
 
@@ -68,8 +69,8 @@ export default function ProductCard({ data }: ProductCardProps) {
             <Rating value={productRating} readOnly size="small" />
           </div>
           <div className="text-sm text-slate-500">
-            {data.reviews.length}{" "}
-            {data.reviews.length === 1 ? "review" : "reviews"}
+            {reviewCount}{" "}
+            {reviewCount === 1 ? "review" : "reviews"}
           </div>
           <div className="mt-1 text-base font-bold text-slate-700 md:text-lg">
             {formatPrice(data.price)}
