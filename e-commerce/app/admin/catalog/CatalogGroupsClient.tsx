@@ -146,6 +146,9 @@ export default function CatalogGroupsClient({
     <div className="space-y-6">
       {/* Title & Section Header */}
       <AdminPageHeader title={title} description="Manage catalog groups, visibility and their linked products.">
+        <Link href="/admin/homepage?tab=Catalog%20media" className="inline-flex min-h-10 items-center rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-medium text-teal-800 hover:bg-teal-100">
+          Homepage images &amp; order
+        </Link>
         {/* Quick switcher between Categories and Brands */}
         <div className="flex items-center gap-2 bg-slate-200 p-1 rounded-md">
           <Link

@@ -257,6 +257,24 @@ model SupportTicketNote {
   @@index([ticketId, createdAt])
 }
 
+model HomepageSettings {
+  id                  String   @id @map("_id")
+  version             Int      @default(0)
+  draft               Json?
+  publishedRevisionId String?  @db.ObjectId
+  updatedAt           DateTime @updatedAt
+}
+
+model HomepageRevision {
+  id          String   @id @map("_id") @db.ObjectId
+  revision    Int
+  content     Json
+  publishedBy String   @db.ObjectId
+  publishedAt DateTime @default(now())
+
+  @@index([publishedAt])
+}
+
 model CustomerServiceSettings {
   id                  String   @id @map("_id")
   version             Int      @default(0)

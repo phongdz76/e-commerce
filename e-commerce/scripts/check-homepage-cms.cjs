@@ -1,0 +1,98 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { randomUUID } = require('node:crypto');
+const { spawn, spawnSync } = require('node:child_process');
+const { PrismaClient } = require('@prisma/client');
+const { encode } = require('next-auth/jwt');
+const sourceLoader = require('../tests/fixtures/load-source.cjs');
+require('@next/env').loadEnvConfig(path.resolve(__dirname, '..'));
+
+(async () => {
+  const database = 'sg_home_qa_' + Date.now() + '_' + randomUUID().slice(0, 4);
+  const connection = new URL(process.env.DATABASE_URL), application = connection.pathname;
+  connection.pathname = '/' + database;
+  assert.notEqual(connection.pathname, application);
+  assert.match(database, /^sg_home_qa_\d+_[a-f0-9]{4}$/);
+  assert.ok(database.length <= 38);
+  const db = new PrismaClient({ datasources: { db: { url: connection.toString() } } });
+  const second = new PrismaClient({ datasources: { db: { url: connection.toString() } } });
+  const loader = client => sourceLoader({ '@/libs/prismadb': { __esModule: true, default: client } });
+  const load = loader(db), cms = load('libs/homepageContent.ts'), other = loader(second)('libs/homepageContent.ts');
+  const artifacts = path.resolve('.artifacts'), checks = [], port = Number(process.env.QA_HOME_CMS_PORT || 3312), origin = 'http://127.0.0.1:' + port;
+  fs.mkdirSync(artifacts, { recursive: true });
+  const log = fs.openSync(path.join(artifacts, 'homepage-cms-server.log'), 'w');
+  let server;
+  try {
+    const users = await Promise.all([0, 1, 2, 3].map(i => db.user.create({ data: { name: 'Homepage QA ' + i, email: `home-${i}@example.invalid`, role: i === 2 ? 'USER' : 'ADMIN', status: 'ACTIVE', sessionVersion: 0 } })));
+    const categories = await Promise.all(['Phone', 'Laptop', 'Headphone', 'Watch', 'Desktop', 'Accessories'].map(name => db.category.create({ data: { name, slug: name.toLowerCase(), isVisible: true } })));
+    const brand = await db.brand.create({ data: { name: 'Apple', slug: 'apple', isVisible: true } });
+    const product = await db.product.create({ data: { name: 'Homepage QA phone', slug: 'qa-phone', description: 'Isolated homepage product', status: 'ACTIVE', categoryId: categories[0].id, brandId: brand.id } });
+    const variant = await db.productVariant.create({ data: { productId: product.id, sku: 'HOME-QA-1', name: 'White', price: 100000, currency: 'vnd', isActive: true, inStock: true, image: { image: '/products/iphone14-white.webp', color: 'White', colorCode: '#ffffff' }, inventory: { onHand: 5, reserved: 0, version: 1, updatedAt: new Date() } } });
+    assert.equal((await cms.getHomePublication()).revision, 0); assert.equal(await db.homepageSettings.count(), 0);
+    const content = load('utils/homepageStarter.ts').starterHomeContent(); content.featuredProductIds = [product.id];
+    content.categoryMedia = [{ value: categories[0].id, enabled: false, order: 1, image: { src: '/home/accessories-mouse.png', alt: 'QA category image' } }];
+    content.brandMedia = [{ value: brand.id, enabled: true, order: 1, image: { src: '/products/macbook-air-silver.webp', alt: 'QA brand image' } }];
+    const save = { action: 'SAVE', version: 0, requestId: randomUUID(), content, revisionId: null };
+    await Promise.all(Array.from({ length: 6 }, (_, i) => (i % 2 ? cms : other).updateHomepage(users[0].id, save)));
+    assert.equal((await cms.getAdminHomepage()).version, 1); assert.equal((await cms.getHomePublication()).revision, 0);
+    const publish = { action: 'PUBLISH', version: 1, requestId: randomUUID(), content: null, revisionId: null };
+    await Promise.all(Array.from({ length: 6 }, (_, i) => (i % 2 ? cms : other).updateHomepage(users[0].id, publish)));
+    const first = await cms.getHomePublication(); assert.equal(first.revision, 2); assert.equal(await db.homepageRevision.count(), 1);
+    checks.push('Six two-client first-use SAVE and PUBLISH replays create one draft/version/revision without exposing a draft or writing to the application DB');
+    const composition = await load('libs/homepage.ts').getHomepage(null);
+    assert.equal(composition.featured[0].id, product.id); assert.equal(composition.featured[0].matchedVariantId, variant.id);
+    assert.equal(composition.catalog.categories.some(row => row.value === 'phone'), false);
+    assert.equal(composition.catalog.brands[0].homeImage.alt, 'QA brand image');
+    assert.equal((await db.category.findUnique({ where: { id: categories[0].id } })).isVisible, true);
+    const edits = await Promise.allSettled(users.slice(0, 2).map(actor => cms.updateHomepage(actor.id, { ...save, version: 2, requestId: randomUUID() })));
+    assert.equal(edits.filter(row => row.status === 'fulfilled').length, 1);
+    assert.equal(edits.filter(row => row.status === 'rejected' && row.reason.status === 409).length, 1);
+    assert.equal((await cms.getHomePublication()).id, first.id);
+    await cms.updateHomepage(users[0].id, { ...publish, version: 3, requestId: randomUUID() });
+    checks.push('Actual homepage composition keeps featured SKU selection, applies published image/order/visibility overrides only to homepage and rejects concurrent editor overwrites');
+    await db.productVariant.update({ where: { id: variant.id }, data: { isActive: false } });
+    assert.equal((await load('libs/homepage.ts').getHomepage(null)).featured.length, 0);
+    await assert.rejects(cms.updateHomepage(users[0].id, { ...publish, version: 4, requestId: randomUUID() }), error => error.code === 'HOME_REFERENCE');
+    await db.productVariant.update({ where: { id: variant.id }, data: { isActive: true } });
+    const before = await cms.getHomePublication();
+    const failed = loader(db.$extends({ query: { auditLog: { create: async () => { throw Error('QA audit interruption'); } } } }))('libs/homepageContent.ts');
+    const next = { ...publish, version: 4, requestId: randomUUID() };
+    await assert.rejects(failed.updateHomepage(users[0].id, next));
+    assert.deepEqual(await cms.getHomePublication(), before); assert.equal((await cms.getAdminHomepage()).version, 4); assert.equal(await db.homepageRevision.count(), 2);
+    await cms.updateHomepage(users[0].id, next);
+    await cms.updateHomepage(users[0].id, { action: 'RESTORE', version: 5, requestId: randomUUID(), content: null, revisionId: first.id });
+    assert.equal((await cms.getHomePublication()).revision, 5);
+    assert.deepEqual((await cms.getAdminHomepage(1, first.id)).selected, first);
+    checks.push('Hidden featured products disappear immediately and cannot publish; audit failure rolls back the revision/pointer, retries recover, and historical restore changes only the draft');
+    const secret = randomUUID() + randomUUID();
+    server = spawn(process.execPath, [path.resolve('node_modules/next/dist/bin/next'), 'start', '--hostname', '127.0.0.1', '--port', String(port)], { cwd: process.cwd(), windowsHide: true, stdio: ['ignore', log, log], env: { ...process.env, DATABASE_URL: connection.toString(), NEXTAUTH_SECRET: secret, NEXTAUTH_URL: origin, NEXT_PUBLIC_APP_URL: origin, NODE_ENV: 'production', SGTECH_EVENT_EMAILS_ENABLED: 'false' } });
+    let ready = false;
+    for (let i = 0; i < 120; i++) { if (server.exitCode !== null) throw Error('QA server exited'); try { ready = (await fetch(origin + '/api/health', { signal: AbortSignal.timeout(1500) })).ok; } catch {} if (ready) break; await new Promise(resolve => setTimeout(resolve, 250)); }
+    assert.ok(ready);
+    const cookies = await Promise.all(users.map(async user => 'next-auth.session-token=' + await encode({ secret, maxAge: 1200, token: { sub: user.id, userId: user.id, sessionVersion: 0, authenticatedAt: Date.now() } })));
+    const call = (route, cookie, method = 'GET', body) => fetch(origin + route, { method, redirect: 'manual', headers: { ...(cookie ? { Cookie: cookie } : {}), 'Content-Type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(60000) });
+    const readPublic = async () => { const response = await call('/api/homepage'); assert.equal(response.status, 200); return response.json(); };
+    assert.equal((await call('/api/admin/homepage')).status, 401); assert.equal((await call('/api/admin/homepage', cookies[2])).status, 403);
+    assert.equal((await call('/preview/homepage')).status, 307); assert.equal((await call('/preview/homepage', cookies[2])).status, 307);
+    assert.equal((await call('/api/homepage?draft=true')).status, 400);
+    const state = await (await call('/api/admin/homepage', cookies[1])).json();
+    const privateDraft = structuredClone(state.draft); privateDraft.slides[0].eyebrow = 'PRIVATE_UNPUBLISHED_QA_TEXT';
+    assert.equal((await call('/api/admin/homepage', cookies[1], 'POST', { action: 'SAVE', version: state.version, requestId: randomUUID(), content: privateDraft })).status, 200);
+    assert.doesNotMatch(JSON.stringify(await readPublic()), /PRIVATE_UNPUBLISHED_QA_TEXT|"(?:draft|fingerprint|publishedBy|userId|orderId)"\s*:/);
+    assert.equal((await call('/api/admin/homepage', cookies[2], 'POST', { action: 'PUBLISH', version: state.version + 1, requestId: randomUUID() })).status, 403);
+    checks.push('Production HTTP enforces ADMIN/session roles, guards draft preview, rejects public draft/revision queries and keeps unpublished content and actor/order identifiers private');
+    if (process.env.QA_BROWSER !== 'false') await require('./check-homepage-cms-browser.cjs').verifyHomepageCmsBrowser({ origin, cookie: cookies[3], artifacts, checks, readPublic });
+    const report = { passed: true, checks, applicationDatabaseWrites: 0, providerNetworkCalls: 0, externalEmails: 0 };
+    fs.writeFileSync(path.join(artifacts, 'homepage-cms-results.json'), JSON.stringify(report, null, 2));
+    console.log(JSON.stringify(report, null, 2));
+  } finally {
+    if (server?.pid && server.exitCode === null) {
+      if (process.platform === 'win32') spawnSync('taskkill', ['/PID', String(server.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
+      else server.kill('SIGTERM');
+    }
+    fs.closeSync(log);
+    assert.equal(connection.pathname, '/' + database); assert.notEqual(connection.pathname, application); assert.match(database, /^sg_home_qa_\d+_[a-f0-9]{4}$/);
+    await db.$runCommandRaw({ dropDatabase: 1 }); await Promise.all([db.$disconnect(), second.$disconnect()]);
+  }
+})().catch(error => { console.error('Homepage CMS QA failed.', error instanceof assert.AssertionError ? error.stack : { name: error.name, code: error.code, message: String(error.message).slice(0, 200) }); process.exitCode = 1; });

@@ -30,8 +30,9 @@ export default function UserMenu({
       <div
         className="relative z-30 shrink-0"
         onBlur={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget))
+          if (!event.currentTarget.contains(event.relatedTarget)) {
             setIsOpen(false);
+          }
         }}
         onKeyDown={(event) => {
           if (event.key === "Escape") {
@@ -48,46 +49,48 @@ export default function UserMenu({
           aria-controls={isOpen ? "account-menu" : undefined}
           onClick={toggleOpen}
           className="
-        flex
-        h-10
-        shrink-0
-        items-center
-        gap-1.5
-        rounded-full
-        border
-        border-slate-300
-        py-1
-        pl-1.5
-        pr-2.5
-        text-slate-700
-        transition
-        hover:bg-slate-300/60
-        hover:shadow-sm
-        focus-visible:outline-2
-        focus-visible:outline-teal-600
-        cursor-pointer
-        "
+          flex
+          h-10
+          shrink-0
+          items-center
+          gap-1.5
+          rounded-full
+          border
+          border-slate-300
+          py-1
+          pl-1.5
+          pr-2.5
+          text-slate-700
+          transition
+          hover:bg-slate-300/60
+          hover:shadow-sm
+          focus-visible:outline-2
+          focus-visible:outline-teal-600
+          cursor-pointer
+          "
         >
           <Avatar src={currentUser?.image || undefined} size={26} />
           <FiChevronDown size={15} className="text-slate-600" />
         </button>
+
         {isOpen && (
           <div
             id="account-menu"
             aria-label="Account links"
-            className="absolute
-         rounded-md 
-         shadow-md 
-         w-[170px] 
-         bg-white 
-         overflow-hidden 
-         right-0 
-         top-12 
-         text-base
-         flex 
-         flex-col
-         cursor-pointer
-         "
+            className="
+            absolute
+            rounded-md
+            shadow-md
+            w-[170px]
+            bg-white
+            overflow-hidden
+            right-0
+            top-12
+            text-base
+            flex
+            flex-col
+            cursor-pointer
+            "
           >
             {currentUser ? (
               <div>
@@ -95,16 +98,17 @@ export default function UserMenu({
                   <Link
                     href="/admin"
                     onClick={toggleOpen}
-                    className="block px-4 py-3 hover:bg-slate-50"
+                    className="block px-4 py-3 hover:bg-slate-50 transition"
                   >
                     Admin page
                   </Link>
                 )}
+
                 {isAdmin ? (
                   <Link
                     href="/"
                     onClick={toggleOpen}
-                    className="block px-4 py-3 hover:bg-slate-50"
+                    className="block px-4 py-3 hover:bg-slate-50 transition"
                   >
                     User page
                   </Link>
@@ -112,33 +116,49 @@ export default function UserMenu({
                   <Link
                     href="/orders"
                     onClick={toggleOpen}
-                    className="block px-4 py-3 hover:bg-slate-50"
+                    className="block px-4 py-3 hover:bg-slate-50 transition"
                   >
                     Your Orders
                   </Link>
                 )}
+
                 <Link
                   href="/profile"
                   onClick={toggleOpen}
-                  className="block px-4 py-3 hover:bg-slate-50"
+                  className="block px-4 py-3 hover:bg-slate-50 transition"
                 >
                   Profile
                 </Link>
-                <Link href="/wishlist" onClick={toggleOpen} className="block px-4 py-3 hover:bg-slate-50">
+
+                <Link
+                  href="/wishlist"
+                  onClick={toggleOpen}
+                  className="block px-4 py-3 hover:bg-slate-50 transition"
+                >
                   Your wishlist
                 </Link>
+
                 <Link
                   href="/support/requests"
                   onClick={toggleOpen}
-                  className="block px-4 py-3 hover:bg-slate-50"
+                  className="block px-4 py-3 hover:bg-slate-50 transition"
                 >
                   Your support requests
                 </Link>
-                <hr />
-                <Link href="/returns" onClick={toggleOpen} className="block px-4 py-3 hover:bg-slate-50">Your return requests</Link>
+
+                <Link
+                  href="/returns"
+                  onClick={toggleOpen}
+                  className="block px-4 py-3 hover:bg-slate-50 transition"
+                >
+                  Your return requests
+                </Link>
+
+                <hr className="border-slate-200" />
+
                 <button
                   type="button"
-                  className="w-full px-4 py-3 text-left hover:bg-slate-50"
+                  className="w-full px-4 py-3 text-left hover:bg-slate-50 transition cursor-pointer"
                   onClick={() => {
                     toggleOpen();
                     signOut();
@@ -152,7 +172,7 @@ export default function UserMenu({
                 <Link
                   href="/login"
                   onClick={toggleOpen}
-                  className="block px-4 py-3 hover:bg-slate-50"
+                  className="block px-4 py-3 hover:bg-slate-50 transition"
                 >
                   Login
                 </Link>
@@ -160,7 +180,7 @@ export default function UserMenu({
                 <Link
                   href="/register"
                   onClick={toggleOpen}
-                  className="block px-4 py-3 hover:bg-slate-50"
+                  className="block px-4 py-3 hover:bg-slate-50 transition"
                 >
                   Register
                 </Link>

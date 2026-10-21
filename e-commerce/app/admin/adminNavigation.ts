@@ -6,6 +6,7 @@ export const ADMIN_NAVIGATION = [
     { label: "Sales reports", href: "/admin/reports", icon: FiBarChart2 },
   ] },
   { title: "Catalog", items: [
+    { label: "Homepage", href: "/admin/homepage", icon: FiGrid },
     { label: "Reviews", href: "/admin/reviews", icon: FiTag },
     { label: "Products", href: "/admin/products", icon: FiBox },
     { label: "Inventory", href: "/admin/inventory", icon: FiLayers },

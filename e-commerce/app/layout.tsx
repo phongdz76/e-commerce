@@ -19,6 +19,11 @@ const poppins = Poppins({
 export const metadata: Metadata = {
   title: "SGTech",
   description: "ECommerce Application",
+  icons: {
+    icon: "/Image/sgtech_icon_cube.png",
+    shortcut: "/favicon.ico",
+    apple: "/Image/sgtech_icon_cube.png",
+  },
 };
 
 export const dynamic = "force-dynamic";
@@ -29,8 +34,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${poppins.className} text-slate-700`}>
+    <html lang="en" suppressHydrationWarning>
+      <body
+        className={`${poppins.className} text-slate-700`}
+        suppressHydrationWarning
+      >
         <Toaster
           toastOptions={{
             style: {

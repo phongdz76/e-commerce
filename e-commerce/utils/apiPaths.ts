@@ -2,6 +2,7 @@ export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export const API_PATHS = {
   CUSTOMER_SERVICE: "/api/customer-service",
+  HOMEPAGE: "/api/homepage",
   NOTIFICATIONS: "/api/notifications",
   REVIEWS: (id: string) => `/api/products/${id}/reviews`,
   WISHLIST: {
@@ -58,6 +59,7 @@ export const API_PATHS = {
   ADMIN: {
     REVIEWS: "/api/admin/reviews",
     REVIEW: (id: string) => `/api/admin/reviews/${id}`,
+    HOMEPAGE: "/api/admin/homepage",
     RETURNS: "/api/admin/returns",
     RETURN: (id: string) => `/api/admin/returns/${id}`,
     RETURN_EXCHANGE_OPTIONS: (id: string) => `/api/admin/returns/${id}/exchange-options`,
