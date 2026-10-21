@@ -185,15 +185,15 @@ export default function CheckoutForm({
   }
 
   useEffect(() => {
-    if (paymentMethod !== "MOMO") return;
+    if (typeof window === "undefined" || typeof window.addEventListener !== "function") return;
     const resumeCheckout = (event: PageTransitionEvent) => {
       if (!event.persisted) return;
       submitting.current = false;
       setLoading(false);
     };
     window.addEventListener("pageshow", resumeCheckout);
-    return () => window.removeEventListener("pageshow", resumeCheckout);
-  }, [paymentMethod]);
+    return () => window.removeEventListener?.("pageshow", resumeCheckout);
+  }, []);
 
   const getCheckoutRequestId = () => {
     const fingerprint = JSON.stringify([
@@ -763,6 +763,9 @@ export default function CheckoutForm({
         submitting.current = false;
       } catch (error) {
         console.log(error);
+        if (axios.isAxiosError(error) && error.response?.data?.orderId) {
+          setPendingOrderId(error.response.data.orderId);
+        }
         const message = axios.isAxiosError(error)
           ? error.response?.data?.error
           : undefined;

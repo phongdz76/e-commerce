@@ -57,7 +57,7 @@ export async function POST(request: Request) {
   } catch (error: unknown) {
     if (error instanceof CheckoutRequestError) {
       return NextResponse.json(
-        { error: error.message, code: error.code },
+        { error: error.message, code: error.code, ...(error.orderId ? { orderId: error.orderId } : {}) },
         { status: error.status },
       );
     }

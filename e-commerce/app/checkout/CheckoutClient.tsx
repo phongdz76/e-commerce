@@ -118,7 +118,12 @@ export default function CheckoutClient({
     setRetryAttempt((attempt) => attempt + 1);
   };
 
+
   const router = useRouter();
+
+  const handleReturnToCheckout = useCallback(() => {
+    router.replace("/checkout", { scroll: false });
+  }, [router]);
   const searchParams = useSearchParams();
   const isStripeReturn = searchParams?.get("stripe") === "return";
   const stripeReturnIntent = searchParams?.get("payment_intent");
@@ -479,7 +484,7 @@ export default function CheckoutClient({
             Check Your Orders for payment and delivery updates.
           </p>
           {stripeReturnStatus !== "loading" && (
-            <div className="w-full max-w-[220px]">
+            <div className="flex flex-col items-center gap-3 w-full max-w-[280px]">
               <Button
                 label="Check again"
                 onClick={() => {
@@ -487,6 +492,16 @@ export default function CheckoutClient({
                   setReturnRetry((retry) => retry + 1);
                 }}
               />
+              <button
+                type="button"
+                onClick={handleReturnToCheckout}
+                className="min-h-11 w-full rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+              >
+                Return to checkout
+              </button>
+              <p className="text-xs text-slate-400">
+                Go back to choose a different payment method or update your order.
+              </p>
             </div>
           )}
           <Link

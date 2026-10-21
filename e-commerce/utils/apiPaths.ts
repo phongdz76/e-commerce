@@ -55,6 +55,7 @@ export const API_PATHS = {
     CANCEL: (id: string) => `/api/order/${id}/cancel`,
     CREATE_COD: "/api/order/create-cod",
     RETRY_PAYMENT: (id: string) => `/api/order/${id}/retry-payment`,
+    PAYMENT_METHOD: (id: string) => `/api/order/${id}/payment-method`,
   },
   ADMIN: {
     REVIEWS: "/api/admin/reviews",

@@ -95,8 +95,8 @@ export async function releaseVerifiedFailedStock(orderId: string, reference: str
   });
 }
 
-export async function reacquireRetryStock(orderId: string) {
-  return withStockTransaction(async (tx) => {
+export async function reacquireRetryStock(orderId: string, transaction?: Prisma.TransactionClient) {
+  const operation = async (tx: Prisma.TransactionClient) => {
     const order = await tx.order.findUnique({ where: { id: orderId } });
     if (!order) throw stockError();
     const reservation = order.stockReservation;
@@ -107,7 +107,8 @@ export async function reacquireRetryStock(orderId: string) {
       data: { stockReservation: { set: { ...reservation, state: "HELD", version: reservation.version + 1, updatedAt: new Date(), expiresAt: null } } } });
     if (changed.count !== 1) throw Object.assign(new Error("Reservation changed"), { code: "P2034" });
     return (await tx.order.findUnique({ where: { id: order.id } }))!;
-  });
+  };
+  return transaction ? operation(transaction) : withStockTransaction(operation);
 }
 
 export async function reviewPaidReleasedStock(orderId: string) {
