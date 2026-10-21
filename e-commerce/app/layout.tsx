@@ -8,6 +8,7 @@ import { Toaster } from "react-hot-toast";
 import SupportWidget from "./components/support/SupportWidget";
 import StoreLayoutWrapper from "./components/layout/StoreLayoutWrapper";
 import CustomerServiceProvider from "./providers/CustomerServiceProvider";
+import ExtensionCleanup from "./components/ExtensionCleanup";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -35,6 +36,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <ExtensionCleanup />
+      </head>
       <body
         className={`${poppins.className} text-slate-700`}
         suppressHydrationWarning
