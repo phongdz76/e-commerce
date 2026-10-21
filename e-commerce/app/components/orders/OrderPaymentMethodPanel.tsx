@@ -34,7 +34,7 @@ export default function OrderPaymentMethodPanel({
   onChanged,
 }: OrderPaymentMethodPanelProps) {
   const panelId = useId();
-  const [isAllowed, setIsAllowed] = useState(false);
+  const [remoteAllowed, setRemoteAllowed] = useState(false);
   const [availableMethods, setAvailableMethods] = useState<Record<string, boolean>>({});
   const [attemptId, setAttemptId] = useState<string>("");
   const [isOpen, setIsOpen] = useState(false);
@@ -47,9 +47,10 @@ export default function OrderPaymentMethodPanel({
     ["pending", "draft", "failed"].includes(status) &&
     [null, "", "pending"].includes(deliveryStatus);
 
+  const isAllowed = canAttemptChange && remoteAllowed;
+
   useEffect(() => {
     if (!canAttemptChange) {
-      setIsAllowed(false);
       return;
     }
 
@@ -58,7 +59,7 @@ export default function OrderPaymentMethodPanel({
       try {
         const response = await axios.get(API_PATHS.ORDER.PAYMENT_METHOD(orderId));
         if (!active) return;
-        setIsAllowed(Boolean(response.data?.allowed));
+        setRemoteAllowed(Boolean(response.data?.allowed));
         if (response.data?.availableMethods) {
           setAvailableMethods(response.data.availableMethods);
         }
@@ -68,7 +69,7 @@ export default function OrderPaymentMethodPanel({
           setAttemptId(activePaymentAttemptId || paymentIntentId || "");
         }
       } catch {
-        if (active) setIsAllowed(false);
+        if (active) setRemoteAllowed(false);
       }
     };
 
