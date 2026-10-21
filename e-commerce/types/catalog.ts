@@ -8,6 +8,7 @@ export interface CatalogGroup {
   id: string;
   value: string;
   label: string;
+  homeImage?: { src: string; alt: string };
 }
 export interface CatalogAttributeFacet {
   name: string;

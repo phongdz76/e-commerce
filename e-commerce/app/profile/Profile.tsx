@@ -41,6 +41,13 @@ const inputClassName =
 const passwordInputClassName =
   "w-full rounded-lg border border-slate-300 bg-white px-4 py-3 pr-12 text-base outline-none transition focus:border-slate-400 disabled:cursor-not-allowed disabled:opacity-70";
 
+interface AdministrativeUnit {
+  code: number | string;
+  name: string;
+  districts?: AdministrativeUnit[];
+  wards?: AdministrativeUnit[];
+}
+
 export default function Profile({ currentUser }: ProfileProps) {
   const router = useRouter();
   const requiresPasswordSetup = !currentUser.hasPassword;
@@ -59,12 +66,12 @@ export default function Profile({ currentUser }: ProfileProps) {
   // Address States
   const [useNewAddress, setUseNewAddress] = useState(!currentUser?.address);
   const [houseNumber, setHouseNumber] = useState("");
-  const [provinces, setProvinces] = useState<any[]>([]);
-  const [districts, setDistricts] = useState<any[]>([]);
-  const [wards, setWards] = useState<any[]>([]);
-  const [province, setProvince] = useState<any>(null);
-  const [district, setDistrict] = useState<any>(null);
-  const [ward, setWard] = useState<any>(null);
+  const [provinces, setProvinces] = useState<AdministrativeUnit[]>([]);
+  const [districts, setDistricts] = useState<AdministrativeUnit[]>([]);
+  const [wards, setWards] = useState<AdministrativeUnit[]>([]);
+  const [province, setProvince] = useState<AdministrativeUnit | null>(null);
+  const [district, setDistrict] = useState<AdministrativeUnit | null>(null);
+  const [ward, setWard] = useState<AdministrativeUnit | null>(null);
 
   useEffect(() => {
     fetch(PROVINCES_API.GET_ALL)
@@ -75,7 +82,7 @@ export default function Profile({ currentUser }: ProfileProps) {
 
   const handleProvinceChange = (code: string) => {
     const p = provinces.find((x) => x.code == code);
-    setProvince(p);
+    setProvince(p ?? null);
     setDistrict(null);
     setWard(null);
     setDistricts([]);
@@ -90,7 +97,7 @@ export default function Profile({ currentUser }: ProfileProps) {
 
   const handleDistrictChange = (code: string) => {
     const d = districts.find((x) => x.code == code);
-    setDistrict(d);
+    setDistrict(d ?? null);
     setWard(null);
     setWards([]);
     if (d) {
@@ -103,7 +110,7 @@ export default function Profile({ currentUser }: ProfileProps) {
 
   const handleWardChange = (code: string) => {
     const w = wards.find((x) => x.code == code);
-    setWard(w);
+    setWard(w ?? null);
   };
 
   const getFinalAddress = () => {

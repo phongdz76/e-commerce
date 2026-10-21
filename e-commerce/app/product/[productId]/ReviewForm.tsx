@@ -23,7 +23,7 @@ export default function ReviewForm({ onSubmit }: { onSubmit: (input: { rating: n
     try {
       await onSubmit({ rating, comment: comment.trim() });
       setComment(""); setRating(null); closeForm();
-      toast.success("Your review has been saved");
+      toast.success("Review saved and awaiting moderation");
     } catch (error) {
       const message = productRequestError(error);
       setError(message); toast.error(message);
@@ -101,7 +101,7 @@ export default function ReviewForm({ onSubmit }: { onSubmit: (input: { rating: n
         </div>
 
         {error && <p role="alert" className="mt-3 text-sm text-rose-700">{error}</p>}
-        <p className="mt-3 text-xs text-slate-500">One review per purchased product. Your display name and review will be public.</p>
+        <p className="mt-3 text-xs text-slate-500">One review per purchased product. Your display name and review will be public after moderation.</p>
         <div className="mt-5 flex items-center gap-3 border-t border-slate-200 pt-5">
           <button
             type="submit"

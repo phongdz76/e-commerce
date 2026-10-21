@@ -20,6 +20,7 @@ import Heading from "../components/Headinng";
 import Button from "../components/Button";
 import BrandFilter from "./BrandFilter";
 import SelectMenu from "../components/inputs/SelectMenu";
+import { getPaginationPages } from "@/utils/pagination";
 
 interface ProductsClientProps {
   data: CatalogPage;
@@ -65,13 +66,7 @@ export default function ProductsClient({ data }: ProductsClientProps) {
     setPriceError("");
     update({ minPrice: minimum, maxPrice: maximum });
   }
-  const pages = [
-    ...new Set(
-      [1, currentPage - 1, currentPage, currentPage + 1, totalPages].filter(
-        (value) => value > 0 && value <= totalPages,
-      ),
-    ),
-  ].sort((a, b) => a - b);
+  const pages = getPaginationPages(currentPage, totalPages);
   const chips: { label: string; clear: Partial<ProductFilters> }[] = [];
   if (filters.q)
     chips.push({ label: `Search: ${filters.q}`, clear: { q: "" } });
@@ -340,7 +335,7 @@ export default function ProductsClient({ data }: ProductsClientProps) {
             {totalPages > 1 && (
               <nav
                 aria-label="Product pagination"
-                className="flex items-center gap-1"
+                className="flex flex-wrap items-center justify-center gap-1"
               >
                 {currentPage > 1 ? (
                   <Link
@@ -359,7 +354,9 @@ export default function ProductsClient({ data }: ProductsClientProps) {
                     <FiChevronLeft size={20} />
                   </span>
                 )}
-                {pages.map((page) => (
+                {pages.map((page) => typeof page === "string" ? (
+                  <span key={page} aria-hidden="true" className="flex h-9 items-center px-1 text-slate-400">…</span>
+                ) : (
                   <Link
                     key={page}
                     href={getUrl({}, page)}

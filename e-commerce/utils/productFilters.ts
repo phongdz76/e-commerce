@@ -37,6 +37,7 @@ export interface BrandOption {
   value: string;
   label: string;
   count: number;
+  homeImage?: { src: string; alt: string };
 }
 
 export function getBrandLabel(value: string) {

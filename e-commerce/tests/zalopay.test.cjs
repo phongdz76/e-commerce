@@ -703,7 +703,6 @@ for (const [paymentMethod, outcome] of [
       "next/link": { __esModule: true, default: () => null },
       "../../utils/apiPaths": load("utils/apiPaths.ts"),
       "../../utils/externalApiPaths": load("utils/externalApiPaths.ts"),
-      "./MoMoPayment": { __esModule: true, default: () => null },
     }).default;
     try {
       h.reset();
@@ -855,7 +854,6 @@ test("inline Stripe checkout retains the cart until the server confirms receipt 
         "next/link": { __esModule: true, default: () => null },
         "../../utils/apiPaths": load("utils/apiPaths.ts"),
         "../../utils/externalApiPaths": load("utils/externalApiPaths.ts"),
-        "./MoMoPayment": { __esModule: true, default: () => null },
       }).default;
       h.reset();
       const formProps = {

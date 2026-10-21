@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   reconcile:
-    if: vars.SGTECH_OPERATIONS_ENABLED == 'true'
+    if: github.ref == 'refs/heads/main' && vars.SGTECH_OPERATIONS_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -33,7 +33,8 @@ jobs:
           cache-dependency-path: e-commerce/package-lock.json
       - run: npm ci
       - run: npm run worker:payments -- --once
-      - run: node scripts/check-operations-health.cjs
+      - name: Check infrastructure health and report manual follow-up
+        run: node scripts/check-operations-health.cjs
       - name: Process transactional email queue independently
         if: ${{ !cancelled() }}
         run: npm run worker:emails

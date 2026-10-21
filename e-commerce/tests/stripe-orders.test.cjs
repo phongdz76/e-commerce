@@ -555,9 +555,11 @@ test("VNPay uses GMT+7 on a UTC server and includes the forwarded customer IP", 
     assert.equal(params.get("vnp_IpAddr"), "203.0.113.24");
     assert.equal(params.get("vnp_Locale"), "en");
   } finally {
-    previousTimezone === undefined
-      ? delete process.env.TZ
-      : (process.env.TZ = previousTimezone);
+    if (previousTimezone === undefined) {
+      delete process.env.TZ;
+    } else {
+      process.env.TZ = previousTimezone;
+    }
   }
 });
 

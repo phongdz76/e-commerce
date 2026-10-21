@@ -42,6 +42,11 @@ async function main() {
     await assert.rejects(service.createProductReview(owner, product.id, { ...review, rating: 1 }), e => e.code === 'REVIEW_EXISTS');
     checks.push('six concurrent submissions across two clients produce one review; exact retries succeed and changed duplicates conflict');
     let publicList = await service.getProductReviews(product.id, null, 1);
+    assert.equal(publicList.total, 0);
+    assert.equal((await service.getProductReviews(product.id, owner.id, 1)).ownReview.status, 'PENDING');
+    const moderator = await db.user.create({ data: { role: 'ADMIN', name: 'QA moderator' } });
+    await load('libs/reviewModeration.ts').moderateReview(moderator.id, created[0].id, { action: 'APPROVE', version: 0, requestId: randomUUID() });
+    publicList = await service.getProductReviews(product.id, null, 1);
     assert.equal(publicList.total, 1); assert.equal(publicList.average, 5); assert.equal(publicList.canReview, false);
     assert.equal(publicList.ownReview, null);
     assert.doesNotMatch(JSON.stringify(publicList), /userId|orderId|email|hashedPassword/);

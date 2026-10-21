@@ -1,12 +1,13 @@
 import prisma from "@/libs/prismadb";
 import type { CatalogProduct } from "@/utils/productFilters";
+import { publicReviewWhere } from "@/utils/reviewModeration";
 
 export async function withReviewSummaries(products: CatalogProduct[]): Promise<CatalogProduct[]> {
   if (!products.length || !prisma.productReview?.groupBy) return products;
   try {
     const summaries = await prisma.productReview.groupBy({
       by: ["productId"],
-      where: { productId: { in: products.map((product) => product.id) } },
+      where: { ...publicReviewWhere, productId: { in: products.map((product) => product.id) } },
       _count: { _all: true },
       _avg: { rating: true },
     });

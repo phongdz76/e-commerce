@@ -22,6 +22,11 @@ function Review({ review }: { review: ReviewView }) {
     </div>
     <Rating value={review.rating} readOnly size="small" />
     <p className="whitespace-pre-wrap break-words text-sm leading-6">{review.comment}</p>
+    {review.reply && <section aria-label="Store reply" className="mt-3 rounded-lg border-l-4 border-teal-600 bg-slate-50 p-4">
+      <p className="text-sm font-semibold text-teal-800">SGTech · Store reply</p>
+      <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6">{review.reply.comment}</p>
+      <time className="mt-2 block text-xs text-slate-500" dateTime={review.reply.updatedAt}>{new Date(review.reply.updatedAt).toLocaleDateString("en-GB", { timeZone: "Asia/Ho_Chi_Minh" })}</time>
+    </section>}
   </article>;
 }
 
@@ -49,7 +54,7 @@ export default function ListRating({ product, signedIn }: { product: CatalogProd
     {data && <>
       <div className="flex items-center gap-3"><Rating value={data.average} precision={0.1} readOnly /><p className="text-sm">{data.average.toFixed(1)} / 5 · {data.total} {data.total === 1 ? "review" : "reviews"}</p></div>
       {signedIn && data.canReview && <ReviewForm onSubmit={submit} />}
-      {signedIn && data.ownReview && <section aria-label="Your saved review" className="rounded-lg border border-teal-200 bg-teal-50 p-4"><p className="text-sm font-semibold">Your review is saved</p>{!data.items.some(review => review.id === data.ownReview?.id) && <Review review={data.ownReview} />}</section>}
+      {signedIn && data.ownReview && <section aria-label="Your saved review" className="rounded-lg border border-teal-200 bg-teal-50 p-4"><p className="text-sm font-semibold">{data.ownReview.status === "PENDING" ? "Your review is saved and awaiting moderation" : data.ownReview.status === "HIDDEN" ? "Your review is saved and is currently hidden from public view" : "Your review is published"}</p>{!data.items.some(review => review.id === data.ownReview?.id) && <Review review={data.ownReview} />}</section>}
       {signedIn && !data.ownReview && !data.canReview && <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">You can review this product after your purchased item has been delivered.</p>}
       {data.total === 0 && <p className="text-sm text-slate-500">No reviews yet for this product.</p>}
       <div aria-busy={loading}>{data.items.map(review => <Review key={review.id} review={review} />)}</div>

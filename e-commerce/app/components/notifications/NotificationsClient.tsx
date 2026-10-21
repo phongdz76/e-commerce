@@ -13,9 +13,11 @@ import { createRequestScope } from "@/utils/requestScope";
 export default function NotificationsClient({
   admin = false,
   compact = false,
+  guest = false,
 }: {
   admin?: boolean;
   compact?: boolean;
+  guest?: boolean;
 }) {
   const endpoint = admin ? API_PATHS.ADMIN.NOTIFICATIONS : API_PATHS.NOTIFICATIONS;
   const router = useRouter();
@@ -38,6 +40,7 @@ export default function NotificationsClient({
 
   const loadNotifications = useCallback(
     async (showLoading = false) => {
+      if (guest) return;
       const request = fetching.current.begin(showLoading);
       if (!request) {
         return;
@@ -64,10 +67,11 @@ export default function NotificationsClient({
         if (fetching.current.finish(request)) setIsLoading(false);
       }
     },
-    [endpoint, before, filter]
+    [endpoint, before, filter, guest]
   );
 
   useEffect(() => {
+    if (guest) return;
     let active = true;
     const requests = fetching.current;
 
@@ -102,7 +106,7 @@ export default function NotificationsClient({
       document.removeEventListener("visibilitychange", handleRefresh);
       window.removeEventListener("sgtech-notifications-changed", handleChanged);
     };
-  }, [loadNotifications]);
+  }, [loadNotifications, guest]);
 
   useEffect(() => {
     if (!compact || !isOpen) {
@@ -135,7 +139,7 @@ export default function NotificationsClient({
     body: { action: "READ"; id: string } | { action: "READ_ALL"; through: number },
     item?: NotificationView
   ) => {
-    if (working.current) {
+    if (guest || working.current) {
       return;
     }
 
@@ -183,6 +187,14 @@ export default function NotificationsClient({
         )}
       </div>
 
+      {guest ? (
+        <div className="space-y-4 py-3 text-center">
+          <FiBell aria-hidden="true" size={32} className="mx-auto text-teal-700" />
+          <p className="text-sm leading-6 text-slate-600">Sign in to see your order updates, replies and notifications.</p>
+          <Link href="/login?callbackUrl=%2Fnotifications" onClick={() => setIsOpen(false)} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-teal-700 px-6 py-2 text-sm font-semibold text-white hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700">Sign in</Link>
+          <p className="text-xs text-slate-500">New to SGTech? <Link href="/register" onClick={() => setIsOpen(false)} className="font-semibold text-teal-700 underline underline-offset-4">Create an account</Link></p>
+        </div>
+      ) : <>
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <label className="flex items-center gap-1.5 text-slate-700">
           <span>Show</span>
@@ -316,6 +328,7 @@ export default function NotificationsClient({
           View all notifications
         </Link>
       )}
+      </>}
     </>
   );
 
@@ -344,7 +357,7 @@ export default function NotificationsClient({
             }}
             className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-300/60 focus-visible:outline-2 focus-visible:outline-teal-600"
           >
-            <FiBell size={22} />
+            <FiBell size={22} aria-hidden="true" />
             {Boolean(data?.unread) && (
               <span
                 aria-hidden="true"
