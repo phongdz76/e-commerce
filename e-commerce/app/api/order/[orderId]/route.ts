@@ -54,10 +54,11 @@ export async function GET(
     }
 
     const attempt =
-      ["VNPAY", "MOMO"].includes(order.paymentMethod) && order.paymentIntentId
+      ["VNPAY", "MOMO", "ZALOPAY"].includes(order.paymentMethod) &&
+      (order.activePaymentAttemptId || order.paymentIntentId)
         ? await prisma.paymentAttempt.findUnique({
             where: {
-              id: order.activePaymentAttemptId || order.paymentIntentId,
+              id: order.activePaymentAttemptId || order.paymentIntentId!,
             },
           })
         : null;
@@ -73,7 +74,12 @@ export async function GET(
       attempt.state === "READY" &&
       (!attempt.expiresAt || attempt.expiresAt.getTime() > Date.now())
         ? attempt.paymentUrl
-        : null;
+        : order.paymentMethod === "ZALOPAY" &&
+          ["pending", "processing"].includes(order.status) &&
+          order.paymentUrl &&
+          (!order.paymentExpiresAt || order.paymentExpiresAt.getTime() > Date.now())
+          ? order.paymentUrl
+          : null;
     return NextResponse.json({
       id: order.id,
       reference: orderReference(order.id),
