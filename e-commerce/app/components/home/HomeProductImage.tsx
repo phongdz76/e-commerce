@@ -4,8 +4,40 @@ import { useState } from "react";
 import Image from "next/image";
 import { FiImage } from "react-icons/fi";
 
-export default function HomeProductImage({ src, alt, sizes }: { src: string; alt: string; sizes: string }) {
+interface HomeProductImageProps {
+  src: string;
+  alt: string;
+  sizes: string;
+}
+
+export default function HomeProductImage({
+  src,
+  alt,
+  sizes,
+}: HomeProductImageProps) {
   const [failed, setFailed] = useState<string | null>(null);
-  return failed === src ? <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-3 text-center text-[10px] text-slate-500" role="img" aria-label={alt}><FiImage size={28} aria-hidden="true" />Image unavailable</span>
-    : <Image src={src} alt={alt} fill sizes={sizes} onError={() => setFailed(src)} />;
+
+  if (failed === src) {
+    return (
+      <span
+        className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 p-3 text-center text-[10px] text-slate-400"
+        role="img"
+        aria-label={alt}
+      >
+        <FiImage size={24} aria-hidden="true" />
+        <span>Image unavailable</span>
+      </span>
+    );
+  }
+
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      fill
+      sizes={sizes}
+      className="object-contain p-2"
+      onError={() => setFailed(src)}
+    />
+  );
 }

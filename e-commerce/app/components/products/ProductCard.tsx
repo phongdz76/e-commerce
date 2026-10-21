@@ -72,7 +72,10 @@ export default function ProductCard({ data }: ProductCardProps) {
             {reviewCount}{" "}
             {reviewCount === 1 ? "review" : "reviews"}
           </div>
-          <div className="mt-1 text-base font-bold text-slate-700 md:text-lg">
+          <div
+            suppressHydrationWarning
+            className="mt-1 text-base font-bold text-slate-700 md:text-lg"
+          >
             {formatPrice(data.price)}
           </div>
         </div>

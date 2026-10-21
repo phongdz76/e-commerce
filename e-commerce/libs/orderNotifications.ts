@@ -5,6 +5,7 @@ import { orderReference } from "@/utils/orderManagement";
 
 type EventOrder = Pick<Order, "id" | "userId" | "amount" | "currency" | "paymentMethod"> & Partial<Pick<Order, "status">>;
 const titles: Record<string, string> = {
+  PAYMENT_METHOD_CHANGED: "Payment method updated",
   ORDER_CREATED: "Order received; payment pending", ORDER_CONFIRMED: "Order confirmed", ORDER_REJECTED: "Order declined",
   ORDER_CANCELLED: "Order cancelled", ORDER_DELIVERY_UPDATED: "Delivery details updated", ORDER_NOTE_PUBLIC: "A new update on your order",
   PAYMENT_CONFIRMED: "Payment confirmed", PAYMENT_REVIEW: "Payment received; order needs review",

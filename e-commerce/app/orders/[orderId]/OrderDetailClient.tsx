@@ -19,6 +19,7 @@ import OrderTotalsBreakdown from "@/app/components/orders/OrderTotalsBreakdown";
 import OrderPolicySnapshot from "@/app/components/orders/OrderPolicySnapshot";
 import OrderActivityPanel from "@/app/components/orders/OrderActivityPanel";
 import OrderRefundPanel from "@/app/components/orders/OrderRefundPanel";
+import OrderPaymentMethodPanel from "@/app/components/orders/OrderPaymentMethodPanel";
 import type { CheckoutTotals } from "@/types/checkout";
 import { orderReference } from "@/utils/orderManagement";
 
@@ -464,7 +465,7 @@ export default function OrderDetailClient({
                 </dd>
               </div>
             </dl>
-            {["VNPAY", "MOMO"].includes(order.paymentMethod) &&
+            {["VNPAY", "MOMO", "ZALOPAY"].includes(order.paymentMethod) &&
               ["pending", "processing", "failed"].includes(order.status) &&
               currentUser?.id === order.user.id && (
                 <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
@@ -479,7 +480,7 @@ export default function OrderDetailClient({
                   {order.resumePaymentUrl && (
                     <a
                       href={order.resumePaymentUrl}
-                      className="block rounded-md bg-slate-700 px-4 py-3 text-center text-sm font-bold text-white"
+                      className="block rounded-md bg-teal-700 hover:bg-teal-800 px-4 py-3 text-center text-sm font-bold text-white transition shadow-sm"
                     >
                       Continue payment
                     </a>
@@ -508,6 +509,16 @@ export default function OrderDetailClient({
                     )}
                 </div>
               )}
+            <OrderPaymentMethodPanel
+              orderId={order.id}
+              currentMethod={order.paymentMethod}
+              status={order.status}
+              deliveryStatus={order.deliveryStatus}
+              activePaymentAttemptId={order.activePaymentAttemptId}
+              paymentIntentId={order.paymentIntentId}
+              isOwner={currentUser?.id === order.user.id}
+              onChanged={() => void refreshOrder().catch(() => toast.error("Reload this order to see its latest details."))}
+            />
           </div>
 
           {/* Delivery */}

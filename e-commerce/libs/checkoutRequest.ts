@@ -25,7 +25,7 @@ export async function prepareCheckoutRequest(requestId: unknown, userId: string,
   return withStockTransaction(async (tx) => {
     const saved = await tx.checkoutRequest.findUnique({ where: { id } });
     if (saved && (saved.fingerprint !== fingerprint || saved.paymentMethod !== paymentMethod || saved.userId !== userId)) {
-      throw new CheckoutRequestError("This checkout already has different products, delivery details or payment method. Check the existing order first.", 409, "CHECKOUT_REQUEST_CONFLICT");
+      throw new CheckoutRequestError("This checkout already has an active order. Check your order to change the payment method.", 409, "CHECKOUT_REQUEST_CONFLICT", saved.orderId || undefined);
     }
     if (saved) {
       const order = await tx.order.findUnique({ where: saved.orderId ? { id: saved.orderId } : { paymentIntentId: saved.paymentReference } });
