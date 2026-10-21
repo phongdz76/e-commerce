@@ -6,7 +6,9 @@ import { checkAuthRateLimit } from "@/libs/authRateLimit";
 import { ensureProductEngagementStorage } from "@/libs/productEngagementStorage";
 import { getStorefrontProductsByIds, storefrontWhere } from "@/libs/storefrontProductNames";
 import { ENGAGEMENT_PAGE_SIZE } from "@/utils/productEngagement";
-import type { ProductReviews, ReviewView, WishlistPage } from "@/types/productEngagement";
+import type { ProductReviews, WishlistPage } from "@/types/productEngagement";
+import { publicReviewWhere } from "@/utils/reviewModeration";
+import { publicReview, ownReview } from "@/libs/reviewVisibility";
 
 const identity = (scope: string, userId: string, productId: string) =>
   createHash("sha256").update(JSON.stringify([scope, userId, productId])).digest("hex");
@@ -16,13 +18,6 @@ async function requireProduct(productId: string) {
     where: { ...storefrontWhere, id: productId }, select: { id: true },
   });
   if (!product) throw new CheckoutRequestError("Product not found", 404, "PRODUCT_NOT_FOUND");
-}
-
-function publicReview(row: ProductReview): ReviewView {
-  return {
-    id: row.id, rating: row.rating, comment: row.comment, authorName: row.authorName,
-    createdAt: row.createdAt.toISOString(), verifiedPurchase: true,
-  };
 }
 
 function deliveredPurchase(userId: string, productId: string) {
@@ -42,7 +37,7 @@ function deliveredPurchase(userId: string, productId: string) {
 
 export async function getProductReviews(productId: string, userId: string | null, page: number): Promise<ProductReviews> {
   await requireProduct(productId);
-  const where = { productId };
+  const where = { ...publicReviewWhere, productId };
   const [items, summary, own, purchase] = await Promise.all([
     prisma.productReview.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "asc" }],
       skip: (page - 1) * ENGAGEMENT_PAGE_SIZE, take: ENGAGEMENT_PAGE_SIZE }),
@@ -53,7 +48,7 @@ export async function getProductReviews(productId: string, userId: string | null
   const total = summary._count._all;
   return {
     items: items.map(publicReview), page, total, totalPages: Math.max(1, Math.ceil(total / ENGAGEMENT_PAGE_SIZE)),
-    average: summary._avg.rating ?? 0, ownReview: own ? publicReview(own) : null,
+    average: summary._avg.rating ?? 0, ownReview: own ? ownReview(own) : null,
     canReview: Boolean(purchase) && !own,
   };
 }
@@ -71,13 +66,14 @@ export async function createProductReview(
     if (!row || row.rating !== input.rating || row.comment !== input.comment) {
       throw new CheckoutRequestError("You have already reviewed this product. Refresh to see your saved review.", 409, "REVIEW_EXISTS");
     }
-    return publicReview(row);
+    return ownReview(row);
   };
   const existing = await prisma.productReview.findUnique({ where: { id } });
   if (existing) return acknowledge(existing);
   try {
-    return publicReview(await prisma.productReview.create({ data: {
+    return ownReview(await prisma.productReview.create({ data: {
       id, userId: user.id, productId, orderId: purchase.id, ...input,
+      status: "PENDING", version: 0,
       authorName: user.name?.trim().slice(0, 100) || "Customer",
     } }));
   } catch (error) {

@@ -65,6 +65,12 @@ async function main() {
     const review = { rating: 4, comment: 'A practical phone after a recorded purchase and delivery.' };
     for (let i = 0; i < 2; i++) assert.equal((await call(reviews, cookies[2], 'POST', review)).status, 200);
     assert.equal((await call(reviews, cookies[2], 'POST', { ...review, rating: 1 })).status, 409);
+    assert.equal((await (await call(reviews)).json()).items.filter(item => item.comment === review.comment).length, 0);
+    const own = await (await call(reviews, cookies[2])).json();
+    assert.equal(own.ownReview.status, 'PENDING');
+    const moderator = await db.user.create({ data: { name: 'QA moderator', role: 'ADMIN', status: 'ACTIVE', sessionVersion: 0 } });
+    const moderatorCookie = 'next-auth.session-token=' + await encode({ secret, maxAge: 600, token: { sub: moderator.id, userId: moderator.id, sessionVersion: 0, authenticatedAt: Date.now() } });
+    assert.equal((await call('/api/admin/reviews/' + own.ownReview.id, moderatorCookie, 'POST', { action: 'APPROVE', version: 0, requestId: randomUUID() })).status, 200);
     const saved = await (await call(reviews)).json();
     assert.equal(saved.items.filter(item => item.comment === review.comment).length, 1);
     assert.doesNotMatch(JSON.stringify(saved), /userId|orderId|email|hashedPassword/);

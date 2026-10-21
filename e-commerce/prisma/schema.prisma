@@ -45,8 +45,23 @@ model ProductReview {
   comment    String
   authorName String
   createdAt  DateTime @default(now())
+  status     ReviewStatus?
+  version    Int?     @default(0)
+  moderationReason String?
+  reply      String?
+  repliedAt  DateTime?
+  highlightOrder Int?
+  product Product @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([productId, createdAt])
+  @@index([status, createdAt])
+  @@index([highlightOrder])
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  HIDDEN
 }
 
 model WishlistItem {
@@ -355,6 +370,7 @@ model Product {
   category    Category         @relation(fields: [categoryId], references: [id])
   brand       Brand            @relation(fields: [brandId], references: [id])
   variants    ProductVariant[]
+  reviews     ProductReview[]
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 

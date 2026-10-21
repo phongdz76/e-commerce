@@ -56,6 +56,8 @@ export const API_PATHS = {
     RETRY_PAYMENT: (id: string) => `/api/order/${id}/retry-payment`,
   },
   ADMIN: {
+    REVIEWS: "/api/admin/reviews",
+    REVIEW: (id: string) => `/api/admin/reviews/${id}`,
     RETURNS: "/api/admin/returns",
     RETURN: (id: string) => `/api/admin/returns/${id}`,
     RETURN_EXCHANGE_OPTIONS: (id: string) => `/api/admin/returns/${id}/exchange-options`,

@@ -1,4 +1,5 @@
 import type { CatalogProduct } from "@/utils/productFilters";
+import type { ReviewStatus } from "@/types/reviewModeration";
 
 export type ReviewView = {
   id: string;
@@ -7,7 +8,10 @@ export type ReviewView = {
   authorName: string;
   createdAt: string;
   verifiedPurchase: true;
+  reply: { comment: string; updatedAt: string } | null;
 };
+
+export type OwnReviewView = ReviewView & { status: ReviewStatus };
 
 export type ProductReviews = {
   items: ReviewView[];
@@ -15,7 +19,7 @@ export type ProductReviews = {
   total: number;
   totalPages: number;
   average: number;
-  ownReview: ReviewView | null;
+  ownReview: OwnReviewView | null;
   canReview: boolean;
 };
 
