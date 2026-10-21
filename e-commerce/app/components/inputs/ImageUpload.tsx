@@ -4,24 +4,28 @@ import { CldUploadWidget } from "next-cloudinary";
 import { useCallback } from "react";
 import { TbPhotoPlus } from "react-icons/tb";
 
-declare global {
-  var cloudinary: any;
-}
-
 interface ImageUploadProps {
   onChange: (value: string) => void;
-  value: string;
+  value?: string;
   uploadPreset: "ecommerce_avatar" | "ecommerce_product";
 }
 
-const ImageUpload: React.FC<ImageUploadProps> = ({
+interface CloudinaryResult {
+  info?: {
+    secure_url?: string;
+  };
+}
+
+export default function ImageUpload({
   onChange,
-  value,
   uploadPreset,
-}) => {
+}: ImageUploadProps) {
   const handleUpload = useCallback(
-    (result: any) => {
-      onChange(result.info.secure_url);
+    (result: unknown) => {
+      const secureUrl = (result as CloudinaryResult)?.info?.secure_url;
+      if (secureUrl) {
+        onChange(secureUrl);
+      }
     },
     [onChange]
   );
@@ -65,6 +69,4 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
       }}
     </CldUploadWidget>
   );
-};
-
-export default ImageUpload;
+}

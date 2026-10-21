@@ -60,6 +60,7 @@ export default function ServiceContact({
             height="300"
             title={`${contact.storeName} location map`}
             loading="lazy"
+            tabIndex={-1}
             referrerPolicy="no-referrer-when-downgrade"
             className="rounded-lg border-0"
             style={{ border: 0, borderRadius: "0.5rem" }}

@@ -1,6 +1,7 @@
 "use client";
 
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
+import { getPaginationPages } from "@/utils/pagination";
 
 export interface PaginationProps {
   currentPage: number;
@@ -32,27 +33,6 @@ export default function Pagination({
       ? currentPage + 1
       : Math.max(currentPage, 1);
 
-  const getPages = (): (number | string)[] => {
-    if (resolvedTotalPages <= 7) {
-      return Array.from({ length: resolvedTotalPages }, (_, index) => index + 1);
-    }
-    if (currentPage <= 4) {
-      return [1, 2, 3, 4, 5, "more", resolvedTotalPages];
-    }
-    if (currentPage >= resolvedTotalPages - 3) {
-      return [
-        1,
-        "more",
-        resolvedTotalPages - 4,
-        resolvedTotalPages - 3,
-        resolvedTotalPages - 2,
-        resolvedTotalPages - 1,
-        resolvedTotalPages,
-      ];
-    }
-    return [1, "before", currentPage - 1, currentPage, currentPage + 1, "after", resolvedTotalPages];
-  };
-
   const start =
     totalItems && (currentPage - 1) * pageSize < totalItems
       ? (currentPage - 1) * pageSize + 1
@@ -83,7 +63,7 @@ export default function Pagination({
         <span className="px-2 text-sm font-medium sm:hidden">
           {currentPage} / {resolvedTotalPages}
         </span>
-        {getPages().map((item, index) =>
+        {getPaginationPages(currentPage, resolvedTotalPages).map((item, index) =>
           typeof item === "string" ? (
             <span key={item + index} className="hidden px-1 text-slate-400 sm:inline">
               …

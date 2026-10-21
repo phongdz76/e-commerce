@@ -28,7 +28,6 @@ const Footer = async () => {
           <ServiceContact map />
         </div>
         <div
-          id="footer"
           className="flex flex-col md:flex-row justify-between pt-8 pb-8"
         >
           <FooterList>
