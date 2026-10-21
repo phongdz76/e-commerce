@@ -29,8 +29,10 @@ async function verifyHomepageCmsBrowser({ origin, cookie, artifacts, checks, rea
     await page.wait(`document.body.innerText.includes('Draft saved. Preview it before publishing.')`);
     assert.notEqual((await readPublic()).publication.content.slides[0].eyebrow, marker);
     await page.evaluate(() => [...document.querySelectorAll('button')].find(button => button.textContent === 'Preview').click());
-    await page.wait(`!!document.querySelector('iframe')?.contentDocument?.querySelector('#home-title')`);
-    assert.equal(await page.evaluate(text => document.querySelector('iframe').contentDocument.body.innerText.includes(text), marker), true, 'Protected iframe renders the saved draft');
+    // innerText applies the banner's CSS uppercase, while the saved CMS text keeps its original casing.
+    const savedEyebrow = `document.querySelector('iframe[title="Saved homepage draft preview"]')?.contentDocument?.querySelector('.home-eyebrow')?.textContent.trim()`;
+    await page.wait(`${savedEyebrow} === ${JSON.stringify(marker)}`);
+    assert.equal(await page.evaluate(savedEyebrow), marker, 'Protected iframe renders the exact saved draft');
     for (const width of [1440, 390, 320]) {
       await page.send('Emulation.setDeviceMetricsOverride', { width, height: 1000, deviceScaleFactor: 1, mobile: false });
       await delay(100);
@@ -53,6 +55,27 @@ async function verifyHomepageCmsBrowser({ origin, cookie, artifacts, checks, rea
     fs.writeFileSync(path.join(artifacts, 'homepage-cms-admin-1440.png'), Buffer.from(screenshot.data, 'base64'));
     assert.deepEqual(errors, []);
     checks.push('Chrome admin saves a private draft, previews it in a protected iframe, publishes to the actual public API and restores a historical draft; 320/390/1440px and zero runtime exceptions');
+  } catch (error) {
+    if (page) {
+      const diagnostic = await page.evaluate(() => {
+        const iframe = document.querySelector('iframe[title="Saved homepage draft preview"]');
+        const frame = iframe?.contentDocument;
+        const eyebrow = frame?.querySelector('.home-eyebrow');
+        return {
+          page: location.pathname,
+          preview: iframe?.getAttribute('src'),
+          frameReadyState: frame?.readyState,
+          savedText: eyebrow?.textContent.trim(),
+          displayedText: eyebrow?.innerText,
+          alerts: [...document.querySelectorAll('[role="alert"]')].map(element => element.textContent),
+        };
+      }).catch(() => null);
+      fs.writeFileSync(path.join(artifacts, 'homepage-cms-failure-results.json'), JSON.stringify({ error: error.message, diagnostic, runtimeExceptions: errors }, null, 2));
+      const screenshot = await page.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true }).catch(() => null);
+      if (screenshot) fs.writeFileSync(path.join(artifacts, 'homepage-cms-failure.png'), Buffer.from(screenshot.data, 'base64'));
+      console.error('Homepage CMS browser diagnostic:', JSON.stringify(diagnostic));
+    }
+    throw error;
   } finally {
     if (page) { await page.send('Page.close').catch(() => {}); page.close(); }
     if (browser.pid && browser.exitCode === null) {
