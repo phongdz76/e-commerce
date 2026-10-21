@@ -169,6 +169,12 @@ export async function POST(request: Request) {
     }
     const paymentUrl = safeZaloPayPaymentUrl(result.order_url);
     if (result.return_code !== 1 || !paymentUrl) {
+      // Log numeric diagnostics only; provider payloads can contain payment tokens.
+      console.error("[ZaloPay create rejected]", {
+        returnCode: Number.isSafeInteger(result.return_code) ? result.return_code : null,
+        subReturnCode: Number.isSafeInteger(result.sub_return_code) ? result.sub_return_code : null,
+        invalidPaymentUrl: result.return_code === 1 && !paymentUrl,
+      });
       if (result.return_code === 2) {
         await prisma.order.updateMany({
           where: { id: order.id, status: "pending" },
@@ -179,7 +185,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "Unable to create ZaloPay payment. Please check the merchant configuration.",
+            "ZaloPay is temporarily unavailable. Please choose another payment method.",
           code:
             result.return_code === 2
               ? "ZALOPAY_CREATE_FAILED"
